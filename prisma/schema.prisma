@@ -1,0 +1,200 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth.js v5 模型
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  coins         Int       @default(0) // 金币余额
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  purchases     Purchase[]
+  episodeUnlocks EpisodeUnlock[]
+  watchEvents   WatchEvent[]
+  userCards     UserCard[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// 支付记录
+model Purchase {
+  id              String   @id @default(cuid())
+  userId          String
+  stripeSessionId String   @unique
+  amount          Int      // 金额（分）
+  coins           Int      // 购买的金币数量
+  status          String   @default("pending") // pending, completed, failed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("purchases")
+}
+
+// 剧集系列
+model Series {
+  id          String    @id @default(cuid())
+  title       String
+  description String?   @db.Text
+  coverUrl    String?
+  status      String    @default("active") // active, archived
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  episodes Episode[]
+  cards    Card[]
+
+  @@map("series")
+}
+
+// 单集
+model Episode {
+  id           String   @id @default(cuid())
+  seriesId     String
+  episodeNum   Int      // 第几集
+  title        String
+  description  String?  @db.Text
+  thumbnailUrl String?
+  muxAssetId   String?  @unique // Mux 视频资产 ID
+  muxPlaybackId String? @unique // Mux 播放 ID
+  duration     Int?     // 时长（秒）
+  unlockCost   Int      @default(10) // 解锁所需金币
+  status       String   @default("active") // active, archived
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  series         Series          @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  episodeUnlocks EpisodeUnlock[]
+  watchEvents    WatchEvent[]
+
+  @@unique([seriesId, episodeNum])
+  @@index([seriesId])
+  @@map("episodes")
+}
+
+// 用户解锁记录
+model EpisodeUnlock {
+  id        String   @id @default(cuid())
+  userId    String
+  episodeId String
+  coinsCost Int      // 花费的金币
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, episodeId])
+  @@index([userId])
+  @@index([episodeId])
+  @@map("episode_unlocks")
+}
+
+// 观看事件（留存分析）
+model WatchEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  episodeId     String
+  watchPosition Int      // 观看位置（秒）
+  watchDuration Int      // 本次观看时长（秒）
+  completedRate Float    @default(0) // 完成率 (0-1)
+  source        String?  // 来源：web, ios, android
+  createdAt     DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@index([userId, episodeId])
+  @@index([createdAt])
+  @@map("watch_events")
+}
+
+// 卡牌
+model Card {
+  id          String   @id @default(cuid())
+  seriesId    String
+  name        String
+  rarity      String   @default("common") // common, rare, epic, legendary
+  imageUrl    String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  series    Series     @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  userCards UserCard[]
+
+  @@index([seriesId])
+  @@map("cards")
+}
+
+// 用户卡牌
+model UserCard {
+  id        String   @id @default(cuid())
+  userId    String
+  cardId    String
+  quantity  Int      @default(1) // 拥有数量
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+  @@index([userId])
+  @@map("user_cards")
+}
