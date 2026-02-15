@@ -46,17 +46,19 @@ export default async function HomePage() {
       </div>
 
       {/* Banner 占位 */}
-      <div className="relative aspect-[16/9] bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center text-white">
-          <div className="text-center">
-            <h2 className="text-xl font-bold mb-2">新用户福利</h2>
-            <p className="text-sm mb-4">注册送 100 金币</p>
-            <Button variant="secondary" size="sm">
-              立即充值
-            </Button>
+      <Link href="/recharge">
+        <div className="relative aspect-[16/9] bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
+          <div className="absolute inset-0 flex items-center justify-center text-white">
+            <div className="text-center">
+              <h2 className="text-xl font-bold mb-2">金币充值</h2>
+              <p className="text-sm mb-4">解锁更多精彩剧集</p>
+              <Button variant="secondary" size="sm">
+                立即充值
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </Link>
 
       {/* 热门推荐 */}
       <div>

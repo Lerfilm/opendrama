@@ -1,5 +1,6 @@
 import { auth, signOut } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Coins, CreditCard, History, Star, Settings } from "lucide-react"
@@ -13,7 +14,7 @@ export default async function ProfilePage() {
 
   const menuItems = [
     { icon: CreditCard, label: "充值金币", href: "/recharge" },
-    { icon: History, label: "观看历史", href: "/history" },
+    { icon: History, label: "充值记录", href: "/purchases" },
     { icon: Star, label: "我的收藏", href: "/favorites" },
     { icon: Settings, label: "设置", href: "/settings" },
   ]
@@ -54,9 +55,10 @@ export default async function ProfilePage() {
       <Card>
         <CardContent className="p-0">
           {menuItems.map(({ icon: Icon, label, href }, index) => (
-            <button
+            <Link
               key={href}
-              className={`w-full flex items-center justify-between p-4 hover:bg-accent transition-colors ${
+              href={href}
+              className={`flex items-center justify-between p-4 hover:bg-accent transition-colors ${
                 index < menuItems.length - 1 ? "border-b" : ""
               }`}
             >
@@ -77,7 +79,7 @@ export default async function ProfilePage() {
                   d="M9 5l7 7-7 7"
                 />
               </svg>
-            </button>
+            </Link>
           ))}
         </CardContent>
       </Card>

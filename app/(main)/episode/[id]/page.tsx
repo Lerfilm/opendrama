@@ -119,10 +119,12 @@ export default async function EpisodePage({
               />
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-amber-500">金币不足，请先充值</p>
+                <p className="text-sm text-amber-500 text-center">
+                  金币不足，请先充值
+                </p>
                 <Link href="/recharge">
                   <Button className="w-full" size="lg">
-                    去充值
+                    立即充值
                   </Button>
                 </Link>
               </div>
