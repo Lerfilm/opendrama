@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import prisma from "@/lib/prisma"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,37 +14,22 @@ export default async function HomePage() {
     redirect("/auth/signin")
   }
 
-  // 模拟数据，Day 2 会从数据库读取
-  const mockSeries = [
-    {
-      id: "1",
-      title: "霸道总裁的替身新娘",
-      coverUrl: "https://picsum.photos/seed/drama1/400/600",
-      episodes: 80,
-      category: "都市",
+  // 从数据库读取剧集
+  const seriesList = await prisma.series.findMany({
+    where: { status: "active" },
+    include: {
+      episodes: {
+        select: { id: true },
+      },
     },
-    {
-      id: "2",
-      title: "重生之豪门千金归来",
-      coverUrl: "https://picsum.photos/seed/drama2/400/600",
-      episodes: 100,
-      category: "重生",
-    },
-    {
-      id: "3",
-      title: "隐婚老公是大佬",
-      coverUrl: "https://picsum.photos/seed/drama3/400/600",
-      episodes: 60,
-      category: "甜宠",
-    },
-    {
-      id: "4",
-      title: "穿越之王妃要出墙",
-      coverUrl: "https://picsum.photos/seed/drama4/400/600",
-      episodes: 90,
-      category: "古装",
-    },
-  ]
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  })
+
+  const seriesWithCount = seriesList.map((s) => ({
+    ...s,
+    episodeCount: s.episodes.length,
+  }))
 
   return (
     <div className="space-y-6 p-4">
@@ -75,42 +61,54 @@ export default async function HomePage() {
       {/* 热门推荐 */}
       <div>
         <h2 className="text-lg font-semibold mb-3">热门推荐</h2>
-        <div className="grid grid-cols-2 gap-4">
-          {mockSeries.map((series) => (
-            <Link key={series.id} href={`/series/${series.id}`}>
-              <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-                <CardHeader className="p-0">
-                  <div className="relative aspect-[2/3]">
-                    <img
-                      src={series.coverUrl}
-                      alt={series.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-2 right-2">
-                      <Badge variant="secondary" className="text-xs">
-                        {series.category}
-                      </Badge>
+        {seriesWithCount.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>暂无剧集，敬请期待</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            {seriesWithCount.map((series) => (
+              <Link key={series.id} href={`/series/${series.id}`}>
+                <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <CardHeader className="p-0">
+                    <div className="relative aspect-[2/3] bg-muted">
+                      {series.coverUrl ? (
+                        <img
+                          src={series.coverUrl}
+                          alt={series.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                          暂无封面
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {series.status === "active" ? "连载中" : "已完结"}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-3">
-                  <h3 className="font-medium text-sm line-clamp-2 mb-1">
-                    {series.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {series.episodes} 集
-                  </p>
-                </CardContent>
-                <CardFooter className="p-3 pt-0">
-                  <Button size="sm" className="w-full" variant="outline">
-                    <Play className="w-4 h-4 mr-1" />
-                    开始观看
-                  </Button>
-                </CardFooter>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                  </CardHeader>
+                  <CardContent className="p-3">
+                    <h3 className="font-medium text-sm line-clamp-2 mb-1">
+                      {series.title}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      {series.episodeCount} 集
+                    </p>
+                  </CardContent>
+                  <CardFooter className="p-3 pt-0">
+                    <Button size="sm" className="w-full" variant="outline">
+                      <Play className="w-4 h-4 mr-1" />
+                      开始观看
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
