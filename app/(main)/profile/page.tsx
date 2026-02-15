@@ -15,7 +15,7 @@ export default async function ProfilePage() {
   const menuItems = [
     { icon: CreditCard, label: "充值金币", href: "/recharge" },
     { icon: History, label: "充值记录", href: "/purchases" },
-    { icon: Star, label: "我的收藏", href: "/favorites" },
+    { icon: Star, label: "卡牌收藏", href: "/cards" },
     { icon: Settings, label: "设置", href: "/settings" },
   ]
 
