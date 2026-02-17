@@ -7,7 +7,7 @@ const prismaClientSingleton = () => {
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set")
   }
-  const pool = new Pool({ connectionString })
+  const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } })
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter })
 }
