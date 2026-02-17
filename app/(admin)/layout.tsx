@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { isAdmin } from "@/lib/admin"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Home, Film, Sparkles, Upload } from "lucide-react"
+import { Home, Film, Sparkles, Upload, BarChart3 } from "lucide-react"
 
 export default async function AdminLayout({
   children,
@@ -21,6 +21,7 @@ export default async function AdminLayout({
     { href: "/admin/series", icon: Film, label: "剧集管理" },
     { href: "/admin/cards", icon: Sparkles, label: "卡牌管理" },
     { href: "/admin/upload", icon: Upload, label: "视频上传" },
+    { href: "/admin/analytics", icon: BarChart3, label: "数据分析" },
   ]
 
   return (
