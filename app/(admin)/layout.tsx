@@ -31,7 +31,7 @@ export default async function AdminLayout({
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/admin">
-              <h1 className="text-xl font-bold">DramaBox CMS</h1>
+              <h1 className="text-xl font-bold">OpenDrama CMS</h1>
             </Link>
             <nav className="hidden md:flex items-center gap-2">
               {navItems.map(({ href, icon: Icon, label }) => (

@@ -1,6 +1,6 @@
 {
-  "name": "DramaBox",
-  "short_name": "DramaBox",
+  "name": "OpenDrama",
+  "short_name": "OpenDrama",
   "description": "精彩短剧随时看",
   "start_url": "/",
   "display": "standalone",

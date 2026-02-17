@@ -42,7 +42,7 @@ export default async function HomePage() {
       {/* 头部 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">DramaBox</h1>
+          <h1 className="text-2xl font-bold">OpenDrama</h1>
           <p className="text-sm text-muted-foreground">你好，{session.user?.name}</p>
         </div>
         <div className="flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2">

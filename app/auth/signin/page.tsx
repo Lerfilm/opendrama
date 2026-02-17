@@ -7,7 +7,7 @@ export default function SignInPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold">欢迎来到 DramaBox</CardTitle>
+          <CardTitle className="text-3xl font-bold">欢迎来到 OpenDrama</CardTitle>
           <CardDescription className="text-base mt-2">
             精彩短剧，随时随地观看
           </CardDescription>

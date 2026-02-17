@@ -3,7 +3,7 @@ import { MetadataRoute } from "next"
 import prisma from "@/lib/prisma"
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXTAUTH_URL || "https://dramabox.ai"
+  const baseUrl = process.env.NEXTAUTH_URL || "https://opendrama.ai"
 
   const seriesList = await prisma.series.findMany({
     where: { status: "active" },

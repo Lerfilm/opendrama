@@ -48,7 +48,7 @@ export default async function AdminDashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">控制台</h1>
-        <p className="text-muted-foreground">DramaBox 后台管理系统</p>
+        <p className="text-muted-foreground">OpenDrama 后台管理系统</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

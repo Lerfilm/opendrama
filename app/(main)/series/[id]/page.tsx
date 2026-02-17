@@ -24,16 +24,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: series.title,
-    description: series.description || `在 DramaBox 观看 ${series.title}`,
+    description: series.description || `在 OpenDrama 观看 ${series.title}`,
     openGraph: {
       title: series.title,
-      description: series.description || `在 DramaBox 观看 ${series.title}`,
+      description: series.description || `在 OpenDrama 观看 ${series.title}`,
       images: series.coverUrl ? [{ url: series.coverUrl }] : [],
     },
     twitter: {
       card: "summary_large_image",
       title: series.title,
-      description: series.description || `在 DramaBox 观看 ${series.title}`,
+      description: series.description || `在 OpenDrama 观看 ${series.title}`,
       images: series.coverUrl ? [series.coverUrl] : [],
     },
   }

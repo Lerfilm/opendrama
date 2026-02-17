@@ -3,22 +3,22 @@ import "./globals.css"
 
 export const metadata: Metadata = {
   title: {
-    default: "DramaBox - 精彩短剧随时看",
-    template: "%s | DramaBox",
+    default: "OpenDrama - 精彩短剧随时看",
+    template: "%s | OpenDrama",
   },
-  description: "DramaBox 是专注短剧内容的视频平台，海量精彩短剧随时随地观看。",
-  keywords: ["短剧", "DramaBox", "视频", "在线观看", "热门短剧"],
+  description: "OpenDrama 是专注短剧内容的视频平台，海量精彩短剧随时随地观看。",
+  keywords: ["短剧", "OpenDrama", "视频", "在线观看", "热门短剧"],
   openGraph: {
     type: "website",
     locale: "zh_CN",
-    siteName: "DramaBox",
-    title: "DramaBox - 精彩短剧随时看",
-    description: "DramaBox 是专注短剧内容的视频平台，海量精彩短剧随时随地观看。",
+    siteName: "OpenDrama",
+    title: "OpenDrama - 精彩短剧随时看",
+    description: "OpenDrama 是专注短剧内容的视频平台，海量精彩短剧随时随地观看。",
   },
   twitter: {
     card: "summary_large_image",
-    title: "DramaBox - 精彩短剧随时看",
-    description: "DramaBox 是专注短剧内容的视频平台，海量精彩短剧随时随地观看。",
+    title: "OpenDrama - 精彩短剧随时看",
+    description: "OpenDrama 是专注短剧内容的视频平台，海量精彩短剧随时随地观看。",
   },
   manifest: "/manifest.json",
 }
