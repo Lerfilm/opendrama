@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Film, Users, Coins, Sparkles } from "lucide-react"
