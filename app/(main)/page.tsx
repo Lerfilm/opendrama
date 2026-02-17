@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Play, Coins } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 
 export default async function HomePage() {
   const session = await auth()
@@ -17,7 +18,11 @@ export default async function HomePage() {
   // 从数据库读取剧集
   const seriesList = await prisma.series.findMany({
     where: { status: "active" },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      coverUrl: true,
+      status: true,
       episodes: {
         select: { id: true },
       },
@@ -75,10 +80,12 @@ export default async function HomePage() {
                   <CardHeader className="p-0">
                     <div className="relative aspect-[2/3] bg-muted">
                       {series.coverUrl ? (
-                        <img
+                        <Image
                           src={series.coverUrl}
                           alt={series.title}
-                          className="w-full h-full object-cover"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 50vw, 33vw"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground">

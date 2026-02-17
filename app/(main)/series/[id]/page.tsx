@@ -1,17 +1,44 @@
 import { auth } from "@/lib/auth"
-import { redirect } from "next/navigation"
+import { redirect, notFound } from "next/navigation"
 import prisma from "@/lib/prisma"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, Lock, Coins } from "lucide-react"
+import { Play, Coins } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
+import type { Metadata } from "next"
 
-export default async function SeriesDetailPage({
-  params,
-}: {
+type Props = {
   params: { id: string }
-}) {
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const series = await prisma.series.findUnique({
+    where: { id: params.id },
+    select: { title: true, description: true, coverUrl: true },
+  })
+
+  if (!series) return { title: "剧集不存在" }
+
+  return {
+    title: series.title,
+    description: series.description || `在 DramaBox 观看 ${series.title}`,
+    openGraph: {
+      title: series.title,
+      description: series.description || `在 DramaBox 观看 ${series.title}`,
+      images: series.coverUrl ? [{ url: series.coverUrl }] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: series.title,
+      description: series.description || `在 DramaBox 观看 ${series.title}`,
+      images: series.coverUrl ? [series.coverUrl] : [],
+    },
+  }
+}
+
+export default async function SeriesDetailPage({ params }: Props) {
   const session = await auth()
 
   if (!session) {
@@ -23,16 +50,19 @@ export default async function SeriesDetailPage({
     include: {
       episodes: {
         orderBy: { episodeNum: "asc" },
+        select: {
+          id: true,
+          title: true,
+          episodeNum: true,
+          duration: true,
+          unlockCost: true,
+        },
       },
     },
   })
 
   if (!series) {
-    return (
-      <div className="p-4">
-        <h1 className="text-xl font-bold">剧集不存在</h1>
-      </div>
-    )
+    notFound()
   }
 
   // 获取用户已解锁的剧集 ID 列表
@@ -48,10 +78,12 @@ export default async function SeriesDetailPage({
       {/* 封面头部 */}
       <div className="relative h-64 bg-gradient-to-b from-black/60 to-background">
         {series.coverUrl && (
-          <img
+          <Image
             src={series.coverUrl}
             alt={series.title}
-            className="absolute inset-0 w-full h-full object-cover -z-10"
+            fill
+            className="object-cover -z-10"
+            priority
           />
         )}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background to-transparent">

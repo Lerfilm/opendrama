@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth"
-import { redirect } from "next/navigation"
+import { redirect, notFound } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { VideoPlayer } from "@/components/video-player"
 import { UnlockButton } from "@/components/unlock-button"
@@ -7,12 +7,41 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Lock } from "lucide-react"
 import Link from "next/link"
+import type { Metadata } from "next"
 
-export default async function EpisodePage({
-  params,
-}: {
+type Props = {
   params: { id: string }
-}) {
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const episode = await prisma.episode.findUnique({
+    where: { id: params.id },
+    select: { title: true, description: true, episodeNum: true, series: { select: { title: true, coverUrl: true } } },
+  })
+
+  if (!episode) return { title: "剧集不存在" }
+
+  const title = `${episode.series.title} 第${episode.episodeNum}集 - ${episode.title}`
+  const description = episode.description || `观看 ${episode.series.title} 第${episode.episodeNum}集`
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: episode.series.coverUrl ? [{ url: episode.series.coverUrl }] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: episode.series.coverUrl ? [episode.series.coverUrl] : [],
+    },
+  }
+}
+
+export default async function EpisodePage({ params }: Props) {
   const session = await auth()
 
   if (!session) {
@@ -22,16 +51,14 @@ export default async function EpisodePage({
   const episode = await prisma.episode.findUnique({
     where: { id: params.id },
     include: {
-      series: true,
+      series: {
+        select: { id: true, title: true },
+      },
     },
   })
 
   if (!episode) {
-    return (
-      <div className="p-4">
-        <h1 className="text-xl font-bold">剧集不存在</h1>
-      </div>
-    )
+    notFound()
   }
 
   // 检查是否已解锁
