@@ -10,7 +10,7 @@ import { Coins, Sparkles, Zap, Crown } from "lucide-react"
 export default async function RechargePage() {
   const session = await auth()
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/auth/signin")
   }
 

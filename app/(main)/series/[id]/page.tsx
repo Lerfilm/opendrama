@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function SeriesDetailPage({ params }: Props) {
   const session = await auth()
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/auth/signin")
   }
 

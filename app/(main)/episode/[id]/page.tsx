@@ -44,9 +44,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function EpisodePage({ params }: Props) {
   const session = await auth()
 
-  if (!session) {
+  if (!session?.user?.id) {
     redirect("/auth/signin")
   }
+
+  const userId = session.user.id
 
   const episode = await prisma.episode.findUnique({
     where: { id: params.id },
@@ -65,7 +67,7 @@ export default async function EpisodePage({ params }: Props) {
   const unlock = await prisma.episodeUnlock.findUnique({
     where: {
       userId_episodeId: {
-        userId: session.user.id,
+        userId: userId,
         episodeId: episode.id,
       },
     },
@@ -76,7 +78,7 @@ export default async function EpisodePage({ params }: Props) {
 
   // 获取用户当前金币
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: { coins: true },
   })
 
@@ -102,7 +104,7 @@ export default async function EpisodePage({ params }: Props) {
         <VideoPlayer
           playbackId={episode.muxPlaybackId}
           episodeId={episode.id}
-          userId={session.user.id}
+          userId={userId}
           title={episode.title}
         />
       ) : (

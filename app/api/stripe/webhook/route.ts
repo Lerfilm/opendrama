@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       })
 
       if (existing) {
-        console.log("Purchase already processed:", session.id)
+        // Already processed, skip
         return NextResponse.json({ received: true })
       }
 
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         }),
       ])
 
-      console.log(`✅ User ${userId} purchased ${coins} coins`)
+      // Payment processed successfully
     } catch (error) {
       console.error("Failed to process payment:", error)
       return NextResponse.json(

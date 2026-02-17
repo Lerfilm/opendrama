@@ -8,7 +8,7 @@ import { Coins, Calendar } from "lucide-react"
 export default async function PurchasesPage() {
   const session = await auth()
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/auth/signin")
   }
 

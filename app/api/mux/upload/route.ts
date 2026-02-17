@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { requireAdmin } from "@/lib/admin"
 import { video } from "@/lib/mux"
 
 export async function POST(req: NextRequest) {
@@ -9,9 +10,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  // TODO: 添加管理员权限检查
-
   try {
+    requireAdmin(session.user.email)
     const upload = await video.uploads.create({
       cors_origin: "*",
       new_asset_settings: {

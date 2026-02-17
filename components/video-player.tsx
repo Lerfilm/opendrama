@@ -25,7 +25,8 @@ export function VideoPlayer({
   userId,
   title,
 }: VideoPlayerProps) {
-  const playerRef = useRef<HTMLVideoElement>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const playerRef = useRef<any>(null)
   const [lastPosition, setLastPosition] = useState(0)
   const [droppedCard, setDroppedCard] = useState<DroppedCard | null>(null)
   const [showCardModal, setShowCardModal] = useState(false)
