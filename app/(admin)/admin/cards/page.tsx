@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CARD_RARITIES, CardRarity } from "@/lib/cards"
-import { Plus, Edit, Trash2 } from "lucide-react"
+import { Plus, Edit, Trash2 } from "@/components/icons"
 import Link from "next/link"
 
 export default async function AdminCardsPage() {

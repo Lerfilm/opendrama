@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Coins } from "lucide-react"
+import { CheckCircle, Coins } from "@/components/icons"
 import Link from "next/link"
 
 export default async function RechargeSuccessPage({

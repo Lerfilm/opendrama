@@ -6,7 +6,7 @@ import { VideoPlayer } from "@/components/video-player"
 import { UnlockButton } from "@/components/unlock-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Lock } from "lucide-react"
+import { ArrowLeft, Lock } from "@/components/icons"
 import Link from "next/link"
 import type { Metadata } from "next"
 

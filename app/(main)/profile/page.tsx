@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Coins, CreditCard, History, Star, Settings } from "lucide-react"
+import { Coins, CreditCard, History, Star, Settings } from "@/components/icons"
 
 export default async function ProfilePage() {
   const session = await auth()

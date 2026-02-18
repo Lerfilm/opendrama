@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RechargeButton } from "@/components/recharge-button"
 import { COIN_PACKAGES } from "@/lib/stripe"
-import { Coins, Sparkles, Zap, Crown } from "lucide-react"
+import { Coins, Sparkles, Zap, Crown } from "@/components/icons"
 
 export default async function RechargePage() {
   const session = await auth()

@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Play, Coins } from "lucide-react"
+import { Play, Coins } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
 

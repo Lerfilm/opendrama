@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { isAdmin } from "@/lib/admin"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Home, Film, Sparkles, Upload, BarChart3 } from "lucide-react"
+import { Home, Film, Sparkles, Upload, BarChart3 } from "@/components/icons"
 
 export default async function AdminLayout({
   children,

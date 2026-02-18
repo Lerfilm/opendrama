@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CARD_RARITIES, CardRarity } from "@/lib/cards"
-import { Sparkles } from "lucide-react"
+import { Sparkles } from "@/components/icons"
 
 interface CardDropModalProps {
   card: {

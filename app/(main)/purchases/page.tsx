@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Coins, Calendar } from "lucide-react"
+import { Coins, Calendar } from "@/components/icons"
 
 export default async function PurchasesPage() {
   const session = await auth()

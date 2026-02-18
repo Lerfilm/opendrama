@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Loader2, Unlock } from "lucide-react"
+import { Loader2, Unlock } from "@/components/icons"
 
 interface UnlockButtonProps {
   episodeId: string

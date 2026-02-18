@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Edit, Trash2 } from "lucide-react"
+import { Plus, Edit, Trash2 } from "@/components/icons"
 import Link from "next/link"
 
 export default async function AdminSeriesPage() {

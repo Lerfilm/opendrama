@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CARD_RARITIES, CardRarity } from "@/lib/cards"
-import { Sparkles } from "lucide-react"
+import { Sparkles } from "@/components/icons"
 
 export default async function CardsPage() {
   const session = await auth()
