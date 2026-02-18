@@ -106,7 +106,7 @@ export default async function CardsPage() {
                 return (
                   <div key={rarity}>
                     <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                      {info.emoji} {info.name} ({cards.length})
+                      <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: info.dotColor }} /> {info.name} ({cards.length})
                     </h3>
                     <div className="grid grid-cols-3 gap-3">
                       {cards.map((uc) => (
@@ -174,7 +174,7 @@ export default async function CardsPage() {
                             <Badge
                               className={`absolute top-1 right-1 text-xs ${rarityInfo.color}`}
                             >
-                              {rarityInfo.emoji}
+                              <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: rarityInfo.dotColor }} />
                             </Badge>
                           )}
                           {!isOwned && (

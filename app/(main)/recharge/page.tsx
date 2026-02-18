@@ -63,7 +63,7 @@ export default async function RechargePage() {
                   {pkg.popular && (
                     <div className="absolute top-0 right-0">
                       <Badge className="rounded-none rounded-bl-lg">
-                        🔥 最受欢迎
+                        最受欢迎
                       </Badge>
                     </div>
                   )}

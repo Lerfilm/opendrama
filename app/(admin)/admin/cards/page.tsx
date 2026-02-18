@@ -59,7 +59,7 @@ export default async function AdminCardsPage() {
                       <Badge
                         className={`absolute top-2 right-2 text-xs ${rarityInfo.color}`}
                       >
-                        {rarityInfo.emoji} {rarityInfo.name}
+                        <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: rarityInfo.dotColor }} /> {rarityInfo.name}
                       </Badge>
                     )}
                   </div>

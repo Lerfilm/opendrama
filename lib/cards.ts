@@ -5,35 +5,35 @@ export const CARD_RARITIES = {
     color: "bg-gray-100 text-gray-700",
     borderColor: "border-gray-300",
     dropRate: 0.5, // 50%
-    emoji: "⚪",
+    dotColor: "#9CA3AF",
   },
   rare: {
     name: "稀有",
     color: "bg-blue-100 text-blue-700",
     borderColor: "border-blue-400",
     dropRate: 0.3, // 30%
-    emoji: "🔵",
+    dotColor: "#3B82F6",
   },
   epic: {
     name: "史诗",
     color: "bg-purple-100 text-purple-700",
     borderColor: "border-purple-400",
     dropRate: 0.15, // 15%
-    emoji: "🟣",
+    dotColor: "#8B5CF6",
   },
   legendary: {
     name: "传说",
     color: "bg-orange-100 text-orange-700",
     borderColor: "border-orange-400",
     dropRate: 0.04, // 4%
-    emoji: "🟠",
+    dotColor: "#F59E0B",
   },
   limited: {
     name: "限定",
     color: "bg-pink-100 text-pink-700",
     borderColor: "border-pink-400",
     dropRate: 0.01, // 1%
-    emoji: "💖",
+    dotColor: "#EC4899",
   },
 } as const
 
