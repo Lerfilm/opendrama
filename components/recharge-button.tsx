@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "@/components/icons"
+import { t } from "@/lib/i18n"
 
 interface RechargeButtonProps {
   packageId: string
@@ -23,14 +24,13 @@ export function RechargeButton({ packageId }: RechargeButtonProps) {
 
       if (res.ok) {
         const data = await res.json()
-        // 跳转到 Stripe Checkout
         window.location.href = data.url
       } else {
-        alert("充值失败，请重试")
+        alert(t("recharge.failed"))
         setLoading(false)
       }
     } catch (error) {
-      alert("充值失败，请重试")
+      alert(t("recharge.failed"))
       setLoading(false)
     }
   }
@@ -40,10 +40,10 @@ export function RechargeButton({ packageId }: RechargeButtonProps) {
       {loading ? (
         <>
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          处理中...
+          {t("common.processing")}
         </>
       ) : (
-        "立即充值"
+        t("recharge.now")
       )}
     </Button>
   )

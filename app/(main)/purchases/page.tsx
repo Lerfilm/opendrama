@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Coins, Calendar } from "@/components/icons"
+import { t } from "@/lib/i18n"
 
 export default async function PurchasesPage() {
   const session = await auth()
@@ -31,10 +32,9 @@ export default async function PurchasesPage() {
   return (
     <div className="p-4 pb-20">
       <div className="max-w-screen-sm mx-auto space-y-6">
-        {/* 当前余额 */}
         <Card className="bg-gradient-to-r from-purple-500 to-blue-500 text-white border-0">
           <CardContent className="p-6">
-            <p className="text-sm opacity-90 mb-2">当前余额</p>
+            <p className="text-sm opacity-90 mb-2">{t("purchases.currentBalance")}</p>
             <div className="flex items-center gap-2">
               <Coins className="w-8 h-8" />
               <span className="text-4xl font-bold">{user?.coins || 0}</span>
@@ -42,14 +42,13 @@ export default async function PurchasesPage() {
           </CardContent>
         </Card>
 
-        {/* 购买记录 */}
         <div>
-          <h2 className="text-xl font-bold mb-4">充值记录</h2>
+          <h2 className="text-xl font-bold mb-4">{t("purchases.title")}</h2>
           {purchases.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center text-muted-foreground">
                 <Coins className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>暂无充值记录</p>
+                <p>{t("purchases.noPurchases")}</p>
               </CardContent>
             </Card>
           ) : (
@@ -73,7 +72,7 @@ export default async function PurchasesPage() {
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-semibold">
-                              充值 {purchase.coins} 金币
+                              {t("purchases.rechargeCoins", { coins: purchase.coins })}
                             </h3>
                             <Badge
                               variant={
@@ -85,10 +84,10 @@ export default async function PurchasesPage() {
                               }
                             >
                               {purchase.status === "completed"
-                                ? "成功"
+                                ? t("purchases.success")
                                 : purchase.status === "pending"
-                                ? "处理中"
-                                : "失败"}
+                                ? t("purchases.pending")
+                                : t("purchases.failed")}
                             </Badge>
                           </div>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">

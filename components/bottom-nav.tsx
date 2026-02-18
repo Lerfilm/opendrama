@@ -3,14 +3,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, Compass, User } from "@/components/icons"
+import { t } from "@/lib/i18n"
 
 export function BottomNav() {
   const pathname = usePathname()
 
   const navItems = [
-    { href: "/", icon: Home, label: "首页" },
-    { href: "/discover", icon: Compass, label: "发现" },
-    { href: "/profile", icon: User, label: "我的" },
+    { href: "/", icon: Home, label: t("nav.home") },
+    { href: "/discover", icon: Compass, label: t("nav.discover") },
+    { href: "/profile", icon: User, label: t("nav.profile") },
   ]
 
   return (

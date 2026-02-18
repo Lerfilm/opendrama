@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CheckCircle, Coins } from "@/components/icons"
 import Link from "next/link"
+import { t } from "@/lib/i18n"
 
 export default async function RechargeSuccessPage({
   searchParams,
@@ -42,9 +43,9 @@ export default async function RechargeSuccessPage({
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-12 h-12 text-green-600" />
             </div>
-            <h1 className="text-2xl font-bold mb-2">充值成功！</h1>
+            <h1 className="text-2xl font-bold mb-2">{t("recharge.successTitle")}</h1>
             <p className="text-muted-foreground">
-              您的金币已到账，快去解锁精彩剧集吧
+              {t("recharge.successDesc")}
             </p>
           </div>
 
@@ -57,14 +58,14 @@ export default async function RechargeSuccessPage({
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">
-                支付金额：¥{(purchase.amount / 100).toFixed(2)}
+                {t("recharge.payAmount", { amount: (purchase.amount / 100).toFixed(2) })}
               </p>
             </div>
           )}
 
           {user && (
             <div className="bg-muted rounded-lg p-4 mb-6">
-              <p className="text-sm text-muted-foreground mb-1">当前余额</p>
+              <p className="text-sm text-muted-foreground mb-1">{t("purchases.currentBalance")}</p>
               <div className="flex items-center justify-center gap-2">
                 <Coins className="w-6 h-6 text-primary" />
                 <span className="text-2xl font-bold">{user.coins}</span>
@@ -75,12 +76,12 @@ export default async function RechargeSuccessPage({
           <div className="space-y-3">
             <Link href="/">
               <Button className="w-full" size="lg">
-                开始观看
+                {t("recharge.startWatch")}
               </Button>
             </Link>
             <Link href="/purchases">
               <Button variant="outline" className="w-full" size="lg">
-                查看充值记录
+                {t("recharge.viewHistory")}
               </Button>
             </Link>
           </div>

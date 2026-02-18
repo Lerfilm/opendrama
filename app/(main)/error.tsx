@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { t } from "@/lib/i18n"
 
 export default function MainError({
   error,
@@ -14,12 +15,12 @@ export default function MainError({
       <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
         <span className="text-3xl">😵</span>
       </div>
-      <h1 className="text-xl font-bold mb-2">加载失败</h1>
+      <h1 className="text-xl font-bold mb-2">{t("error.loadFailed")}</h1>
       <p className="text-muted-foreground mb-6 max-w-md text-sm">
-        内容加载时遇到了问题，请稍后再试。
+        {t("error.loadFailedDesc")}
       </p>
       <Button onClick={() => reset()} size="sm">
-        重试
+        {t("common.retry")}
       </Button>
     </div>
   )

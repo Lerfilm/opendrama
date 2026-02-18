@@ -9,6 +9,7 @@ import { Play, Coins } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
 import type { Metadata } from "next"
+import { t } from "@/lib/i18n"
 
 type Props = {
   params: { id: string }
@@ -20,20 +21,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     select: { title: true, description: true, coverUrl: true },
   })
 
-  if (!series) return { title: "剧集不存在" }
+  if (!series) return { title: t("series.notFound") }
 
   return {
     title: series.title,
-    description: series.description || `在 OpenDrama 观看 ${series.title}`,
+    description: series.description || t("series.watchAt", { title: series.title }),
     openGraph: {
       title: series.title,
-      description: series.description || `在 OpenDrama 观看 ${series.title}`,
+      description: series.description || t("series.watchAt", { title: series.title }),
       images: series.coverUrl ? [{ url: series.coverUrl }] : [],
     },
     twitter: {
       card: "summary_large_image",
       title: series.title,
-      description: series.description || `在 OpenDrama 观看 ${series.title}`,
+      description: series.description || t("series.watchAt", { title: series.title }),
       images: series.coverUrl ? [series.coverUrl] : [],
     },
   }
@@ -66,7 +67,6 @@ export default async function SeriesDetailPage({ params }: Props) {
     notFound()
   }
 
-  // 获取用户已解锁的剧集 ID 列表
   const unlockedEpisodeIds = await prisma.episodeUnlock
     .findMany({
       where: { userId: session.user.id },
@@ -76,7 +76,6 @@ export default async function SeriesDetailPage({ params }: Props) {
 
   return (
     <div className="pb-4">
-      {/* 封面头部 */}
       <div className="relative h-64 bg-gradient-to-b from-black/60 to-background">
         {series.coverUrl && (
           <Image
@@ -95,15 +94,14 @@ export default async function SeriesDetailPage({ params }: Props) {
             </p>
           )}
           <div className="flex items-center gap-2 mt-3">
-            <Badge>{series.episodes.length} 集</Badge>
-            <Badge variant="outline">{series.status === "active" ? "连载中" : "已完结"}</Badge>
+            <Badge>{t("home.episodeCount", { count: series.episodes.length })}</Badge>
+            <Badge variant="outline">{series.status === "active" ? t("common.ongoing") : t("common.completed")}</Badge>
           </div>
         </div>
       </div>
 
-      {/* 剧集列表 */}
       <div className="p-4 space-y-3">
-        <h2 className="text-lg font-semibold">剧集列表</h2>
+        <h2 className="text-lg font-semibold">{t("series.episodeList")}</h2>
         <div className="space-y-2">
           {series.episodes.map((episode) => {
             const isUnlocked = unlockedEpisodeIds.includes(episode.id)
@@ -121,16 +119,16 @@ export default async function SeriesDetailPage({ params }: Props) {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold">
-                            第 {episode.episodeNum} 集
+                            {t("series.episode", { num: episode.episodeNum })}
                           </span>
                           {isFirst && (
                             <Badge variant="secondary" className="text-xs">
-                              免费
+                              {t("common.free")}
                             </Badge>
                           )}
                           {isUnlocked && !isFirst && (
                             <Badge variant="secondary" className="text-xs">
-                              已解锁
+                              {t("common.unlocked")}
                             </Badge>
                           )}
                         </div>
@@ -139,7 +137,7 @@ export default async function SeriesDetailPage({ params }: Props) {
                         </h3>
                         {episode.duration && (
                           <p className="text-xs text-muted-foreground">
-                            {Math.floor(episode.duration / 60)} 分钟
+                            {t("series.minutes", { min: Math.floor(episode.duration / 60) })}
                           </p>
                         )}
                       </div>
@@ -147,12 +145,12 @@ export default async function SeriesDetailPage({ params }: Props) {
                         {isFirst || isUnlocked ? (
                           <Button size="sm" variant="default">
                             <Play className="w-4 h-4 mr-1" />
-                            播放
+                            {t("common.play")}
                           </Button>
                         ) : (
                           <Button size="sm" variant="outline">
                             <Coins className="w-4 h-4 mr-1" />
-                            {episode.unlockCost} 金币
+                            {t("recharge.coinsAmount", { coins: episode.unlockCost })}
                           </Button>
                         )}
                       </div>

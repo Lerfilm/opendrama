@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { t } from "@/lib/i18n"
 
 export default function GlobalError({
   error,
@@ -14,11 +15,11 @@ export default function GlobalError({
       <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
         <span className="text-3xl">😵</span>
       </div>
-      <h1 className="text-2xl font-bold mb-2">出错了</h1>
+      <h1 className="text-2xl font-bold mb-2">{t("error.somethingWrong")}</h1>
       <p className="text-muted-foreground mb-6 max-w-md">
-        页面加载时遇到了问题，请稍后再试。
+        {t("error.somethingWrongDesc")}
       </p>
-      <Button onClick={() => reset()}>重试</Button>
+      <Button onClick={() => reset()}>{t("common.retry")}</Button>
     </div>
   )
 }

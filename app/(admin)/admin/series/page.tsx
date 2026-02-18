@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Edit, Trash2 } from "@/components/icons"
 import Link from "next/link"
+import { t } from "@/lib/i18n"
 
 export default async function AdminSeriesPage() {
   const seriesList = await prisma.series.findMany({
@@ -23,15 +24,15 @@ export default async function AdminSeriesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">剧集管理</h1>
+          <h1 className="text-3xl font-bold mb-2">{t("admin.series.title")}</h1>
           <p className="text-muted-foreground">
-            管理所有剧集和单集内容
+            {t("admin.series.desc")}
           </p>
         </div>
         <Link href="/admin/series/new">
           <Button>
             <Plus className="w-4 h-4 mr-2" />
-            创建剧集
+            {t("admin.series.create")}
           </Button>
         </Link>
       </div>
@@ -39,7 +40,7 @@ export default async function AdminSeriesPage() {
       {seriesList.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center text-muted-foreground">
-            暂无剧集，点击"创建剧集"开始
+            {t("admin.series.noSeries")}
           </CardContent>
         </Card>
       ) : (
@@ -68,7 +69,7 @@ export default async function AdminSeriesPage() {
                               : "secondary"
                           }
                         >
-                          {series.status === "active" ? "上线" : "下线"}
+                          {series.status === "active" ? t("admin.series.online") : t("admin.series.offline")}
                         </Badge>
                       </div>
                       {series.description && (
@@ -77,9 +78,9 @@ export default async function AdminSeriesPage() {
                         </p>
                       )}
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>{series._count.episodes} 集</span>
+                        <span>{t("home.episodeCount", { count: series._count.episodes })}</span>
                         <span>
-                          创建时间：
+                          {t("admin.series.createdAt")}
                           {new Date(series.createdAt).toLocaleDateString()}
                         </span>
                       </div>
@@ -89,7 +90,7 @@ export default async function AdminSeriesPage() {
                     <Link href={`/admin/series/${series.id}`}>
                       <Button variant="outline" size="sm">
                         <Edit className="w-4 h-4 mr-1" />
-                        编辑
+                        {t("common.edit")}
                       </Button>
                     </Link>
                     <Button variant="outline" size="sm">

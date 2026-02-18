@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CARD_RARITIES, CardRarity } from "@/lib/cards"
 import { Sparkles } from "@/components/icons"
+import { t } from "@/lib/i18n"
 
 export default async function CardsPage() {
   const session = await auth()
@@ -15,7 +16,6 @@ export default async function CardsPage() {
     redirect("/auth/signin")
   }
 
-  // 获取所有卡牌
   const allCards = await prisma.card.findMany({
     include: {
       series: {
@@ -25,7 +25,6 @@ export default async function CardsPage() {
     orderBy: { createdAt: "desc" },
   })
 
-  // 获取用户拥有的卡牌
   const userCards = await prisma.userCard.findMany({
     where: { userId: session.user.id },
     include: {
@@ -42,7 +41,6 @@ export default async function CardsPage() {
 
   const userCardIds = new Set(userCards.map((uc) => uc.cardId))
 
-  // 按稀有度分类用户卡牌
   const cardsByRarity = userCards.reduce((acc, uc) => {
     const rarity = uc.card.rarity as CardRarity
     if (!acc[rarity]) acc[rarity] = []
@@ -53,12 +51,11 @@ export default async function CardsPage() {
   return (
     <div className="p-4 pb-20">
       <div className="max-w-screen-sm mx-auto space-y-6">
-        {/* 统计卡片 */}
         <Card className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm opacity-90 mb-1">我的收藏</p>
+                <p className="text-sm opacity-90 mb-1">{t("cards.myCollection")}</p>
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-8 h-8" />
                   <span className="text-4xl font-bold">
@@ -67,7 +64,7 @@ export default async function CardsPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs opacity-75">收集进度</p>
+                <p className="text-xs opacity-75">{t("cards.collectionProgress")}</p>
                 <p className="text-2xl font-bold">
                   {allCards.length > 0
                     ? Math.round(
@@ -81,21 +78,19 @@ export default async function CardsPage() {
           </CardContent>
         </Card>
 
-        {/* 标签页 */}
         <Tabs defaultValue="collection" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="collection">我的收藏</TabsTrigger>
-            <TabsTrigger value="gallery">卡牌图鉴</TabsTrigger>
+            <TabsTrigger value="collection">{t("cards.collection")}</TabsTrigger>
+            <TabsTrigger value="gallery">{t("cards.gallery")}</TabsTrigger>
           </TabsList>
 
-          {/* 我的收藏 */}
           <TabsContent value="collection" className="space-y-4 mt-4">
             {userCards.length === 0 ? (
               <Card>
                 <CardContent className="p-12 text-center text-muted-foreground">
                   <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>还没有收藏卡牌</p>
-                  <p className="text-sm mt-2">观看剧集有机会获得卡牌掉落</p>
+                  <p>{t("cards.noCards")}</p>
+                  <p className="text-sm mt-2">{t("cards.noCardsHint")}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -146,7 +141,6 @@ export default async function CardsPage() {
             )}
           </TabsContent>
 
-          {/* 卡牌图鉴 */}
           <TabsContent value="gallery" className="mt-4">
             <div className="grid grid-cols-3 gap-3">
               {allCards.map((card) => {
@@ -179,7 +173,7 @@ export default async function CardsPage() {
                           )}
                           {!isOwned && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs">
-                              未获得
+                              {t("cards.notObtained")}
                             </div>
                           )}
                         </div>

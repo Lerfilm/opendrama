@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/admin"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Home, Film, Sparkles, Upload, BarChart3 } from "@/components/icons"
+import { t } from "@/lib/i18n"
 
 export default async function AdminLayout({
   children,
@@ -17,16 +18,15 @@ export default async function AdminLayout({
   }
 
   const navItems = [
-    { href: "/admin", icon: Home, label: "概览" },
-    { href: "/admin/series", icon: Film, label: "剧集管理" },
-    { href: "/admin/cards", icon: Sparkles, label: "卡牌管理" },
-    { href: "/admin/upload", icon: Upload, label: "视频上传" },
-    { href: "/admin/analytics", icon: BarChart3, label: "数据分析" },
+    { href: "/admin", icon: Home, label: t("admin.overview") },
+    { href: "/admin/series", icon: Film, label: t("admin.seriesManagement") },
+    { href: "/admin/cards", icon: Sparkles, label: t("admin.cardManagement") },
+    { href: "/admin/upload", icon: Upload, label: t("admin.videoUpload") },
+    { href: "/admin/analytics", icon: BarChart3, label: t("admin.analytics") },
   ]
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* 顶部导航 */}
       <header className="bg-background border-b sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -47,14 +47,13 @@ export default async function AdminLayout({
           <div className="flex items-center gap-2">
             <Link href="/">
               <Button variant="outline" size="sm">
-                返回前台
+                {t("admin.backToFront")}
               </Button>
             </Link>
           </div>
         </div>
       </header>
 
-      {/* 主内容 */}
       <main className="container mx-auto p-4">{children}</main>
     </div>
   )

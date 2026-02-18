@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
+import { t } from "@/lib/i18n"
 
 async function getOverview() {
   const today = new Date()
@@ -94,10 +95,10 @@ async function getFunnel() {
   ])
 
   return [
-    { label: "注册", value: registered },
-    { label: "首次观看", value: firstWatch },
-    { label: "首次付费", value: firstPay },
-    { label: "复购", value: repurchase },
+    { label: t("analytics.registered"), value: registered },
+    { label: t("analytics.firstWatch"), value: firstWatch },
+    { label: t("analytics.firstPay"), value: firstPay },
+    { label: t("analytics.repurchase"), value: repurchase },
   ]
 }
 
@@ -128,15 +129,15 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">数据分析</h1>
+      <h1 className="text-2xl font-bold">{t("analytics.title")}</h1>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "总用户数", value: overview.totalUsers.toLocaleString(), color: "bg-blue-500" },
-          { label: "总收入", value: formatCents(overview.totalRevenue), color: "bg-green-500" },
-          { label: "总观看时长", value: formatDuration(overview.totalWatchDuration), color: "bg-purple-500" },
-          { label: "今日新增", value: overview.todayNewUsers.toLocaleString(), color: "bg-orange-500" },
+          { label: t("analytics.totalUsers"), value: overview.totalUsers.toLocaleString(), color: "bg-blue-500" },
+          { label: t("analytics.totalRevenue"), value: formatCents(overview.totalRevenue), color: "bg-green-500" },
+          { label: t("analytics.totalWatchTime"), value: formatDuration(overview.totalWatchDuration), color: "bg-purple-500" },
+          { label: t("analytics.todayNew"), value: overview.todayNewUsers.toLocaleString(), color: "bg-orange-500" },
         ].map((kpi) => (
           <div key={kpi.label} className="bg-background rounded-lg border p-6 relative overflow-hidden">
             <div className={`absolute top-0 left-0 w-1 h-full ${kpi.color}`} />
@@ -148,9 +149,9 @@ export default async function AnalyticsPage() {
 
       {/* User Growth Chart */}
       <div className="bg-background rounded-lg border p-6">
-        <h2 className="text-lg font-semibold mb-4">用户增长趋势（过去30天）</h2>
+        <h2 className="text-lg font-semibold mb-4">{t("analytics.userGrowth")}</h2>
         {userTrend.length === 0 ? (
-          <p className="text-muted-foreground text-sm">暂无数据</p>
+          <p className="text-muted-foreground text-sm">{t("common.noData")}</p>
         ) : (
           <div className="flex items-end gap-1 h-40">
             {userTrend.map((d) => (
@@ -174,9 +175,9 @@ export default async function AnalyticsPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Top 10 Series */}
         <div className="bg-background rounded-lg border p-6">
-          <h2 className="text-lg font-semibold mb-4">热门剧集 Top 10</h2>
+          <h2 className="text-lg font-semibold mb-4">{t("analytics.topSeries")}</h2>
           {topSeries.length === 0 ? (
-            <p className="text-muted-foreground text-sm">暂无数据</p>
+            <p className="text-muted-foreground text-sm">{t("common.noData")}</p>
           ) : (
             <div className="space-y-3">
               {topSeries.map((s, i) => {
@@ -190,7 +191,7 @@ export default async function AnalyticsPage() {
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium truncate">{s.title}</span>
                         <span className="text-xs text-muted-foreground ml-2 shrink-0">
-                          {s.watchCount.toLocaleString()} 次
+                          {s.watchCount.toLocaleString()} {t("analytics.times")}
                         </span>
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -209,9 +210,9 @@ export default async function AnalyticsPage() {
 
         {/* Revenue Trend */}
         <div className="bg-background rounded-lg border p-6">
-          <h2 className="text-lg font-semibold mb-4">收入趋势（过去30天）</h2>
+          <h2 className="text-lg font-semibold mb-4">{t("analytics.revenueTrend")}</h2>
           {revenueTrend.length === 0 ? (
-            <p className="text-muted-foreground text-sm">暂无数据</p>
+            <p className="text-muted-foreground text-sm">{t("common.noData")}</p>
           ) : (
             <div className="flex items-end gap-1 h-40">
               {revenueTrend.map((d) => (
@@ -235,7 +236,7 @@ export default async function AnalyticsPage() {
 
       {/* Retention Funnel */}
       <div className="bg-background rounded-lg border p-6">
-        <h2 className="text-lg font-semibold mb-4">留存漏斗</h2>
+        <h2 className="text-lg font-semibold mb-4">{t("analytics.funnel")}</h2>
         <div className="space-y-4">
           {funnel.map((step, i) => {
             const pct = funnelMax > 0 ? (step.value / funnelMax) * 100 : 0

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { t } from "@/lib/i18n"
 
 export default function NotFound() {
   return (
@@ -8,9 +9,9 @@ export default function NotFound() {
         <span className="text-3xl">🔍</span>
       </div>
       <h1 className="text-4xl font-bold mb-2">404</h1>
-      <p className="text-muted-foreground mb-6">页面不存在或已被移除</p>
+      <p className="text-muted-foreground mb-6">{t("error.notFound")}</p>
       <Link href="/">
-        <Button>返回首页</Button>
+        <Button>{t("nav.home")}</Button>
       </Link>
     </div>
   )

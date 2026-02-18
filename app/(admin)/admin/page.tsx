@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Film, Users, Coins, Sparkles } from "@/components/icons"
+import { t } from "@/lib/i18n"
 
 export default async function AdminDashboardPage() {
   const stats = await Promise.all([
@@ -19,36 +20,36 @@ export default async function AdminDashboardPage() {
 
   const statCards = [
     {
-      title: "剧集总数",
+      title: t("admin.totalSeries"),
       value: seriesCount,
       icon: Film,
-      description: `${episodeCount} 集`,
+      description: t("home.episodeCount", { count: episodeCount }),
     },
     {
-      title: "用户总数",
+      title: t("admin.totalUsers"),
       value: userCount,
       icon: Users,
-      description: "注册用户",
+      description: t("admin.registeredUsers"),
     },
     {
-      title: "总收入",
+      title: t("admin.totalRevenue"),
       value: `¥${(totalRevenue / 100).toFixed(2)}`,
       icon: Coins,
-      description: "累计充值",
+      description: t("admin.totalRecharge"),
     },
     {
-      title: "卡牌总数",
+      title: t("admin.totalCards"),
       value: cardCount,
       icon: Sparkles,
-      description: "已创建卡牌",
+      description: t("admin.createdCards"),
     },
   ]
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-2">控制台</h1>
-        <p className="text-muted-foreground">OpenDrama 后台管理系统</p>
+        <h1 className="text-3xl font-bold mb-2">{t("admin.dashboard")}</h1>
+        <p className="text-muted-foreground">{t("admin.dashboardDesc")}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -72,17 +73,17 @@ export default async function AdminDashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>快速操作</CardTitle>
+          <CardTitle>{t("admin.quickActions")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            • 剧集管理：创建、编辑、删除剧集和单集
+            • {t("admin.quickAction1")}
           </p>
           <p className="text-sm text-muted-foreground">
-            • 卡牌管理：创建、编辑卡牌信息
+            • {t("admin.quickAction2")}
           </p>
           <p className="text-sm text-muted-foreground">
-            • 视频上传：上传视频到 Mux，获取 PlaybackID
+            • {t("admin.quickAction3")}
           </p>
         </CardContent>
       </Card>

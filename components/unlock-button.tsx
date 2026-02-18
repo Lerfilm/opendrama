@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Loader2, Unlock } from "@/components/icons"
+import { t } from "@/lib/i18n"
 
 interface UnlockButtonProps {
   episodeId: string
@@ -29,10 +30,10 @@ export function UnlockButton({ episodeId, cost, seriesId }: UnlockButtonProps) {
         router.refresh()
       } else {
         const data = await res.json()
-        alert(data.error || "解锁失败")
+        alert(data.error || t("episode.unlockFailed"))
       }
     } catch (error) {
-      alert("解锁失败，请重试")
+      alert(t("episode.unlockFailedRetry"))
     } finally {
       setLoading(false)
     }
@@ -48,12 +49,12 @@ export function UnlockButton({ episodeId, cost, seriesId }: UnlockButtonProps) {
       {loading ? (
         <>
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          解锁中...
+          {t("episode.unlocking")}
         </>
       ) : (
         <>
           <Unlock className="w-4 h-4 mr-2" />
-          花费 {cost} 金币解锁
+          {t("episode.unlockCost", { cost })}
         </>
       )}
     </Button>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Lock } from "@/components/icons"
 import Link from "next/link"
 import type { Metadata } from "next"
+import { t } from "@/lib/i18n"
 
 type Props = {
   params: { id: string }
@@ -20,10 +21,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     select: { title: true, description: true, episodeNum: true, series: { select: { title: true, coverUrl: true } } },
   })
 
-  if (!episode) return { title: "剧集不存在" }
+  if (!episode) return { title: t("series.notFound") }
 
-  const title = `${episode.series.title} 第${episode.episodeNum}集 - ${episode.title}`
-  const description = episode.description || `观看 ${episode.series.title} 第${episode.episodeNum}集`
+  const title = t("series.episodeTitle", { series: episode.series.title, num: episode.episodeNum, title: episode.title })
+  const description = episode.description || t("series.watchEpisode", { series: episode.series.title, num: episode.episodeNum })
 
   return {
     title,
@@ -64,7 +65,6 @@ export default async function EpisodePage({ params }: Props) {
     notFound()
   }
 
-  // 检查是否已解锁
   const unlock = await prisma.episodeUnlock.findUnique({
     where: {
       userId_episodeId: {
@@ -77,7 +77,6 @@ export default async function EpisodePage({ params }: Props) {
   const isFirst = episode.episodeNum === 1
   const isUnlocked = !!unlock || isFirst
 
-  // 获取用户当前金币
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { coins: true },
@@ -85,7 +84,6 @@ export default async function EpisodePage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* 顶部导航 */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent">
         <div className="flex items-center justify-between p-4 max-w-screen-sm mx-auto">
           <Link href={`/series/${episode.seriesId}`}>
@@ -94,13 +92,12 @@ export default async function EpisodePage({ params }: Props) {
             </Button>
           </Link>
           <div className="text-white text-sm font-medium">
-            第 {episode.episodeNum} 集
+            {t("series.episode", { num: episode.episodeNum })}
           </div>
           <div className="w-8" />
         </div>
       </div>
 
-      {/* 视频播放器或解锁界面 */}
       {isUnlocked && episode.muxPlaybackId ? (
         <VideoPlayer
           playbackId={episode.muxPlaybackId}
@@ -118,7 +115,7 @@ export default async function EpisodePage({ params }: Props) {
               {episode.title}
             </h2>
             <p className="text-muted-foreground mb-4">
-              {episode.series.title} · 第 {episode.episodeNum} 集
+              {episode.series.title} · {t("series.episode", { num: episode.episodeNum })}
             </p>
             {episode.description && (
               <p className="text-sm text-muted-foreground mb-6 max-w-md">
@@ -129,16 +126,16 @@ export default async function EpisodePage({ params }: Props) {
 
           <div className="bg-card/50 backdrop-blur rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-muted-foreground">解锁观看</span>
+              <span className="text-sm text-muted-foreground">{t("episode.unlock")}</span>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="text-base px-3 py-1">
-                  {episode.unlockCost} 金币
+                  {t("recharge.coinsAmount", { coins: episode.unlockCost })}
                 </Badge>
               </div>
             </div>
             <div className="flex items-center justify-between mb-6">
-              <span className="text-sm text-muted-foreground">当前余额</span>
-              <span className="font-semibold">{user?.coins || 0} 金币</span>
+              <span className="text-sm text-muted-foreground">{t("episode.currentBalance")}</span>
+              <span className="font-semibold">{t("recharge.coinsAmount", { coins: user?.coins || 0 })}</span>
             </div>
 
             {(user?.coins || 0) >= episode.unlockCost ? (
@@ -150,11 +147,11 @@ export default async function EpisodePage({ params }: Props) {
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-amber-500 text-center">
-                  金币不足，请先充值
+                  {t("episode.insufficientCoins")}
                 </p>
                 <Link href="/recharge">
                   <Button className="w-full" size="lg">
-                    立即充值
+                    {t("home.rechargeNow")}
                   </Button>
                 </Link>
               </div>

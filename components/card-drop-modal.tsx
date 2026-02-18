@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CARD_RARITIES, CardRarity } from "@/lib/cards"
 import { Sparkles } from "@/components/icons"
+import { t } from "@/lib/i18n"
 
 interface CardDropModalProps {
   card: {
@@ -28,7 +29,7 @@ export function CardDropModal({ card, open, onClose }: CardDropModalProps) {
           <div className="mb-4">
             <Sparkles className="w-12 h-12 text-yellow-500 mx-auto animate-pulse" />
           </div>
-          <h2 className="text-2xl font-bold mb-4">恭喜获得卡牌！</h2>
+          <h2 className="text-2xl font-bold mb-4">{t("cards.congratulations")}</h2>
 
           <div
             className={`relative rounded-lg overflow-hidden border-4 ${rarityInfo?.borderColor} mb-4`}
@@ -47,11 +48,11 @@ export function CardDropModal({ card, open, onClose }: CardDropModalProps) {
 
           <h3 className="text-xl font-bold mb-2">{card.name}</h3>
           <p className="text-muted-foreground mb-4">
-            已拥有 x{card.quantity}
+            {t("cards.owned", { qty: card.quantity })}
           </p>
 
           <Button onClick={onClose} className="w-full" size="lg">
-            继续观看
+            {t("cards.continueWatch")}
           </Button>
         </div>
       </DialogContent>
