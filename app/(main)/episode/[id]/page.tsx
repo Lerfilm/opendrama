@@ -12,12 +12,13 @@ import type { Metadata } from "next"
 import { t } from "@/lib/i18n"
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params
   const episode = await prisma.episode.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: { title: true, description: true, episodeNum: true, series: { select: { title: true, coverUrl: true } } },
   })
 
@@ -44,6 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function EpisodePage({ params }: Props) {
+  const { id } = await params
   const session = await auth()
 
   if (!session?.user?.id) {
@@ -53,7 +55,7 @@ export default async function EpisodePage({ params }: Props) {
   const userId = session.user.id
 
   const episode = await prisma.episode.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       series: {
         select: { id: true, title: true },

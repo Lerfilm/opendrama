@@ -6,19 +6,14 @@ export type Locale = "zh" | "en"
 const translations: Record<Locale, Record<string, string>> = { zh, en }
 
 /**
- * Get locale from cookies (server-side) or navigator (client-side).
- * Default: zh
+ * Get locale synchronously.
+ * Server-side: defaults to "zh" (use getLocaleAsync for cookie-based).
+ * Client-side: reads from cookie or navigator.
  */
 export function getLocale(): Locale {
-  // Server-side: read from cookies
   if (typeof window === "undefined") {
-    try {
-      const { cookies } = require("next/headers")
-      const locale = cookies().get("locale")?.value
-      if (locale === "en") return "en"
-    } catch {
-      // fallback
-    }
+    // Server-side: can't call cookies() synchronously in Next.js 15+
+    // Default to zh; pages can use getLocaleAsync() if needed
     return "zh"
   }
 
@@ -29,6 +24,23 @@ export function getLocale(): Locale {
   }
 
   if (navigator.language.startsWith("en")) return "en"
+  return "zh"
+}
+
+/**
+ * Async locale getter for server components.
+ */
+export async function getLocaleAsync(): Promise<Locale> {
+  if (typeof window === "undefined") {
+    try {
+      const { cookies } = await import("next/headers")
+      const cookieStore = await cookies()
+      const locale = cookieStore.get("locale")?.value
+      if (locale === "en") return "en"
+    } catch {
+      // fallback
+    }
+  }
   return "zh"
 }
 
