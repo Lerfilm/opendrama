@@ -43,10 +43,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function SeriesDetailPage({ params }: Props) {
   const session = await auth()
 
-  if (!session?.user) {
-    redirect("/auth/signin")
-  }
-
   const series = await prisma.series.findUnique({
     where: { id: params.id },
     include: {
@@ -67,12 +63,14 @@ export default async function SeriesDetailPage({ params }: Props) {
     notFound()
   }
 
-  const unlockedEpisodeIds = await prisma.episodeUnlock
-    .findMany({
-      where: { userId: session.user.id },
-      select: { episodeId: true },
-    })
-    .then((unlocks) => unlocks.map((u) => u.episodeId))
+  const unlockedEpisodeIds = session?.user?.id
+    ? await prisma.episodeUnlock
+        .findMany({
+          where: { userId: session.user.id },
+          select: { episodeId: true },
+        })
+        .then((unlocks) => unlocks.map((u) => u.episodeId))
+    : []
 
   return (
     <div className="pb-4">
