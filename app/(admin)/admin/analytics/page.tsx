@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
 import { t } from "@/lib/i18n"
 
 async function getOverview() {
@@ -33,20 +32,18 @@ async function getUserTrend() {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
   thirtyDaysAgo.setHours(0, 0, 0, 0)
 
-  const rows = await prisma.$queryRaw<{ date: string; count: bigint }[]>`
+  const rows = (await prisma.$queryRaw`
     SELECT DATE("createdAt") as date, COUNT(*)::bigint as count
     FROM users
     WHERE "createdAt" >= ${thirtyDaysAgo}
     GROUP BY DATE("createdAt")
     ORDER BY date ASC
-  `
+  `) as { date: string; count: bigint }[]
   return rows.map((r) => ({ date: String(r.date).slice(0, 10), count: Number(r.count) }))
 }
 
 async function getTopSeries() {
-  const rows = await prisma.$queryRaw<
-    { id: string; title: string; watch_count: bigint }[]
-  >`
+  const rows = (await prisma.$queryRaw`
     SELECT s.id, s.title, COUNT(w.id)::bigint as watch_count
     FROM series s
     JOIN episodes e ON e."seriesId" = s.id
@@ -54,7 +51,7 @@ async function getTopSeries() {
     GROUP BY s.id, s.title
     ORDER BY watch_count DESC
     LIMIT 10
-  `
+  `) as { id: string; title: string; watch_count: bigint }[]
   return rows.map((r) => ({
     id: r.id,
     title: r.title,
@@ -67,31 +64,31 @@ async function getRevenueTrend() {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
   thirtyDaysAgo.setHours(0, 0, 0, 0)
 
-  const rows = await prisma.$queryRaw<{ date: string; total: bigint }[]>`
+  const rows = (await prisma.$queryRaw`
     SELECT DATE("createdAt") as date, SUM(amount)::bigint as total
     FROM purchases
     WHERE status = 'completed' AND "createdAt" >= ${thirtyDaysAgo}
     GROUP BY DATE("createdAt")
     ORDER BY date ASC
-  `
+  `) as { date: string; total: bigint }[]
   return rows.map((r) => ({ date: String(r.date).slice(0, 10), total: Number(r.total) }))
 }
 
 async function getFunnel() {
   const [registered, firstWatch, firstPay, repurchase] = await Promise.all([
     prisma.user.count(),
-    prisma.$queryRaw<{ count: bigint }[]>`
+    (prisma.$queryRaw`
       SELECT COUNT(DISTINCT "userId")::bigint as count FROM watch_events
-    `.then((r) => Number(r[0]?.count ?? 0)),
-    prisma.$queryRaw<{ count: bigint }[]>`
+    ` as Promise<{ count: bigint }[]>).then((r) => Number(r[0]?.count ?? 0)),
+    (prisma.$queryRaw`
       SELECT COUNT(DISTINCT "userId")::bigint as count FROM purchases WHERE status = 'completed'
-    `.then((r) => Number(r[0]?.count ?? 0)),
-    prisma.$queryRaw<{ count: bigint }[]>`
+    ` as Promise<{ count: bigint }[]>).then((r) => Number(r[0]?.count ?? 0)),
+    (prisma.$queryRaw`
       SELECT COUNT(*)::bigint as count FROM (
         SELECT "userId" FROM purchases WHERE status = 'completed'
         GROUP BY "userId" HAVING COUNT(*) >= 2
       ) sub
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    ` as Promise<{ count: bigint }[]>).then((r) => Number(r[0]?.count ?? 0)),
   ])
 
   return [
