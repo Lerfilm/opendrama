@@ -13,10 +13,6 @@ import { t } from "@/lib/i18n"
 export default async function HomePage() {
   const session = await auth()
 
-  if (!session?.user) {
-    redirect("/auth/signin")
-  }
-
   const seriesList = await prisma.series.findMany({
     where: { status: "active" },
     select: {
@@ -42,16 +38,26 @@ export default async function HomePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">OpenDrama</h1>
-          <p className="text-sm text-muted-foreground">{t("home.greeting", { name: session.user?.name || "" })}</p>
+          <p className="text-sm text-muted-foreground">
+            {session?.user
+              ? t("home.greeting", { name: session.user?.name || "" })
+              : t("home.welcomeGuest")}
+          </p>
         </div>
-        <div className="flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2">
-          <Coins className="w-5 h-5 text-primary" />
-          <span className="font-semibold">{(session.user as any)?.coins || 0}</span>
-        </div>
+        {session?.user ? (
+          <div className="flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2">
+            <Coins className="w-5 h-5 text-primary" />
+            <span className="font-semibold">{(session.user as any)?.coins || 0}</span>
+          </div>
+        ) : (
+          <Link href="/auth/signin">
+            <Button size="sm">{t("common.login")}</Button>
+          </Link>
+        )}
       </div>
 
       <Link href="/recharge">
-        <div className="relative aspect-[16/9] bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
+        <div className="relative aspect-[2/1] sm:aspect-[16/9] bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
           <div className="absolute inset-0 flex items-center justify-center text-white">
             <div className="text-center">
               <h2 className="text-xl font-bold mb-2">{t("home.recharge")}</h2>
@@ -71,7 +77,7 @@ export default async function HomePage() {
             <p>{t("home.noSeries")}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {seriesWithCount.map((series) => (
               <Link key={series.id} href={`/series/${series.id}`}>
                 <Card className="overflow-hidden hover:shadow-lg transition-shadow">

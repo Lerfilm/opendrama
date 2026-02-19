@@ -145,6 +145,13 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* 移动端字体缩放 */
+@media (max-width: 374px) {
+  html {
+    font-size: 14px;
+  }
+}
+
 /* 隐藏滚动条但保持功能 */
 .hide-scrollbar {
   -ms-overflow-style: none;

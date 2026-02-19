@@ -76,7 +76,7 @@ export default async function SeriesDetailPage({ params }: Props) {
 
   return (
     <div className="pb-4">
-      <div className="relative h-64 bg-gradient-to-b from-black/60 to-background">
+      <div className="relative h-48 sm:h-64 bg-gradient-to-b from-black/60 to-background">
         {series.coverUrl && (
           <Image
             src={series.coverUrl}

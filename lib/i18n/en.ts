@@ -27,6 +27,8 @@ const en: Record<string, string> = {
 
   // Home
   "home.greeting": "Hello, {name}",
+  "home.welcomeGuest": "Discover great short dramas",
+  "common.login": "Sign In",
   "home.recharge": "Top Up Coins",
   "home.rechargeDesc": "Unlock more exciting episodes",
   "home.rechargeNow": "Top Up Now",

@@ -67,10 +67,10 @@ export default async function RechargePage() {
                     </div>
                   )}
                   <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                         <div
-                          className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                          className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shrink-0 ${
                             index === 0
                               ? "bg-blue-100 text-blue-600"
                               : index === 1
@@ -80,7 +80,7 @@ export default async function RechargePage() {
                               : "bg-orange-100 text-orange-600"
                           }`}
                         >
-                          <Icon className="w-8 h-8" />
+                          <Icon className="w-6 h-6 sm:w-8 sm:h-8" />
                         </div>
                         <div>
                           <h3 className="text-lg font-bold mb-1">

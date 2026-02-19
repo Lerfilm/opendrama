@@ -27,6 +27,8 @@ const zh = {
 
   // Home
   "home.greeting": "你好，{name}",
+  "home.welcomeGuest": "发现精彩短剧",
+  "common.login": "登录",
   "home.recharge": "金币充值",
   "home.rechargeDesc": "解锁更多精彩剧集",
   "home.rechargeNow": "立即充值",
