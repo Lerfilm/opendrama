@@ -4,11 +4,10 @@ FROM node:22-alpine AS base
 FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
-# Fresh install for Linux platform (ignore macOS lockfile)
-RUN npm install --ignore-scripts=false
+RUN npm ci
 RUN npx prisma generate
 
 # Build the application
