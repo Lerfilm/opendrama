@@ -4,13 +4,12 @@ FROM node:22-alpine AS base
 FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
-RUN npm ci
-# Install correct platform-specific binary for lightningcss (Tailwind CSS 4)
-# npm ci installs from macOS lockfile which lacks linux-x64-musl bindings
-RUN npm install --no-save lightningcss-linux-x64-musl
+# Use npm install (not npm ci) to get correct platform-specific binaries
+# macOS lockfile lacks linux-x64-musl bindings for lightningcss, tailwindcss/oxide, etc.
+RUN npm install
 RUN npx prisma generate
 
 # Build the application
