@@ -8,6 +8,8 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 RUN npm ci
+# Ensure lightningcss has correct platform binary for Alpine Linux
+RUN npm rebuild lightningcss
 RUN npx prisma generate
 
 # Build the application
