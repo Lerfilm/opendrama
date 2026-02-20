@@ -6,6 +6,7 @@ RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 RUN npm ci
 RUN npx prisma generate
 
@@ -26,6 +27,7 @@ ENV MUX_TOKEN_SECRET="dummy"
 ENV AUTH_SECRET="dummy-secret-for-build"
 ENV NEXTAUTH_SECRET="dummy-secret-for-build"
 ENV NEXTAUTH_URL="http://localhost:3000"
+ENV OPENROUTER_API_KEY="dummy"
 RUN npm run build
 
 # Production image
