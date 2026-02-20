@@ -8,8 +8,9 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 RUN npm ci
-# Ensure lightningcss has correct platform binary for Alpine Linux
-RUN npm rebuild lightningcss
+# Install correct platform-specific binary for lightningcss (Tailwind CSS 4)
+# npm ci installs from macOS lockfile which lacks linux-x64-musl bindings
+RUN npm install --no-save lightningcss-linux-x64-musl
 RUN npx prisma generate
 
 # Build the application
