@@ -12,7 +12,7 @@ import {
   ArrowLeft, Loader2, Zap,
   CheckCircle, XIcon, Coins, PenTool,
   Play, RefreshCw, ChevronDown, ChevronUp,
-  Upload,
+  Upload, Trash2,
 } from "@/components/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -78,6 +78,9 @@ export function GenerateWorkbench({
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set())
   const [previewVideo, setPreviewVideo] = useState<{ url: string; title: string } | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [resettingSegment, setResettingSegment] = useState<string | null>(null)
+  const [isResettingAll, setIsResettingAll] = useState(false)
+  const [showResetAllConfirm, setShowResetAllConfirm] = useState(false)
   const autoStartedRef = useRef(false)
 
   // Derived state
@@ -225,6 +228,51 @@ export function GenerateWorkbench({
     })
   }
 
+  // Reset single segment (delete it so it can be re-prepared in Studio)
+  async function handleResetSegment(segmentId: string) {
+    setResettingSegment(segmentId)
+    try {
+      const res = await fetch("/api/video/reset", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ segmentId }),
+      })
+      if (res.ok) {
+        setExistingSegments(prev => prev.filter(s => s.id !== segmentId))
+      } else {
+        const data = await res.json()
+        alert(data.error || "Reset failed")
+      }
+    } catch {
+      alert("Reset failed")
+    } finally {
+      setResettingSegment(null)
+    }
+  }
+
+  // Reset all segments for this episode
+  async function handleResetAll() {
+    setShowResetAllConfirm(false)
+    setIsResettingAll(true)
+    try {
+      const res = await fetch("/api/video/reset", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptId: script.id, episodeNum }),
+      })
+      if (res.ok) {
+        setExistingSegments([])
+      } else {
+        const data = await res.json()
+        alert(data.error || "Reset failed")
+      }
+    } catch {
+      alert("Reset failed")
+    } finally {
+      setIsResettingAll(false)
+    }
+  }
+
   // Publish script → Series
   async function handlePublish() {
     setIsPublishing(true)
@@ -288,9 +336,26 @@ export function GenerateWorkbench({
             {t("studio.episode", { num: episodeNum })} — {t("theater.title")}
           </p>
         </div>
-        <div className="flex items-center gap-1 text-sm">
-          <Coins className="w-4 h-4 text-amber-500" />
-          <span className="font-medium">{balance}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 text-sm">
+            <Coins className="w-4 h-4 text-amber-500" />
+            <span className="font-medium">{balance}</span>
+          </div>
+          {hasExistingSegments && !isWorking && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              onClick={() => setShowResetAllConfirm(true)}
+              disabled={isResettingAll}
+            >
+              {isResettingAll
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Trash2 className="w-3.5 h-3.5" />
+              }
+              <span className="ml-1 text-xs">{t("generate.resetAll")}</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -495,6 +560,20 @@ export function GenerateWorkbench({
                         {t("generate.preview")}
                       </Button>
                     )}
+
+                    {/* Reset — always visible, pushes to right */}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs h-7 px-2 ml-auto text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleResetSegment(seg.id)}
+                      disabled={isSegGenerating || resettingSegment === seg.id}
+                    >
+                      {resettingSegment === seg.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Trash2 className="w-3 h-3" />
+                      }
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -652,6 +731,34 @@ export function GenerateWorkbench({
           </div>
         </div>
       )}
+
+      {/* ── Reset All confirmation dialog ── */}
+      <Dialog open={showResetAllConfirm} onOpenChange={setShowResetAllConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-destructive" />
+              {t("generate.resetAllTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("generate.resetAllDesc", { count: existingSegments.length })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowResetAllConfirm(false)} className="flex-1">
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleResetAll}
+              className="flex-1"
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              {t("generate.resetAllConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Coin confirmation dialog ── */}
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>

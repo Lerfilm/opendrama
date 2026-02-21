@@ -548,6 +548,10 @@ const en: Record<string, string> = {
   "generate.preview": "Preview",
   "generate.mergePublish": "Publish Series",
   "generate.alreadyPublished": "This script is already published. Check the Series page.",
+  "generate.resetAll": "Reset All",
+  "generate.resetAllTitle": "Reset All Segments",
+  "generate.resetAllDesc": "This will delete all {count} segments and refund any unused coins. You will need to re-configure segments in Studio.",
+  "generate.resetAllConfirm": "Confirm Reset",
   "studio.segment": "Segment",
 
   // Episode management

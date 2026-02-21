@@ -550,6 +550,10 @@ const zh = {
   "generate.preview": "预览",
   "generate.mergePublish": "合并发布",
   "generate.alreadyPublished": "该剧本已发布，请前往系列页面查看",
+  "generate.resetAll": "全部重置",
+  "generate.resetAllTitle": "重置全部片段",
+  "generate.resetAllDesc": "将删除全部 {count} 个片段并退还未使用的金币。重置后需重新前往创作中心配置片段。",
+  "generate.resetAllConfirm": "确认重置",
   "studio.segment": "片段",
 
   // 集数管理
