@@ -70,7 +70,7 @@ export default async function ProfilePage() {
                 <span className="text-2xl font-bold text-amber-600">
                   {(session.user as any)?.coins || 0}
                 </span>
-                <span className="text-xs text-amber-500">充值 →</span>
+                <span className="text-xs text-amber-500">{t("home.rechargeNow")} →</span>
               </div>
             </div>
           </Link>
@@ -83,7 +83,7 @@ export default async function ProfilePage() {
                 <span className="font-medium text-sm">{t("subscribe.title")}</span>
               </div>
               <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs">
-                开通 →
+                {t("subscribe.join")} →
               </Badge>
             </div>
           </Link>
@@ -94,15 +94,15 @@ export default async function ProfilePage() {
       <div className="grid grid-cols-3 gap-3">
         <Card className="text-center p-3">
           <p className="text-2xl font-bold">{watchCount}</p>
-          <p className="text-xs text-muted-foreground">观看记录</p>
+          <p className="text-xs text-muted-foreground">{t("history.title")}</p>
         </Card>
         <Card className="text-center p-3">
           <p className="text-2xl font-bold">{scriptCount}</p>
-          <p className="text-xs text-muted-foreground">我的剧本</p>
+          <p className="text-xs text-muted-foreground">{t("studio.myScripts")}</p>
         </Card>
         <Card className="text-center p-3">
           <p className="text-2xl font-bold">{cardCount}</p>
-          <p className="text-xs text-muted-foreground">卡牌收藏</p>
+          <p className="text-xs text-muted-foreground">{t("profile.cardCollection")}</p>
         </Card>
       </div>
 
