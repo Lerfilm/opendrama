@@ -302,29 +302,91 @@ export function GenerateWorkbench({
       {/* Existing segments — progress view */}
       {hasExistingSegments && !hasPending && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">
-              {t("theater.videoSegments") || "Video Segments"} ({existingSegments.filter(s => s.status === "done").length}/{existingSegments.length})
-            </h2>
-            {pollingActive && (
-              <div className="flex items-center gap-1 text-xs text-amber-600">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                {t("t2v.generating")}
-              </div>
-            )}
-          </div>
+          {/* ── Progress overview card ── */}
+          {(() => {
+            const doneCount = existingSegments.filter(s => s.status === "done").length
+            const failedCount = existingSegments.filter(s => s.status === "failed").length
+            const generatingCount = existingSegments.filter(
+              s => s.status === "generating" || s.status === "submitted" || s.status === "reserved"
+            ).length
+            const total = existingSegments.length
+            const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0
+            const isWorking = generatingCount > 0
 
-          {/* Progress bar */}
-          <div className="w-full bg-muted rounded-full h-2">
-            <div
-              className="bg-gradient-to-r from-green-400 to-green-500 h-2 rounded-full transition-all duration-500"
-              style={{
-                width: `${existingSegments.length > 0
-                  ? (existingSegments.filter(s => s.status === "done").length / existingSegments.length) * 100
-                  : 0}%`,
-              }}
-            />
-          </div>
+            // Status hint text
+            let statusHint = ""
+            if (allDone) {
+              statusHint = t("generate.allDone")
+            } else if (failedCount > 0 && generatingCount === 0) {
+              statusHint = t("generate.progressFailed", { count: failedCount })
+            } else if (generatingCount > 0 && doneCount === 0) {
+              statusHint = t("generate.progressSubmitting")
+            } else if (doneCount > 0 && doneCount < total) {
+              statusHint = t("generate.progressWorking", { done: doneCount, total })
+            } else if (doneCount === 0) {
+              statusHint = t("generate.progressWaiting")
+            }
+
+            return (
+              <Card className={isWorking ? "border-amber-200 dark:border-amber-800" : ""}>
+                <CardContent className="p-4 space-y-3">
+                  {/* Title row */}
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">
+                      {t("generate.progressTitle")}
+                    </h2>
+                    <span className="text-lg font-bold text-primary">{percent}%</span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                    <div
+                      className={`h-3 rounded-full transition-all duration-700 ease-out ${
+                        allDone
+                          ? "bg-gradient-to-r from-green-400 to-green-500"
+                          : failedCount > 0 && generatingCount === 0
+                            ? "bg-gradient-to-r from-amber-400 to-orange-500"
+                            : "bg-gradient-to-r from-indigo-400 to-purple-500"
+                      } ${isWorking ? "animate-pulse" : ""}`}
+                      style={{ width: `${Math.max(percent, isWorking ? 3 : 0)}%` }}
+                    />
+                  </div>
+
+                  {/* Status hint */}
+                  <div className="flex items-center gap-2">
+                    {isWorking && <Loader2 className="w-4 h-4 animate-spin text-amber-500" />}
+                    {allDone && <CheckCircle className="w-4 h-4 text-green-500" />}
+                    {failedCount > 0 && generatingCount === 0 && !allDone && (
+                      <XIcon className="w-4 h-4 text-red-500" />
+                    )}
+                    <p className="text-xs text-muted-foreground">{statusHint}</p>
+                  </div>
+
+                  {/* Segment count chips */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {doneCount > 0 && (
+                      <Badge className="bg-green-100 text-green-700 text-[10px]">
+                        <CheckCircle className="w-3 h-3 mr-0.5" />
+                        {doneCount} {t("generate.progressDone")}
+                      </Badge>
+                    )}
+                    {generatingCount > 0 && (
+                      <Badge className="bg-amber-100 text-amber-700 text-[10px]">
+                        <Loader2 className="w-3 h-3 mr-0.5 animate-spin" />
+                        {generatingCount} {t("generate.progressGenerating")}
+                      </Badge>
+                    )}
+                    {failedCount > 0 && (
+                      <Badge className="bg-red-100 text-red-700 text-[10px]">
+                        <XIcon className="w-3 h-3 mr-0.5" />
+                        {failedCount} {t("common.failed")}
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })()}
 
           {existingSegments.map((seg) => (
             <Card key={seg.id} className={seg.status === "done" ? "border-green-200 dark:border-green-800" : ""}>

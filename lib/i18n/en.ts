@@ -536,6 +536,13 @@ const en: Record<string, string> = {
   "generate.confirmBalance": "Your Balance",
   "generate.confirmBalanceAfter": "Balance After",
   "generate.confirmProceed": "Confirm & Generate",
+  "generate.progressTitle": "Generation Progress",
+  "generate.progressSubmitting": "Submitting to AI video engine... This may take a few minutes.",
+  "generate.progressWorking": "{done} of {total} segments complete — generating the rest...",
+  "generate.progressWaiting": "Preparing video generation...",
+  "generate.progressFailed": "{count} segment(s) failed — tap Retry to regenerate.",
+  "generate.progressDone": "done",
+  "generate.progressGenerating": "generating",
 
   // Episode management
   "studio.addEpisode": "Add Episode",

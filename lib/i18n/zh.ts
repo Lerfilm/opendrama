@@ -538,6 +538,13 @@ const zh = {
   "generate.confirmBalance": "当前余额",
   "generate.confirmBalanceAfter": "剩余余额",
   "generate.confirmProceed": "确认并生成",
+  "generate.progressTitle": "生成进度",
+  "generate.progressSubmitting": "正在提交到 AI 视频引擎……可能需要几分钟",
+  "generate.progressWorking": "已完成 {done}/{total} 个片段，继续生成中……",
+  "generate.progressWaiting": "正在准备生成……",
+  "generate.progressFailed": "{count} 个片段失败，点击重试可重新生成",
+  "generate.progressDone": "已完成",
+  "generate.progressGenerating": "生成中",
 
   // 集数管理
   "studio.addEpisode": "添加集",
