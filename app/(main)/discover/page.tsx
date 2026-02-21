@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic"
 import prisma from "@/lib/prisma"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Play, Star } from "@/components/icons"
+import { Star } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
@@ -155,70 +154,40 @@ export default async function DiscoverPage({
 
             return (
               <Link key={series.id} href={`/series/${series.id}`}>
-                <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <CardHeader className="p-0">
-                    <div className="relative aspect-[2/3] bg-muted">
-                      {(series.coverTall || series.coverUrl) ? (
-                        <Image
-                          src={series.coverTall || series.coverUrl!}
-                          alt={series.title}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 50vw, 33vw"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                          {t("common.noCover")}
+                <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-muted hover:shadow-lg transition-shadow">
+                  {(series.coverTall || series.coverUrl) ? (
+                    <Image
+                      src={series.coverTall || series.coverUrl!}
+                      alt={series.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 50vw, 33vw"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 flex items-center justify-center text-white/30 text-sm">
+                      {t("common.noCover")}
+                    </div>
+                  )}
+                  {/* Bottom gradient + title + stats */}
+                  <div className="absolute bottom-0 left-0 right-0
+                                  bg-gradient-to-t from-black/80 via-black/40 to-transparent
+                                  px-2.5 pt-8 pb-2.5">
+                    <h3 className="text-white font-bold text-xs leading-tight line-clamp-2 mb-1">
+                      {series.title}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <p className="text-white/70 text-[10px]">
+                        {t("discover.viewCount", { count: series.viewCount })}
+                      </p>
+                      {rating && rating.count > 0 && (
+                        <div className="flex items-center gap-0.5">
+                          <Star className="w-3 h-3 text-amber-400" />
+                          <span className="text-white text-[10px] font-medium">{rating.avg}</span>
                         </div>
                       )}
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                        <div className="flex items-center justify-between">
-                          <p className="text-white text-xs">
-                            {t("discover.viewCount", { count: series.viewCount })}
-                          </p>
-                          {rating && rating.count > 0 && (
-                            <div className="flex items-center gap-0.5">
-                              <Star className="w-3 h-3 text-amber-400" />
-                              <span className="text-white text-xs font-medium">{rating.avg}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-3">
-                    <h3 className="font-medium text-sm line-clamp-2 mb-1">{series.title}</h3>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 min-w-0 flex-1">
-                        {series.user ? (
-                          <>
-                            {series.user.image ? (
-                              <Image
-                                src={series.user.image}
-                                alt={series.user.name || ""}
-                                width={16}
-                                height={16}
-                                className="rounded-full shrink-0"
-                              />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-bold text-muted-foreground shrink-0">
-                                {(series.user.name || "?")[0]?.toUpperCase()}
-                              </div>
-                            )}
-                            <p className="text-[11px] text-muted-foreground truncate">
-                              {series.user.name || t("series.anonymous")}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            {t("home.episodeCount", { count: series._count.episodes })}
-                          </p>
-                        )}
-                      </div>
-                      <Play className="w-4 h-4 text-primary shrink-0" />
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </Link>
             )
           })}

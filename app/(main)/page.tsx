@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Play, Coins, PenTool, Film, Sparkles, Zap, Crown, Compass } from "@/components/icons"
@@ -200,38 +199,39 @@ export default async function HomePage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {seriesWithCount.map((series) => (
               <Link key={series.id} href={`/series/${series.id}`}>
-                <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                  <CardHeader className="p-0">
-                    <div className="relative aspect-[2/3] bg-muted">
-                      {series.coverUrl ? (
-                        <Image
-                          src={series.coverUrl}
-                          alt={series.title}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 50vw, 33vw"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-gradient-to-br from-indigo-100 to-violet-50">
-                          <Play className="w-8 h-8 opacity-30" />
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2">
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-black/50 text-white border-none backdrop-blur">
-                          {series.status === "active" ? t("common.ongoing") : t("common.completed")}
-                        </Badge>
-                      </div>
+                <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-muted
+                                hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                  {series.coverUrl ? (
+                    <Image
+                      src={series.coverUrl}
+                      alt={series.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 50vw, 33vw"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 flex items-center justify-center">
+                      <Play className="w-8 h-8 text-white/30" />
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-3">
-                    <h3 className="font-semibold text-sm line-clamp-1 mb-0.5">
+                  )}
+                  {/* Status badge */}
+                  <div className="absolute top-2 right-2">
+                    <Badge className="text-[10px] px-1.5 py-0.5 bg-black/50 text-white border-none backdrop-blur">
+                      {series.status === "active" ? t("common.ongoing") : t("common.completed")}
+                    </Badge>
+                  </div>
+                  {/* Bottom gradient + title */}
+                  <div className="absolute bottom-0 left-0 right-0
+                                  bg-gradient-to-t from-black/80 via-black/40 to-transparent
+                                  px-2.5 pt-8 pb-2.5">
+                    <h3 className="text-white font-bold text-xs leading-tight line-clamp-2 mb-0.5">
                       {series.title}
                     </h3>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-white/70 text-[10px]">
                       {t("home.episodeCount", { count: series.episodeCount })}
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </Link>
             ))}
           </div>

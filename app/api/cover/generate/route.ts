@@ -28,17 +28,17 @@ export async function POST(req: NextRequest) {
     // Generate cover prompt via LLM
     const prompt = await generateCoverPrompt(scriptId, episodeNum)
 
-    // Submit cover generation (wide + tall) to Jimeng
-    const { wideTaskId, tallTaskId } = await submitCoverGeneration(scriptId, episodeNum, prompt)
+    // Submit cover generation (9:16 vertical) to Jimeng
+    const { tallTaskId } = await submitCoverGeneration(scriptId, episodeNum, prompt)
 
     // Poll & save in background (fire-and-forget)
     // The client polls /api/cover/status to check progress
-    pollAndSaveCovers(scriptId, wideTaskId, tallTaskId).catch(err => {
+    pollAndSaveCovers(scriptId, tallTaskId).catch(err => {
       console.error("[Cover] Background poll failed:", err)
     })
 
-    // Return task IDs immediately so client can poll for progress
-    return NextResponse.json({ wideTaskId, tallTaskId, prompt, status: "generating" })
+    // Return task ID immediately so client can poll for progress
+    return NextResponse.json({ tallTaskId, prompt, status: "generating" })
   } catch (error) {
     console.error("Cover generation failed:", error)
     return NextResponse.json({ error: String(error) }, { status: 500 })

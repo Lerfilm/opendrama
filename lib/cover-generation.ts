@@ -24,13 +24,19 @@ export async function generateCoverPrompt(scriptId: string, episodeNum: number):
     messages: [
       {
         role: "system",
-        content: `You are a professional movie poster designer. Generate an AI image generation prompt based on the following episode information.
-Requirements:
-- Movie poster style, visually striking
-- Describe composition, character poses, scene atmosphere, lighting and color
-- Do NOT include any text in the image
-- English description, under 800 characters
-- Suitable for cinematic poster style`,
+        content: `You are a cover art director for Chinese short-form vertical dramas (竖屏短剧).
+Generate a vivid, cinematic image prompt in English for a 9:16 vertical poster.
+
+Style requirements:
+- Photorealistic, dramatic lighting (strong rim light, backlight, or neon glow)
+- Focused on 1-2 characters: close-up or medium shot, intense emotional expression
+- Cinematic composition for vertical/portrait orientation (9:16)
+- High contrast, rich colors — bold shadows and highlights
+- Atmosphere: tension, desire, betrayal, romance, or power struggle
+- Real-life settings: office, luxury villa, street at night, hospital corridor, etc.
+- Inspired by popular Chinese short drama aesthetics (抖音短剧 style)
+- NO text, NO watermark, NO subtitles in the image
+- Output: one compact English prompt, under 800 characters`,
       },
       {
         role: "user",
@@ -84,23 +90,19 @@ async function submitT2ITask(prompt: string, width: number, height: number): Pro
 }
 
 /**
- * Submit cover generation tasks (wide 16:9 + tall 3:4) to Jimeng.
- * Both submitted in parallel.
+ * Submit cover generation task (9:16 vertical) to Jimeng.
  */
 export async function submitCoverGeneration(
   scriptId: string,
   episodeNum: number,
   prompt: string
-): Promise<{ wideTaskId: string; tallTaskId: string }> {
+): Promise<{ tallTaskId: string }> {
   console.log(`[Cover] Submitting cover generation for script=${scriptId} ep=${episodeNum}`)
 
-  const [wideTaskId, tallTaskId] = await Promise.all([
-    submitT2ITask(prompt, 1920, 1080),  // 16:9 wide
-    submitT2ITask(prompt, 1024, 1365),  // 3:4 tall (≈ 3:4 ratio)
-  ])
+  const tallTaskId = await submitT2ITask(prompt, 1080, 1920)  // 9:16 vertical
 
-  console.log(`[Cover] Submitted: wide=${wideTaskId} tall=${tallTaskId}`)
-  return { wideTaskId, tallTaskId }
+  console.log(`[Cover] Submitted: tall=${tallTaskId}`)
+  return { tallTaskId }
 }
 
 /**
@@ -140,52 +142,35 @@ export async function queryCoverResult(taskId: string): Promise<{ imageUrl?: str
 }
 
 /**
- * Poll both cover tasks until done, save results to Script.
+ * Poll the tall cover task until done, save result to Script.
  * Called server-side after submitCoverGeneration.
  * Max wait ~3 minutes (36 × 5s).
  */
 export async function pollAndSaveCovers(
   scriptId: string,
-  wideTaskId: string,
   tallTaskId: string
-): Promise<{ coverWide?: string; coverTall?: string }> {
+): Promise<{ coverTall?: string }> {
   const MAX_POLLS = 36
   const POLL_INTERVAL_MS = 5000
 
-  let wideUrl: string | undefined
   let tallUrl: string | undefined
-  let wideDone = false
-  let tallDone = false
 
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
 
-    if (!wideDone) {
-      const r = await queryCoverResult(wideTaskId).catch((): { status: string; imageUrl?: string } => ({ status: "failed" }))
-      if (r.status === "done") { wideUrl = r.imageUrl; wideDone = true }
-      if (r.status === "failed") { wideDone = true }
-    }
-
-    if (!tallDone) {
-      const r = await queryCoverResult(tallTaskId).catch((): { status: string; imageUrl?: string } => ({ status: "failed" }))
-      if (r.status === "done") { tallUrl = r.imageUrl; tallDone = true }
-      if (r.status === "failed") { tallDone = true }
-    }
-
-    if (wideDone && tallDone) break
+    const r = await queryCoverResult(tallTaskId).catch((): { status: string; imageUrl?: string } => ({ status: "failed" }))
+    if (r.status === "done") { tallUrl = r.imageUrl; break }
+    if (r.status === "failed") { break }
   }
 
   // Save to Script
-  if (wideUrl || tallUrl) {
+  if (tallUrl) {
     await prisma.script.update({
       where: { id: scriptId },
-      data: {
-        ...(wideUrl ? { coverWide: wideUrl } : {}),
-        ...(tallUrl ? { coverTall: tallUrl, coverImage: tallUrl } : {}),
-      },
+      data: { coverTall: tallUrl, coverImage: tallUrl },
     })
-    console.log(`[Cover] Saved: wide=${wideUrl} tall=${tallUrl}`)
+    console.log(`[Cover] Saved: tall=${tallUrl}`)
   }
 
-  return { coverWide: wideUrl, coverTall: tallUrl }
+  return { coverTall: tallUrl }
 }

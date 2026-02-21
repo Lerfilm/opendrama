@@ -111,23 +111,19 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
 
   // Cover state
   const [coverStatus, setCoverStatus] = useState<"idle" | "generating" | "done" | "failed">("idle")
-  const [coverTaskIds, setCoverTaskIds] = useState<{ wideTaskId?: string; tallTaskId?: string }>({})
-  const [coverWide, setCoverWide] = useState<string | null>(script.coverWide)
+  const [coverTallTaskId, setCoverTallTaskId] = useState<string | null>(null)
   const [coverTall, setCoverTall] = useState<string | null>(script.coverTall)
   const coverPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ─── Cover polling effect ─────────────────────
   useEffect(() => {
-    const { wideTaskId, tallTaskId } = coverTaskIds
-    if (coverStatus !== "generating" || (!wideTaskId && !tallTaskId)) return
+    if (coverStatus !== "generating" || !coverTallTaskId) return
 
     if (coverPollRef.current) clearInterval(coverPollRef.current)
 
     coverPollRef.current = setInterval(async () => {
       try {
-        const params = new URLSearchParams({ scriptId: script.id })
-        if (wideTaskId) params.set("wideTaskId", wideTaskId)
-        if (tallTaskId) params.set("tallTaskId", tallTaskId)
+        const params = new URLSearchParams({ scriptId: script.id, tallTaskId: coverTallTaskId })
 
         const res = await fetch(`/api/cover/status?${params}`)
         if (!res.ok) return
@@ -137,7 +133,6 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
           clearInterval(coverPollRef.current!)
           coverPollRef.current = null
           setCoverStatus("done")
-          if (data.coverWide) setCoverWide(data.coverWide)
           if (data.coverTall) setCoverTall(data.coverTall)
           onDataChanged()
         } else if (data.status === "failed") {
@@ -154,7 +149,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
       if (coverPollRef.current) clearInterval(coverPollRef.current)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coverTaskIds, coverStatus])
+  }, [coverTallTaskId, coverStatus])
 
   // ─── Derived data ─────────────────────────────
 
@@ -293,7 +288,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
   // Generate cover
   async function handleGenerateCover() {
     setCoverStatus("generating")
-    setCoverTaskIds({})
+    setCoverTallTaskId(null)
     try {
       const res = await fetch("/api/cover/generate", {
         method: "POST",
@@ -308,11 +303,8 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
         throw new Error(data.error || "Cover generation failed")
       }
       const data = await res.json()
-      // Save task IDs to start polling
-      setCoverTaskIds({
-        wideTaskId: data.wideTaskId,
-        tallTaskId: data.tallTaskId,
-      })
+      // Save task ID to start polling
+      setCoverTallTaskId(data.tallTaskId)
       // coverStatus stays "generating" — polling effect handles done/failed
     } catch (err) {
       console.error("[Cover] Submit error:", err)
@@ -690,35 +682,23 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
             </div>
           )}
 
-          {/* Cover previews (use local state so they update without page refresh) */}
-          {(coverWide || coverTall) && coverStatus !== "generating" && (
-            <div className="grid grid-cols-2 gap-2">
-              {coverWide && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground mb-1">16:9</p>
-                  <img
-                    src={coverWide}
-                    alt="Wide cover"
-                    className="w-full rounded-md border object-cover aspect-video"
-                  />
-                </div>
-              )}
-              {coverTall && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground mb-1">3:4</p>
-                  <img
-                    src={coverTall}
-                    alt="Tall cover"
-                    className="w-full rounded-md border object-cover aspect-[3/4]"
-                  />
-                </div>
-              )}
+          {/* Cover preview — 9:16 vertical */}
+          {coverTall && coverStatus !== "generating" && (
+            <div className="flex justify-center">
+              <div className="w-32">
+                <p className="text-[10px] text-muted-foreground mb-1 text-center">9:16</p>
+                <img
+                  src={coverTall}
+                  alt="Tall cover"
+                  className="w-full rounded-md border object-cover aspect-[9/16]"
+                />
+              </div>
             </div>
           )}
 
           {/* Generate button */}
           <Button
-            variant={coverWide ? "outline" : "default"}
+            variant={coverTall ? "outline" : "default"}
             size="sm"
             onClick={handleGenerateCover}
             disabled={coverStatus === "generating"}
@@ -732,7 +712,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
             ) : (
               <>
                 <ImageIcon className="w-3 h-3 mr-1" />
-                {coverWide ? t("studio.regenerateCover") : t("studio.generateCover")}
+                {coverTall ? t("studio.regenerateCover") : t("studio.generateCover")}
               </>
             )}
           </Button>
