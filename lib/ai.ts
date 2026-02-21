@@ -46,9 +46,8 @@ export async function aiComplete(options: AICompletionOptions): Promise<AIComple
     max_tokens: options.maxTokens ?? 4096,
   }
 
-  if (options.responseFormat === "json") {
-    body.response_format = { type: "json_object" }
-  }
+  // Note: Do NOT set response_format for MiniMax models — they don't support json_object.
+  // Instead, instruct JSON output in the system prompt.
 
   const res = await fetch(OPENROUTER_API_URL, {
     method: "POST",
@@ -68,9 +67,17 @@ export async function aiComplete(options: AICompletionOptions): Promise<AIComple
   }
 
   const data = await res.json()
+
+  // Log the raw response for debugging
+  if (data.error) {
+    console.error("OpenRouter returned error in body:", JSON.stringify(data.error))
+    throw new Error(`AI API error: ${data.error.message || JSON.stringify(data.error)}`)
+  }
+
   const choice = data.choices?.[0]
 
   if (!choice?.message?.content) {
+    console.error("Empty AI response. Full response:", JSON.stringify(data).slice(0, 500))
     throw new Error("Empty AI response")
   }
 
