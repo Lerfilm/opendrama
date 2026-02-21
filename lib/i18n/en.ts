@@ -346,6 +346,43 @@ const en: Record<string, string> = {
   "recommend.forYou": "For You",
   "recommend.similar": "Similar Viewers Also Watched",
   "recommend.trending": "Trending This Week",
+
+  // Series Interactions (V0.5)
+  "series.views": "{count} views",
+  "series.likes": "{count}",
+  "series.favorites": "{count}",
+  "series.share": "Share",
+  "series.tags": "Tags",
+  "series.like": "Like",
+  "series.favorite": "Favorite",
+
+  // Review & Rating
+  "review.rating": "Rating",
+  "review.ratings": "{count} ratings",
+  "review.yourRating": "Your Rating",
+  "review.rateThis": "Rate this series",
+  "review.loginToRate": "Sign in to rate",
+
+  // Comments
+  "review.comments": "Comments ({count})",
+  "review.writeComment": "Write a comment...",
+  "review.postComment": "Post",
+  "review.loginToComment": "Sign in to comment",
+  "review.noComments": "No comments yet. Be the first!",
+  "review.loadMore": "Load More",
+  "review.delete": "Delete",
+  "review.deleteConfirm": "Delete this comment?",
+  "review.posting": "Posting...",
+  "review.justNow": "Just now",
+  "review.minutesAgo": "{min}m ago",
+  "review.hoursAgo": "{hours}h ago",
+  "review.daysAgo": "{days}d ago",
+  "review.charLimit": "{count}/500",
+
+  // Continue Watching
+  "home.continueWatching": "Continue Watching",
+  "home.progress": "{percent}% watched",
+  "home.resumeEp": "Ep {num}",
 }
 
 export default en

@@ -346,6 +346,43 @@ const zh = {
   "recommend.forYou": "为你推荐",
   "recommend.similar": "看过的人也在看",
   "recommend.trending": "本周热门",
+
+  // 系列互动 (V0.5)
+  "series.views": "{count} 次观看",
+  "series.likes": "{count}",
+  "series.favorites": "{count}",
+  "series.share": "分享",
+  "series.tags": "标签",
+  "series.like": "喜欢",
+  "series.favorite": "收藏",
+
+  // 评分
+  "review.rating": "评分",
+  "review.ratings": "{count} 人评分",
+  "review.yourRating": "你的评分",
+  "review.rateThis": "为这部剧评分",
+  "review.loginToRate": "登录后评分",
+
+  // 评论
+  "review.comments": "评论 ({count})",
+  "review.writeComment": "写评论...",
+  "review.postComment": "发布",
+  "review.loginToComment": "登录后评论",
+  "review.noComments": "暂无评论，快来抢沙发！",
+  "review.loadMore": "加载更多",
+  "review.delete": "删除",
+  "review.deleteConfirm": "确认删除这条评论？",
+  "review.posting": "发布中...",
+  "review.justNow": "刚刚",
+  "review.minutesAgo": "{min}分钟前",
+  "review.hoursAgo": "{hours}小时前",
+  "review.daysAgo": "{days}天前",
+  "review.charLimit": "{count}/500",
+
+  // 继续观看
+  "home.continueWatching": "继续观看",
+  "home.progress": "已看 {percent}%",
+  "home.resumeEp": "第{num}集",
 } as const
 
 export type TranslationKey = keyof typeof zh

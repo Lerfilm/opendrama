@@ -8,6 +8,7 @@ import { Play, Coins, PenTool, Video, TheaterIcon, Sparkles, Zap, Crown } from "
 import Link from "next/link"
 import Image from "next/image"
 import { t } from "@/lib/i18n"
+import ContinueWatching from "@/components/continue-watching"
 
 export default async function HomePage() {
   const session = await auth()
@@ -177,6 +178,9 @@ export default async function HomePage() {
           </div>
         </Link>
       </div>
+
+      {/* ===== Continue Watching ===== */}
+      {session?.user && <ContinueWatching />}
 
       {/* ===== 热门推荐 ===== */}
       <div className="px-4 mt-8 mb-6">

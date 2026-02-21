@@ -1,15 +1,20 @@
 export const dynamic = "force-dynamic";
 import { auth } from "@/lib/auth"
-import { redirect, notFound } from "next/navigation"
+import { notFound } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, Coins } from "@/components/icons"
+import { Play, Coins, Eye } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
 import type { Metadata } from "next"
 import { t } from "@/lib/i18n"
+import SeriesActions from "@/components/series-actions"
+import StarRating from "@/components/star-rating"
+import CommentSection from "@/components/comment-section"
+import SeriesTags from "@/components/series-tags"
+import SeriesViewTracker from "./view-tracker"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -41,10 +46,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+function formatViewCount(n: number): string {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
+}
+
 export default async function SeriesDetailPage({ params }: Props) {
   const { id } = await params
   const session = await auth()
+  const userId = session?.user?.id
 
+  // Fetch series with all related data
   const series = await prisma.series.findUnique({
     where: { id },
     include: {
@@ -65,17 +78,51 @@ export default async function SeriesDetailPage({ params }: Props) {
     notFound()
   }
 
-  const unlockedEpisodeIds = session?.user?.id
-    ? await prisma.episodeUnlock
-        .findMany({
-          where: { userId: session.user.id },
-          select: { episodeId: true },
-        })
-        .then((unlocks) => unlocks.map((u) => u.episodeId))
-    : []
+  // Parallel data fetching for stats and user state
+  const [
+    unlockedEpisodeIds,
+    likeCount,
+    favoriteCount,
+    ratingAgg,
+    commentCount,
+    comments,
+    userLike,
+    userFavorite,
+    userRating,
+  ] = await Promise.all([
+    userId
+      ? prisma.episodeUnlock
+          .findMany({ where: { userId }, select: { episodeId: true } })
+          .then((u) => u.map((x) => x.episodeId))
+      : Promise.resolve([]),
+    prisma.seriesLike.count({ where: { seriesId: id } }),
+    prisma.seriesFavorite.count({ where: { seriesId: id } }),
+    prisma.seriesRating.aggregate({
+      where: { seriesId: id },
+      _avg: { rating: true },
+      _count: { rating: true },
+    }),
+    prisma.seriesComment.count({ where: { seriesId: id } }),
+    prisma.seriesComment.findMany({
+      where: { seriesId: id },
+      include: { user: { select: { id: true, name: true, image: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+    userId ? prisma.seriesLike.findUnique({ where: { userId_seriesId: { userId, seriesId: id } } }) : null,
+    userId ? prisma.seriesFavorite.findUnique({ where: { userId_seriesId: { userId, seriesId: id } } }) : null,
+    userId ? prisma.seriesRating.findUnique({ where: { userId_seriesId: { userId, seriesId: id } } }) : null,
+  ])
+
+  const avgRating = Math.round((ratingAgg._avg.rating || 0) * 10) / 10
+  const totalRatings = ratingAgg._count.rating
 
   return (
     <div className="pb-4">
+      {/* View tracker (auto-increment on page load) */}
+      <SeriesViewTracker seriesId={id} />
+
+      {/* Cover area */}
       <div className="relative h-48 sm:h-64 bg-gradient-to-b from-black/60 to-background">
         {series.coverUrl && (
           <Image
@@ -96,10 +143,43 @@ export default async function SeriesDetailPage({ params }: Props) {
           <div className="flex items-center gap-2 mt-3">
             <Badge>{t("home.episodeCount", { count: series.episodes.length })}</Badge>
             <Badge variant="outline">{series.status === "active" ? t("common.ongoing") : t("common.completed")}</Badge>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
+              <Eye className="w-3.5 h-3.5" />
+              {t("series.views", { count: formatViewCount(series.viewCount) })}
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Tags */}
+      <div className="px-4 pt-3">
+        <SeriesTags genre={series.genre} tags={series.tags} />
+      </div>
+
+      {/* Like / Favorite / Share */}
+      <div className="px-4">
+        <SeriesActions
+          seriesId={id}
+          initialLiked={!!userLike}
+          initialFavorited={!!userFavorite}
+          initialLikeCount={likeCount}
+          initialFavoriteCount={favoriteCount}
+          isLoggedIn={!!userId}
+        />
+      </div>
+
+      {/* Star Rating */}
+      <div className="px-4 border-t border-b">
+        <StarRating
+          seriesId={id}
+          initialAvgRating={avgRating}
+          initialTotalRatings={totalRatings}
+          initialUserRating={userRating?.rating || null}
+          isLoggedIn={!!userId}
+        />
+      </div>
+
+      {/* Episode List */}
       <div className="p-4 space-y-3">
         <h2 className="text-lg font-semibold">{t("series.episodeList")}</h2>
         <div className="space-y-2">
@@ -161,6 +241,22 @@ export default async function SeriesDetailPage({ params }: Props) {
             )
           })}
         </div>
+      </div>
+
+      {/* Comments Section */}
+      <div className="px-4 pb-4">
+        <CommentSection
+          seriesId={id}
+          initialComments={comments.map((c) => ({
+            id: c.id,
+            content: c.content,
+            createdAt: c.createdAt.toISOString(),
+            user: c.user,
+          }))}
+          initialTotal={commentCount}
+          isLoggedIn={!!userId}
+          currentUserId={userId}
+        />
       </div>
     </div>
   )

@@ -30,6 +30,10 @@ model User {
   aiJobs        AIJob[]
   theaters      Theater[]      @relation("theaterCreator")
   theaterVotes  TheaterVote[]
+  seriesLikes   SeriesLike[]
+  seriesFavorites SeriesFavorite[]
+  seriesRatings  SeriesRating[]
+  seriesComments SeriesComment[]
 
   @@map("users")
 }
@@ -96,14 +100,85 @@ model Series {
   title       String
   description String?   @db.Text
   coverUrl    String?
+  genre       String?   // romance, thriller, fantasy, comedy, drama, horror, action, mystery
+  tags        String?   @db.Text  // JSON: ["Love Triangle", "Hidden Identity", "Billionaire"]
+  viewCount   Int       @default(0) // 总浏览量
   status      String    @default("active") // active, archived
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  episodes Episode[]
-  cards    Card[]
+  episodes  Episode[]
+  cards     Card[]
+  likes     SeriesLike[]
+  favorites SeriesFavorite[]
+  ratings   SeriesRating[]
+  comments  SeriesComment[]
 
   @@map("series")
+}
+
+// 系列点赞
+model SeriesLike {
+  id        String   @id @default(cuid())
+  seriesId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, seriesId])
+  @@index([seriesId])
+  @@map("series_likes")
+}
+
+// 系列收藏
+model SeriesFavorite {
+  id        String   @id @default(cuid())
+  seriesId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, seriesId])
+  @@index([seriesId])
+  @@map("series_favorites")
+}
+
+// 系列评分
+model SeriesRating {
+  id        String   @id @default(cuid())
+  seriesId  String
+  userId    String
+  rating    Int      // 1-5
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, seriesId])
+  @@index([seriesId])
+  @@map("series_ratings")
+}
+
+// 系列评论
+model SeriesComment {
+  id        String   @id @default(cuid())
+  seriesId  String
+  userId    String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([seriesId, createdAt])
+  @@index([userId])
+  @@map("series_comments")
 }
 
 // 单集
