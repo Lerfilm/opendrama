@@ -20,7 +20,9 @@ function sha256(data: string): string {
 }
 
 function getDateTimeNow(): string {
-  return new Date().toISOString().replace(/[:-]|\.\d{3}/g, "")
+  // Remove dashes, colons, and milliseconds from ISO 8601 string
+  // e.g. "2026-02-21T11:03:12.000Z" → "20260221T110312Z"
+  return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "")
 }
 
 function uriEscape(str: string): string {
