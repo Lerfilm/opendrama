@@ -10,7 +10,7 @@ import {
 } from "@/components/icons"
 import Link from "next/link"
 import { t } from "@/lib/i18n"
-import { MODEL_PRICING } from "@/lib/tokens"
+import { MODEL_PRICING } from "@/lib/model-pricing"
 
 interface Script {
   id: string
