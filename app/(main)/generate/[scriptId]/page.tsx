@@ -35,12 +35,13 @@ export default async function GenerateScriptPage({
   const episodes = Object.keys(episodeMap).map(Number).sort((a, b) => a - b)
 
   // Group video segments by episode
-  const segmentMap: Record<number, { total: number; done: number; generating: number }> = {}
+  const segmentMap: Record<number, { total: number; done: number; generating: number; pending: number }> = {}
   for (const seg of script.videoSegments) {
-    if (!segmentMap[seg.episodeNum]) segmentMap[seg.episodeNum] = { total: 0, done: 0, generating: 0 }
+    if (!segmentMap[seg.episodeNum]) segmentMap[seg.episodeNum] = { total: 0, done: 0, generating: 0, pending: 0 }
     segmentMap[seg.episodeNum].total++
     if (seg.status === "done") segmentMap[seg.episodeNum].done++
     if (seg.status === "generating" || seg.status === "submitted") segmentMap[seg.episodeNum].generating++
+    if (seg.status === "pending") segmentMap[seg.episodeNum].pending++
   }
 
   return (
@@ -74,6 +75,7 @@ export default async function GenerateScriptPage({
               const segInfo = segmentMap[ep]
               const isDone = segInfo && segInfo.done > 0 && segInfo.done === segInfo.total
               const isGenerating = segInfo && segInfo.generating > 0
+              const hasPending = segInfo && segInfo.pending > 0
 
               return (
                 <Link key={ep} href={`/generate/${scriptId}/${ep}`}>
@@ -87,7 +89,7 @@ export default async function GenerateScriptPage({
                       <p className="text-xs text-muted-foreground">
                         {t("studio.sceneCount", { count: sceneCount })}
                       </p>
-                      {segInfo && (
+                      {segInfo && segInfo.done > 0 && (
                         <div className="w-full bg-muted rounded-full h-1.5">
                           <div
                             className="bg-green-500 h-1.5 rounded-full transition-all"
@@ -95,10 +97,14 @@ export default async function GenerateScriptPage({
                           />
                         </div>
                       )}
+                      {hasPending && !isGenerating && !isDone && (
+                        <Badge className="text-[10px] bg-green-100 text-green-700">
+                          {t("generate.readyBadge")}
+                        </Badge>
+                      )}
                       {!segInfo && (
-                        <Badge variant="outline" className="text-[10px]">
-                          <Play className="w-3 h-3 mr-1" />
-                          {t("studio.goToTheater")}
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                          {t("studio.needsSegments")}
                         </Badge>
                       )}
                     </CardContent>

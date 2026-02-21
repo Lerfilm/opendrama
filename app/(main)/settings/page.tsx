@@ -104,15 +104,6 @@ export default async function SettingsPage() {
               <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all" />
             </div>
           </div>
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sm font-medium">{t("settings.theaterNotify")}</p>
-              <p className="text-xs text-muted-foreground">{t("settings.theaterNotifyDesc")}</p>
-            </div>
-            <div className="w-10 h-6 bg-primary rounded-full relative cursor-pointer">
-              <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all" />
-            </div>
-          </div>
         </CardContent>
       </Card>
 

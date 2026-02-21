@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Play, Coins, PenTool, Video, TheaterIcon, Sparkles, Zap, Crown } from "@/components/icons"
+import { Play, Coins, PenTool, Video, Film, Sparkles, Zap, Crown } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
 import { t } from "@/lib/i18n"
@@ -147,14 +147,14 @@ export default async function HomePage() {
             </div>
           </Link>
 
-          {/* AI 剧场 */}
-          <Link href="/theater">
+          {/* Video Theater */}
+          <Link href="/generate">
             <div className="ai-card bg-card rounded-2xl p-4 text-center shadow-lg border animate-fade-up-delay-3">
               <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-rose-500/10 flex items-center justify-center">
-                <TheaterIcon className="w-5 h-5 text-rose-500" />
+                <Film className="w-5 h-5 text-rose-500" />
               </div>
-              <h3 className="text-xs font-bold mb-0.5 line-clamp-1">{t("home.aiTheaterTitle")}</h3>
-              <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{t("home.aiTheaterDesc")}</p>
+              <h3 className="text-xs font-bold mb-0.5 line-clamp-1">{t("home.theaterTitle")}</h3>
+              <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{t("home.theaterDesc")}</p>
             </div>
           </Link>
         </div>

@@ -5,8 +5,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  ArrowLeft, Sparkles, Loader2, Play, Zap,
-  CheckCircle, XIcon, Coins, ChevronDown, ChevronUp, ImageIcon,
+  ArrowLeft, Loader2, Zap,
+  CheckCircle, XIcon, Coins, PenTool,
 } from "@/components/icons"
 import Link from "next/link"
 import { t } from "@/lib/i18n"
@@ -54,22 +54,6 @@ interface VideoSegment {
   errorMessage: string | null
 }
 
-interface GeneratedSegment {
-  segmentIndex: number
-  durationSec: number
-  prompt: string
-  shotType: string
-  cameraMove: string
-}
-
-const MODELS = [
-  { id: "seedance_2_0", name: "Seedance 2.0", resolutions: ["1080p", "720p"] },
-  { id: "seedance_1_5_pro", name: "Seedance 1.5 Pro", resolutions: ["1080p", "720p"] },
-  { id: "jimeng_3_0_pro", name: "Jimeng 3.0 Pro", resolutions: ["1080p"] },
-  { id: "jimeng_3_0", name: "Jimeng 3.0", resolutions: ["1080p", "720p"] },
-  { id: "jimeng_s2_pro", name: "Jimeng S2 Pro", resolutions: ["720p"] },
-]
-
 export function GenerateWorkbench({
   script,
   episodeNum,
@@ -79,38 +63,30 @@ export function GenerateWorkbench({
   episodeNum: number
   balance: number
 }) {
-  const [selectedModel, setSelectedModel] = useState("seedance_2_0")
-  const [selectedResolution, setSelectedResolution] = useState("720p")
-  const [isSplitting, setIsSplitting] = useState(false)
-  const [segments, setSegments] = useState<GeneratedSegment[]>([])
   const [existingSegments, setExistingSegments] = useState<VideoSegment[]>(script.videoSegments)
-  const [expandedSegment, setExpandedSegment] = useState<number | null>(null)
-  const [editingPrompts, setEditingPrompts] = useState<Record<number, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [balance, setBalance] = useState(initialBalance)
   const [pollingActive, setPollingActive] = useState(false)
-  const [coverStatus, setCoverStatus] = useState<"idle" | "generating" | "done" | "failed">("idle")
-  const [coverWide, setCoverWide] = useState<string | null>(null)
-  const [coverTall, setCoverTall] = useState<string | null>(null)
 
-  // Check if we already have segments from DB
+  // Derived state
   const hasExistingSegments = existingSegments.length > 0
+  const pendingSegments = existingSegments.filter(s => s.status === "pending")
+  const hasPending = pendingSegments.length > 0
   const allDone = hasExistingSegments && existingSegments.every(s => s.status === "done")
-  const hasGenerating = existingSegments.some(s => s.status === "generating" || s.status === "submitted" || s.status === "reserved")
+  const hasGenerating = existingSegments.some(
+    s => s.status === "generating" || s.status === "submitted" || s.status === "reserved"
+  )
 
-  // Available resolutions for selected model
-  const modelInfo = MODELS.find(m => m.id === selectedModel)
-  const availableResolutions = modelInfo?.resolutions || ["720p"]
-
-  // Calculate cost
+  // Calculate cost for pending segments (model/resolution from segment records)
   const calculateTotalCost = useCallback(() => {
-    const segs = segments.length > 0 ? segments : existingSegments.filter(s => s.status === "pending")
-    const costPerSec = MODEL_PRICING[selectedModel]?.[selectedResolution] || 0
-    const totalDuration = segs.reduce((sum, s) => sum + (s.durationSec || 15), 0)
-    const apiCostCents = costPerSec * totalDuration
-    const userCostCents = apiCostCents * 2
-    return Math.ceil(userCostCents / 100)
-  }, [segments, existingSegments, selectedModel, selectedResolution])
+    if (pendingSegments.length === 0) return 0
+    const firstSeg = pendingSegments[0]
+    const model = firstSeg.model || "seedance_2_0"
+    const resolution = firstSeg.resolution || "720p"
+    const costPerSec = MODEL_PRICING[model]?.[resolution] || 0
+    const totalDuration = pendingSegments.reduce((sum, s) => sum + (s.durationSec || 15), 0)
+    return Math.ceil(costPerSec * totalDuration * 2 / 100)
+  }, [pendingSegments])
 
   const totalCost = calculateTotalCost()
 
@@ -129,7 +105,6 @@ export function GenerateWorkbench({
           const data = await res.json()
           setExistingSegments(data.segments || [])
 
-          // Check if all done
           const allComplete = (data.segments || []).every(
             (s: VideoSegment) => s.status === "done" || s.status === "failed"
           )
@@ -145,64 +120,9 @@ export function GenerateWorkbench({
     return () => clearInterval(interval)
   }, [hasGenerating, script.id, episodeNum])
 
-  // Auto-generate cover when all segments are done (episode 1 only for script cover)
-  useEffect(() => {
-    if (allDone && coverStatus === "idle" && !coverWide) {
-      handleGenerateCover()
-    }
-  }, [allDone]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Generate cover poster
-  async function handleGenerateCover() {
-    setCoverStatus("generating")
-    try {
-      const res = await fetch("/api/cover/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptId: script.id, episodeNum }),
-      })
-
-      if (!res.ok) throw new Error("Cover generation failed")
-
-      const data = await res.json()
-      // For now the cover generation is async (TODO stubs), so set status
-      // In production this would poll for completion
-      setCoverStatus("done")
-      if (data.coverWide) setCoverWide(data.coverWide)
-      if (data.coverTall) setCoverTall(data.coverTall)
-    } catch {
-      setCoverStatus("failed")
-    }
-  }
-
-  // AI Split — generate segments from scenes
-  async function handleSplit() {
-    setIsSplitting(true)
-    try {
-      const res = await fetch("/api/ai/split", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scriptId: script.id,
-          episodeNum,
-          model: selectedModel,
-          resolution: selectedResolution,
-        }),
-      })
-
-      if (!res.ok) throw new Error("Split failed")
-
-      const data = await res.json()
-      setSegments(data.segments || [])
-    } catch {
-      alert("Split failed")
-    } finally {
-      setIsSplitting(false)
-    }
-  }
-
-  // Submit all segments for video generation
+  // Submit all pending segments for video generation
   async function handleSubmitAll() {
+    if (pendingSegments.length === 0) return
     if (totalCost > balance) {
       alert(t("episode.insufficientCoins"))
       return
@@ -210,22 +130,27 @@ export function GenerateWorkbench({
 
     setIsSubmitting(true)
     try {
-      // Create video segments in DB
-      const segsToCreate = segments.map((seg, i) => ({
-        ...seg,
-        prompt: editingPrompts[i] || seg.prompt,
+      const firstSeg = pendingSegments[0]
+      const model = firstSeg.model || "seedance_2_0"
+      const resolution = firstSeg.resolution || "720p"
+
+      const segsToSubmit = pendingSegments.map(seg => ({
+        segmentIndex: seg.segmentIndex,
+        durationSec: seg.durationSec,
+        prompt: seg.prompt,
+        shotType: seg.shotType || "medium",
+        cameraMove: seg.cameraMove || "static",
       }))
 
-      // Batch submit
       const res = await fetch("/api/video/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           scriptId: script.id,
           episodeNum,
-          model: selectedModel,
-          resolution: selectedResolution,
-          segments: segsToCreate,
+          model,
+          resolution,
+          segments: segsToSubmit,
           mode: "batch",
         }),
       })
@@ -238,7 +163,6 @@ export function GenerateWorkbench({
 
       const data = await res.json()
       setExistingSegments(data.segments || [])
-      setSegments([])
       setBalance(prev => prev - totalCost)
     } catch {
       alert("Submit failed")
@@ -247,7 +171,7 @@ export function GenerateWorkbench({
     }
   }
 
-  // Submit single segment
+  // Submit single segment (retry)
   async function handleSubmitSingle(segmentId: string) {
     try {
       const res = await fetch("/api/video/submit", {
@@ -286,7 +210,7 @@ export function GenerateWorkbench({
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-bold truncate">{script.title}</h1>
           <p className="text-xs text-muted-foreground">
-            {t("studio.episode", { num: episodeNum })} — {t("studio.goToTheater")}
+            {t("studio.episode", { num: episodeNum })} — {t("theater.title")}
           </p>
         </div>
         <div className="flex items-center gap-1 text-sm">
@@ -295,191 +219,83 @@ export function GenerateWorkbench({
         </div>
       </div>
 
-      {/* Model + Resolution selection */}
+      {/* No segments — redirect to Studio */}
       {!hasExistingSegments && (
         <Card>
-          <CardContent className="p-3 space-y-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1.5">
-                {t("t2v.style")} / Model
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {MODELS.map(m => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setSelectedModel(m.id)
-                      if (!m.resolutions.includes(selectedResolution)) {
-                        setSelectedResolution(m.resolutions[0])
-                      }
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      selectedModel === m.id
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {m.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1.5">
-                {t("t2v.resolution")}
-              </label>
-              <div className="flex gap-2">
-                {availableResolutions.map(res => (
-                  <button
-                    key={res}
-                    onClick={() => setSelectedResolution(res)}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      selectedResolution === res
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {res}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <CardContent className="p-8 text-center space-y-3">
+            <PenTool className="w-8 h-8 text-muted-foreground mx-auto" />
+            <h2 className="font-semibold">{t("generate.noSegments")}</h2>
+            <p className="text-xs text-muted-foreground">
+              {t("generate.noSegmentsHint")}
+            </p>
+            <Link href={`/studio/script/${script.id}`}>
+              <Button variant="outline">
+                <PenTool className="w-4 h-4 mr-1" />
+                {t("generate.goToStudio") || "Go to Studio"}
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       )}
 
-      {/* Step 1: Split scenes into segments */}
-      {!hasExistingSegments && segments.length === 0 && (
-        <Card>
-          <CardContent className="p-6 text-center space-y-3">
-            <Zap className="w-8 h-8 text-amber-500 mx-auto" />
-            <h2 className="font-semibold">{t("studio.goToTheater")}</h2>
-            <p className="text-xs text-muted-foreground">
-              {script.scenes.length} {t("studio.scenes").toLowerCase()} → AI splits into video segments
-            </p>
+      {/* Pending segments — cost confirmation + generate button */}
+      {hasPending && !hasGenerating && (
+        <Card className="border-2 border-primary/20">
+          <CardContent className="p-4 space-y-3">
+            <div className="text-center">
+              <Zap className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+              <h2 className="font-semibold">{t("generate.startGenerate")}</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                {pendingSegments.length} {t("studio.segments").toLowerCase()} · {pendingSegments[0]?.model || "seedance_2_0"} · {pendingSegments[0]?.resolution || "720p"}
+              </p>
+            </div>
+
+            {/* Segment summary */}
+            <div className="space-y-1">
+              {pendingSegments.map(seg => (
+                <div key={seg.id} className="flex items-center gap-2 text-xs p-1.5 rounded bg-muted/50">
+                  <span className="font-mono font-bold text-primary w-6">#{seg.segmentIndex + 1}</span>
+                  <span className="flex-1 truncate">{seg.prompt.substring(0, 50)}...</span>
+                  <span className="text-muted-foreground">{seg.durationSec}s</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Cost info */}
+            <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+              <span className="text-sm font-medium">{t("generate.costSummary")}</span>
+              <span className="flex items-center gap-1 font-bold text-amber-600">
+                <Coins className="w-4 h-4" />
+                {totalCost} coins
+              </span>
+            </div>
+
+            {totalCost > balance && (
+              <p className="text-xs text-red-500 text-center">{t("episode.insufficientCoins")}</p>
+            )}
+
             <Button
-              onClick={handleSplit}
-              disabled={isSplitting}
-              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+              onClick={handleSubmitAll}
+              disabled={isSubmitting || totalCost > balance}
+              className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
             >
-              {isSplitting ? (
+              {isSubmitting ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <Sparkles className="w-4 h-4 mr-2" />
+                <Zap className="w-4 h-4 mr-2" />
               )}
-              {isSplitting ? t("studio.suggesting") : "AI Split into Segments"}
+              {isSubmitting ? t("common.processing") : t("generate.startGenerate")}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Step 2: Review generated segments */}
-      {segments.length > 0 && (
+      {/* Existing segments — progress view */}
+      {hasExistingSegments && !hasPending && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">
-              Generated Segments ({segments.length})
-            </h2>
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <Coins className="w-3 h-3 text-amber-500" />
-              {t("t2v.cost", { coins: totalCost })}
-            </div>
-          </div>
-
-          {segments.map((seg, i) => {
-            const isExpanded = expandedSegment === i
-
-            return (
-              <Card key={i}>
-                <CardContent className="p-0">
-                  <button
-                    onClick={() => setExpandedSegment(isExpanded ? null : i)}
-                    className="w-full flex items-center gap-2 p-3 text-left"
-                  >
-                    <span className="text-xs font-mono font-bold text-primary w-6">
-                      #{i + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs truncate">{editingPrompts[i] || seg.prompt}</p>
-                    </div>
-                    <Badge variant="outline" className="text-[10px] px-1">
-                      {seg.durationSec}s
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] px-1">
-                      {seg.shotType}
-                    </Badge>
-                    {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </button>
-
-                  {isExpanded && (
-                    <div className="px-3 pb-3 space-y-2 border-t">
-                      <div className="pt-2">
-                        <label className="text-[10px] font-medium text-muted-foreground block mb-1">
-                          Prompt
-                        </label>
-                        <textarea
-                          value={editingPrompts[i] ?? seg.prompt}
-                          onChange={e => setEditingPrompts(prev => ({ ...prev, [i]: e.target.value }))}
-                          rows={4}
-                          className="w-full text-xs px-2 py-1.5 rounded-md border bg-background resize-none"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Badge variant="secondary" className="text-[10px]">
-                          {seg.shotType} / {seg.cameraMove}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px]">
-                          {seg.durationSec}s
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
-
-          {/* Submit all button */}
-          <Card className="border-2 border-primary/20">
-            <CardContent className="p-3 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">Total cost</span>
-                <span className="flex items-center gap-1 font-bold text-amber-600">
-                  <Coins className="w-4 h-4" />
-                  {totalCost} coins
-                </span>
-              </div>
-              {totalCost > balance && (
-                <p className="text-xs text-red-500">{t("episode.insufficientCoins")}</p>
-              )}
-              <Button
-                onClick={handleSubmitAll}
-                disabled={isSubmitting || totalCost > balance}
-                className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Zap className="w-4 h-4 mr-2" />
-                )}
-                {isSubmitting ? t("common.processing") : `Generate All (${segments.length} segments)`}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Step 3: Existing segments — progress view */}
-      {hasExistingSegments && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">
-              Video Segments ({existingSegments.filter(s => s.status === "done").length}/{existingSegments.length})
+              {t("theater.videoSegments") || "Video Segments"} ({existingSegments.filter(s => s.status === "done").length}/{existingSegments.length})
             </h2>
             {pollingActive && (
               <div className="flex items-center gap-1 text-xs text-amber-600">
@@ -571,44 +387,6 @@ export function GenerateWorkbench({
                   {t("generate.segmentsReady", { count: existingSegments.length })}
                 </p>
 
-                {/* Cover generation */}
-                <div className="border-t pt-3 space-y-2">
-                  {coverStatus === "generating" && (
-                    <div className="flex items-center justify-center gap-2 text-xs text-amber-600">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      {t("cover.autoGenerate")}
-                    </div>
-                  )}
-                  {coverStatus === "done" && (coverWide || coverTall) && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-center gap-1 text-xs text-green-600">
-                        <ImageIcon className="w-3 h-3" />
-                        {t("cover.generated")}
-                      </div>
-                      <div className="flex gap-2 justify-center">
-                        {coverWide && (
-                          <img src={coverWide} alt="Wide cover" className="h-20 rounded-md border object-cover" />
-                        )}
-                        {coverTall && (
-                          <img src={coverTall} alt="Tall cover" className="h-20 rounded-md border object-cover" />
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {(coverStatus === "failed" || coverStatus === "done") && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleGenerateCover}
-                      className="text-xs"
-                    >
-                      <ImageIcon className="w-3 h-3 mr-1" />
-                      {t("cover.regenerate")}
-                      <Badge variant="secondary" className="ml-1 text-[10px]">{t("cover.free")}</Badge>
-                    </Button>
-                  )}
-                </div>
-
                 <div className="flex gap-2 justify-center pt-1">
                   <Link href={`/generate/${script.id}`}>
                     <Button size="sm" variant="outline">
@@ -617,7 +395,8 @@ export function GenerateWorkbench({
                   </Link>
                   <Link href={`/studio/script/${script.id}`}>
                     <Button size="sm" variant="outline">
-                      {t("common.edit")} Script
+                      <PenTool className="w-3 h-3 mr-1" />
+                      {t("common.edit")}
                     </Button>
                   </Link>
                 </div>

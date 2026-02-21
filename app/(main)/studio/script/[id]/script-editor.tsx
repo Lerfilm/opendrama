@@ -12,18 +12,36 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { t } from "@/lib/i18n"
+import { SegmentsTab } from "./segments-tab"
+
+interface VideoSegment {
+  id: string
+  episodeNum: number
+  segmentIndex: number
+  durationSec: number
+  prompt: string
+  shotType: string | null
+  cameraMove: string | null
+  model: string | null
+  resolution: string | null
+  status: string
+}
 
 interface Script {
   id: string
   title: string
   genre: string
   format: string
+  language: string
   logline: string | null
   synopsis: string | null
+  coverWide: string | null
+  coverTall: string | null
   targetEpisodes: number
   status: string
   scenes: Scene[]
   roles: Role[]
+  videoSegments: VideoSegment[]
 }
 
 interface Scene {
@@ -61,7 +79,7 @@ interface PolishResult {
 
 export function ScriptEditor({ script: initial }: { script: Script }) {
   const [script, setScript] = useState(initial)
-  const [activeTab, setActiveTab] = useState<"scenes" | "roles">("scenes")
+  const [activeTab, setActiveTab] = useState<"scenes" | "roles" | "segments">("scenes")
   const [isGenerating, setIsGenerating] = useState(false)
   const [selectedEpisode, setSelectedEpisode] = useState(1)
   const [expandedScenes, setExpandedScenes] = useState<Set<string>>(new Set())
@@ -177,6 +195,24 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
     const sceneIds = Object.keys(editingScenes)
     await Promise.all(sceneIds.map(id => saveScene(id)))
   }, [editingScenes, saveScene])
+
+  // Refresh script data from server (used by SegmentsTab after save)
+  async function refreshScript() {
+    try {
+      const res = await fetch(`/api/scripts/${script.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setScript(data.script)
+      }
+    } catch {
+      // silent fail
+    }
+  }
+
+  // Segment count for current episode
+  const episodeSegmentCount = script.videoSegments?.filter(
+    s => s.episodeNum === selectedEpisode
+  ).length || 0
 
   // AI Generate script
   async function handleAIGenerate() {
@@ -396,9 +432,34 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
         </Card>
       )}
 
-      {/* Scenes/Roles tabs */}
+      {/* Episode selector (shared across all tabs) */}
+      {episodes.length > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="flex gap-2 overflow-x-auto flex-1 no-scrollbar">
+            {episodes.map((ep) => (
+              <button
+                key={ep}
+                onClick={() => {
+                  setSelectedEpisode(ep)
+                  setSuggestions(null)
+                  setPolishResult(null)
+                }}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  selectedEpisode === ep
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {t("studio.episode", { num: ep })}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Scenes/Roles/Segments tabs */}
       <div className="flex border-b border-border">
-        {(["scenes", "roles"] as const).map((tab) => (
+        {(["scenes", "roles", "segments"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -408,7 +469,7 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
                 : "border-transparent text-muted-foreground"
             }`}
           >
-            {t(`studio.${tab}`)} ({tab === "scenes" ? script.scenes.length : script.roles.length})
+            {t(`studio.${tab}`)} ({tab === "scenes" ? currentScenes.length : tab === "roles" ? script.roles.length : episodeSegmentCount})
           </button>
         ))}
       </div>
@@ -416,36 +477,15 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
       {/* SCENES TAB */}
       {activeTab === "scenes" && (
         <div className="space-y-3">
-          {/* Episode selector + expand/collapse */}
-          {episodes.length > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="flex gap-2 overflow-x-auto flex-1 no-scrollbar">
-                {episodes.map((ep) => (
-                  <button
-                    key={ep}
-                    onClick={() => {
-                      setSelectedEpisode(ep)
-                      setSuggestions(null)
-                      setPolishResult(null)
-                    }}
-                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      selectedEpisode === ep
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {t("studio.episode", { num: ep })}
-                  </button>
-                ))}
-              </div>
-              {currentScenes.length > 0 && (
-                <button
-                  onClick={expandedScenes.size === currentScenes.length ? collapseAll : expandAll}
-                  className="text-xs text-muted-foreground hover:text-foreground flex-shrink-0"
-                >
-                  {expandedScenes.size === currentScenes.length ? t("studio.collapseAll") : t("studio.expandAll")}
-                </button>
-              )}
+          {/* Expand/collapse controls */}
+          {currentScenes.length > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={expandedScenes.size === currentScenes.length ? collapseAll : expandAll}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                {expandedScenes.size === currentScenes.length ? t("studio.collapseAll") : t("studio.expandAll")}
+              </button>
             </div>
           )}
 
@@ -820,8 +860,17 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
         </div>
       )}
 
+      {/* SEGMENTS TAB */}
+      {activeTab === "segments" && (
+        <SegmentsTab
+          script={script}
+          selectedEpisode={selectedEpisode}
+          onDataChanged={refreshScript}
+        />
+      )}
+
       {/* Floating action bar */}
-      {activeTab === "scenes" && currentScenes.length > 0 && (
+      {(activeTab === "scenes" || activeTab === "segments") && currentScenes.length > 0 && (
         <div className="fixed bottom-20 left-0 right-0 px-4 z-40">
           <div className="max-w-screen-md mx-auto">
             <Card className="shadow-lg border-2">
@@ -848,13 +897,13 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ status: "ready" }),
                     }).then(() => {
-                      router.push(`/generate/${script.id}`)
+                      router.push(`/generate/${script.id}/${selectedEpisode}`)
                     })
                   }}
                   className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs"
                 >
                   <Play className="w-3 h-3 mr-1" />
-                  {t("studio.goToTheater")}
+                  {episodeSegmentCount > 0 ? t("studio.goToTheater") : t("studio.needsSegments")}
                 </Button>
               </CardContent>
             </Card>

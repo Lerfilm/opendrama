@@ -28,8 +28,6 @@ model User {
   userCards       UserCard[]
   scripts         Script[]
   aiJobs          AIJob[]
-  theaters        Theater[]      @relation("theaterCreator")
-  theaterVotes    TheaterVote[]
   seriesLikes     SeriesLike[]
   seriesFavorites SeriesFavorite[]
   seriesRatings   SeriesRating[]
@@ -366,7 +364,6 @@ model ScriptRole {
 model AIJob {
   id          String    @id @default(cuid())
   scriptId    String?
-  theaterId   String?
   userId      String
   type        String    // script_generate, dialogue_enhance, voice_generate, image_generate, video_compose
   status      String    @default("pending") // pending, processing, completed, failed
@@ -381,123 +378,12 @@ model AIJob {
   updatedAt   DateTime  @updatedAt
 
   script  Script?  @relation(fields: [scriptId], references: [id], onDelete: SetNull)
-  theater Theater? @relation(fields: [theaterId], references: [id], onDelete: SetNull)
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
   @@index([scriptId])
-  @@index([theaterId])
   @@map("ai_jobs")
-}
-
-// ============================================
-// 互动端 - AI 剧场
-// ============================================
-
-// AI 剧场
-model Theater {
-  id          String   @id @default(cuid())
-  creatorId   String
-  title       String
-  description String?  @db.Text
-  coverUrl    String?
-  genre       String   @default("drama")
-  scenario    String?  @db.Text // JSON: 初始剧情设定
-  characters  String?  @db.Text // JSON: [{name, personality, avatar}]
-  maxViewers  Int      @default(100)
-  status      String   @default("draft") // draft, live, paused, ended, archived
-  isPublic    Boolean  @default(true)
-  totalVotes  Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  creator  User              @relation("theaterCreator", fields: [creatorId], references: [id], onDelete: Cascade)
-  sessions TheaterSession[]
-  messages TheaterMessage[]
-  votes    TheaterVote[]
-  jobs     AIJob[]
-
-  @@index([creatorId])
-  @@index([status])
-  @@map("theaters")
-}
-
-// 剧场会话/幕
-model TheaterSession {
-  id             String    @id @default(cuid())
-  theaterId      String
-  sessionNum     Int
-  title          String?
-  narrative      String?   @db.Text
-  status         String    @default("active") // active, voting, resolved, ended
-  votingEndsAt   DateTime?
-  chosenOptionId String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  theater  Theater              @relation(fields: [theaterId], references: [id], onDelete: Cascade)
-  messages TheaterMessage[]
-  options  TheaterVoteOption[]
-
-  @@index([theaterId])
-  @@index([theaterId, sessionNum])
-  @@map("theater_sessions")
-}
-
-// 剧场消息
-model TheaterMessage {
-  id          String   @id @default(cuid())
-  theaterId   String
-  sessionId   String
-  role        String   // narrator, character, system
-  character   String?
-  content     String   @db.Text
-  messageType String   @default("dialogue") // dialogue, narration, action, choice_prompt
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-
-  theater Theater        @relation(fields: [theaterId], references: [id], onDelete: Cascade)
-  session TheaterSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([theaterId])
-  @@index([sessionId])
-  @@map("theater_messages")
-}
-
-// 投票选项
-model TheaterVoteOption {
-  id          String   @id @default(cuid())
-  sessionId   String
-  label       String
-  description String?  @db.Text
-  voteCount   Int      @default(0)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-
-  session TheaterSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  votes   TheaterVote[]
-
-  @@index([sessionId])
-  @@map("theater_vote_options")
-}
-
-// 用户投票
-model TheaterVote {
-  id        String   @id @default(cuid())
-  theaterId String
-  optionId  String
-  userId    String
-  createdAt DateTime @default(now())
-
-  theater Theater           @relation(fields: [theaterId], references: [id], onDelete: Cascade)
-  option  TheaterVoteOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, optionId])
-  @@index([theaterId])
-  @@index([optionId])
-  @@map("theater_votes")
 }
 
 // ============================================

@@ -19,6 +19,14 @@ export default async function ScriptDetailPage({
     include: {
       scenes: { orderBy: [{ episodeNum: "asc" }, { sortOrder: "asc" }] },
       roles: { orderBy: { createdAt: "asc" } },
+      videoSegments: {
+        orderBy: [{ episodeNum: "asc" }, { segmentIndex: "asc" }],
+        select: {
+          id: true, episodeNum: true, segmentIndex: true,
+          durationSec: true, prompt: true, shotType: true,
+          cameraMove: true, model: true, resolution: true, status: true,
+        },
+      },
     },
   })
 
