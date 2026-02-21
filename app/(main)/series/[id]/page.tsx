@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { notFound } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Badge } from "@/components/ui/badge"
-import { Eye } from "@/components/icons"
+import { Eye, Star, User as UserIcon } from "@/components/icons"
 import Image from "next/image"
 import type { Metadata } from "next"
 import { t } from "@/lib/i18n"
@@ -13,6 +13,8 @@ import CommentSection from "@/components/comment-section"
 import SeriesTags from "@/components/series-tags"
 import SeriesViewTracker from "./view-tracker"
 import EpisodeListClient from "@/components/episode-list-client"
+import ExpandableSynopsis from "@/components/expandable-synopsis"
+import CastSection from "@/components/cast-section"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -22,24 +24,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const series = await prisma.series.findUnique({
     where: { id },
-    select: { title: true, description: true, coverUrl: true },
+    select: {
+      title: true, description: true, synopsis: true,
+      coverUrl: true, coverWide: true,
+      user: { select: { name: true } },
+    },
   })
 
   if (!series) return { title: t("series.notFound") }
 
+  const desc = series.synopsis || series.description || t("series.watchAt", { title: series.title })
+  const ogImage = series.coverWide || series.coverUrl
+
   return {
-    title: series.title,
-    description: series.description || t("series.watchAt", { title: series.title }),
+    title: `${series.title}${series.user?.name ? ` · ${series.user.name}` : ""}`,
+    description: desc,
     openGraph: {
       title: series.title,
-      description: series.description || t("series.watchAt", { title: series.title }),
-      images: series.coverUrl ? [{ url: series.coverUrl }] : [],
+      description: desc,
+      images: ogImage ? [{ url: ogImage }] : [],
     },
     twitter: {
       card: "summary_large_image",
       title: series.title,
-      description: series.description || t("series.watchAt", { title: series.title }),
-      images: series.coverUrl ? [series.coverUrl] : [],
+      description: desc,
+      images: ogImage ? [ogImage] : [],
     },
   }
 }
@@ -55,7 +64,7 @@ export default async function SeriesDetailPage({ params }: Props) {
   const session = await auth()
   const userId = session?.user?.id
 
-  // Fetch series with all related data
+  // Fetch series with creator, cast, and episodes
   const series = await prisma.series.findUnique({
     where: { id },
     include: {
@@ -68,6 +77,18 @@ export default async function SeriesDetailPage({ params }: Props) {
           duration: true,
           unlockCost: true,
           muxPlaybackId: true,
+        },
+      },
+      user: {
+        select: { id: true, name: true, image: true },
+      },
+      script: {
+        select: {
+          synopsis: true,
+          roles: {
+            select: { id: true, name: true, role: true, description: true, avatarUrl: true },
+            orderBy: { createdAt: "asc" },
+          },
         },
       },
     },
@@ -119,47 +140,98 @@ export default async function SeriesDetailPage({ params }: Props) {
 
   const avgRating = Math.round((ratingAgg._avg.rating || 0) * 10) / 10
   const totalRatings = ratingAgg._count.rating
+  const heroImage = series.coverWide || series.coverUrl
+  const synopsisText = series.synopsis || series.script?.synopsis || series.description || ""
+  const castRoles = series.script?.roles || []
+  const createdYear = series.createdAt.getFullYear()
 
   return (
     <div className="pb-4">
-      {/* View tracker (auto-increment on page load) */}
+      {/* View tracker */}
       <SeriesViewTracker seriesId={id} />
 
-      {/* Cover area */}
-      <div className="relative h-48 sm:h-64 bg-gradient-to-b from-black/60 to-background">
-        {series.coverUrl && (
+      {/* ── Hero Section (Netflix-style wide backdrop) ── */}
+      <div className="relative h-[280px] sm:h-[380px] -mx-4 -mt-4 overflow-hidden">
+        {heroImage ? (
           <Image
-            src={series.coverUrl}
+            src={heroImage}
             alt={series.title}
             fill
-            className="object-cover -z-10"
+            className="object-cover"
             priority
           />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-950 to-slate-900" />
         )}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background to-transparent">
-          <h1 className="text-2xl font-bold mb-2">{series.title}</h1>
-          {series.description && (
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {series.description}
-            </p>
-          )}
-          <div className="flex items-center gap-2 mt-3">
-            <Badge>{t("home.episodeCount", { count: series.episodes.length })}</Badge>
-            <Badge variant="outline">{series.status === "active" ? t("common.ongoing") : t("common.completed")}</Badge>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+
+        {/* Content at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-bold leading-tight">{series.title}</h1>
+
+          {/* Meta line: genre · year · episodes · rating */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+            {series.genre && (
+              <Badge variant="outline" className="text-[10px]">{series.genre}</Badge>
+            )}
+            <span>{createdYear}</span>
+            <span>·</span>
+            <span>{t("home.episodeCount", { count: series.episodes.length })}</span>
+            <span>·</span>
+            <Badge variant="outline" className="text-[10px]">
+              {series.status === "active" ? t("common.ongoing") : t("common.completed")}
+            </Badge>
+            {avgRating > 0 && (
+              <>
+                <span>·</span>
+                <div className="flex items-center gap-0.5">
+                  <Star className="w-3 h-3 text-amber-400" />
+                  <span className="font-medium text-foreground">{avgRating}</span>
+                </div>
+              </>
+            )}
+            <div className="flex items-center gap-1 ml-auto">
               <Eye className="w-3.5 h-3.5" />
-              {t("series.views", { count: formatViewCount(series.viewCount) })}
+              {formatViewCount(series.viewCount)}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tags */}
-      <div className="px-4 pt-3">
-        <SeriesTags genre={series.genre} tags={series.tags} />
+      {/* ── Creator / Director ── */}
+      <div className="px-4 py-3 flex items-center gap-3">
+        {series.user ? (
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            {series.user.image ? (
+              <Image
+                src={series.user.image}
+                alt={series.user.name || ""}
+                width={32}
+                height={32}
+                className="rounded-full shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground shrink-0">
+                {(series.user.name || "?")[0]?.toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">{t("series.createdBy")}</p>
+              <p className="text-sm font-medium truncate">{series.user.name || t("series.anonymous")}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-1">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+              <UserIcon className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">{t("series.anonymous")}</p>
+          </div>
+        )}
       </div>
 
-      {/* Like / Favorite / Share */}
+      {/* ── Actions (Like / Favorite / Share) ── */}
       <div className="px-4">
         <SeriesActions
           seriesId={id}
@@ -171,7 +243,23 @@ export default async function SeriesDetailPage({ params }: Props) {
         />
       </div>
 
-      {/* Star Rating */}
+      {/* ── Tags ── */}
+      <div className="px-4 pt-1">
+        <SeriesTags genre={series.genre} tags={series.tags} />
+      </div>
+
+      {/* ── Synopsis ── */}
+      {synopsisText && (
+        <div className="px-4 py-3">
+          <h3 className="text-sm font-semibold mb-2">{t("series.synopsis")}</h3>
+          <ExpandableSynopsis text={synopsisText} maxLines={3} />
+        </div>
+      )}
+
+      {/* ── Cast & Characters ── */}
+      <CastSection roles={castRoles} />
+
+      {/* ── Star Rating ── */}
       <div className="px-4 border-t border-b">
         <StarRating
           seriesId={id}
@@ -182,7 +270,7 @@ export default async function SeriesDetailPage({ params }: Props) {
         />
       </div>
 
-      {/* Episode List (Client Component with inline player) */}
+      {/* ── Episode List ── */}
       <EpisodeListClient
         seriesId={id}
         episodes={series.episodes}
@@ -191,7 +279,7 @@ export default async function SeriesDetailPage({ params }: Props) {
         userCoins={userCoins}
       />
 
-      {/* Comments Section */}
+      {/* ── Comments ── */}
       <div className="px-4 pb-4">
         <CommentSection
           seriesId={id}

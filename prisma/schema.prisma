@@ -36,6 +36,7 @@ model User {
   tokenTransactions TokenTransaction[]
   publishedScripts  PublishedScript[]
   achievementCards  AchievementCard[]
+  series            Series[]
 
   @@map("users")
 }
@@ -101,14 +102,21 @@ model Series {
   id          String    @id @default(cuid())
   title       String
   description String?   @db.Text
+  synopsis    String?   @db.Text    // 完整简介 (from Script.synopsis)
   coverUrl    String?
+  coverTall   String?               // 竖版海报 (3:4)
+  coverWide   String?               // 横版封面 (16:9)
   genre       String?   // romance, thriller, fantasy, comedy, drama, horror, action, mystery
   tags        String?   @db.Text  // JSON: ["Love Triangle", "Hidden Identity", "Billionaire"]
   viewCount   Int       @default(0) // 总浏览量
   status      String    @default("active") // active, archived
+  userId      String?               // 创作者/导演
+  scriptId    String?   @unique     // 关联源 Script
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  user      User?     @relation(fields: [userId], references: [id])
+  script    Script?   @relation("SeriesScript", fields: [scriptId], references: [id])
   episodes  Episode[]
   cards     Card[]
   likes     SeriesLike[]
@@ -116,6 +124,7 @@ model Series {
   ratings   SeriesRating[]
   comments  SeriesComment[]
 
+  @@index([userId])
   @@map("series")
 }
 
@@ -308,6 +317,7 @@ model Script {
   jobs          AIJob[]
   videoSegments VideoSegment[]
   published     PublishedScript?
+  seriesLink    Series?           @relation("SeriesScript")
 
   @@index([userId])
   @@index([status])

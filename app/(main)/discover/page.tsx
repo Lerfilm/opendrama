@@ -47,10 +47,12 @@ export default async function DiscoverPage({
       id: true,
       title: true,
       coverUrl: true,
+      coverTall: true,
       description: true,
       genre: true,
       viewCount: true,
       createdAt: true,
+      user: { select: { id: true, name: true, image: true } },
       _count: { select: { episodes: true } },
     },
     orderBy: tab === "latest" ? { createdAt: "desc" } : { viewCount: "desc" },
@@ -156,9 +158,9 @@ export default async function DiscoverPage({
                 <Card className="overflow-hidden hover:shadow-lg transition-shadow">
                   <CardHeader className="p-0">
                     <div className="relative aspect-[2/3] bg-muted">
-                      {series.coverUrl ? (
+                      {(series.coverTall || series.coverUrl) ? (
                         <Image
-                          src={series.coverUrl}
+                          src={series.coverTall || series.coverUrl!}
                           alt={series.title}
                           fill
                           className="object-cover"
@@ -187,10 +189,33 @@ export default async function DiscoverPage({
                   <CardContent className="p-3">
                     <h3 className="font-medium text-sm line-clamp-2 mb-1">{series.title}</h3>
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">
-                        {t("home.episodeCount", { count: series._count.episodes })}
-                      </p>
-                      <Play className="w-4 h-4 text-primary" />
+                      <div className="flex items-center gap-1 min-w-0 flex-1">
+                        {series.user ? (
+                          <>
+                            {series.user.image ? (
+                              <Image
+                                src={series.user.image}
+                                alt={series.user.name || ""}
+                                width={16}
+                                height={16}
+                                className="rounded-full shrink-0"
+                              />
+                            ) : (
+                              <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-bold text-muted-foreground shrink-0">
+                                {(series.user.name || "?")[0]?.toUpperCase()}
+                              </div>
+                            )}
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              {series.user.name || t("series.anonymous")}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            {t("home.episodeCount", { count: series._count.episodes })}
+                          </p>
+                        )}
+                      </div>
+                      <Play className="w-4 h-4 text-primary shrink-0" />
                     </div>
                   </CardContent>
                 </Card>

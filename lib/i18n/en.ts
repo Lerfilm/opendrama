@@ -372,6 +372,17 @@ const en: Record<string, string> = {
   "series.tags": "Tags",
   "series.like": "Like",
   "series.favorite": "Favorite",
+  "series.createdBy": "Created by",
+  "series.cast": "Cast & Characters",
+  "series.synopsis": "Synopsis",
+  "series.readMore": "Read More",
+  "series.showLess": "Show Less",
+  "series.protagonist": "Lead",
+  "series.antagonist": "Antagonist",
+  "series.supporting": "Supporting",
+  "series.minor": "Minor",
+  "series.anonymous": "Anonymous",
+  "series.playFirst": "Play",
 
   // Review & Rating
   "review.rating": "Rating",

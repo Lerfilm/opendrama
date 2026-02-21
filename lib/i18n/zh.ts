@@ -374,6 +374,17 @@ const zh = {
   "series.tags": "标签",
   "series.like": "喜欢",
   "series.favorite": "收藏",
+  "series.createdBy": "创作者",
+  "series.cast": "演员与角色",
+  "series.synopsis": "剧情简介",
+  "series.readMore": "展开更多",
+  "series.showLess": "收起",
+  "series.protagonist": "主角",
+  "series.antagonist": "反派",
+  "series.supporting": "配角",
+  "series.minor": "龙套",
+  "series.anonymous": "匿名",
+  "series.playFirst": "播放",
 
   // 评分
   "review.rating": "评分",

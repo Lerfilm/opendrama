@@ -63,10 +63,15 @@ export async function POST(
       data: {
         title: script.title,
         description: script.logline || script.synopsis || "",
+        synopsis: script.synopsis || null,
         coverUrl: script.coverWide || script.coverTall || script.coverImage || null,
+        coverTall: script.coverTall || null,
+        coverWide: script.coverWide || null,
         genre: script.genre,
         tags: tags ? JSON.stringify(tags) : JSON.stringify([script.genre]),
         status: "active",
+        userId: session.user.id,
+        scriptId: id,
       },
     })
 
