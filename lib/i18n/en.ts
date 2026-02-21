@@ -44,14 +44,14 @@ const en: Record<string, string> = {
   "home.exploreNow": "Explore Now",
   "home.startCreate": "Start Creating",
 
-  // Home - AI Features
+  // Home - Three Pillars
   "home.aiFeatures": "AI Creative Engine",
-  "home.aiStudioTitle": "AI Create Studio",
-  "home.aiStudioDesc": "Script, prompts & covers — your creation hub",
-  "home.aiT2VTitle": "Text to Video",
-  "home.aiT2VDesc": "Describe your vision, AI creates the video",
-  "home.theaterTitle": "Video Theater",
-  "home.theaterDesc": "Generate, compose & publish your episodes",
+  "home.aiStudioTitle": "Create",
+  "home.aiStudioDesc": "Write scripts, design characters & build your story",
+  "home.theaterTitle": "Theater",
+  "home.theaterDesc": "Seedance 2.0 turns your script into cinematic video",
+  "home.discoverTitle": "Discover",
+  "home.discoverDesc": "Share your drama, grow your audience & earn coins",
 
   // Home - Lerfilm Brand
   "home.lerfilmProduction": "A Lerfilm.com Production",

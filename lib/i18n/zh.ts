@@ -44,14 +44,14 @@ const zh = {
   "home.exploreNow": "开始探索",
   "home.startCreate": "创作剧本",
 
-  // Home - AI 玩法分流
+  // Home - 三大模块
   "home.aiFeatures": "AI 创作引擎",
-  "home.aiStudioTitle": "AI 创作中心",
-  "home.aiStudioDesc": "剧本·提示词·封面，一站式创作",
-  "home.aiT2VTitle": "文生视频",
-  "home.aiT2VDesc": "文字描述画面，AI 生成视频",
-  "home.theaterTitle": "视频剧场",
-  "home.theaterDesc": "生成、合成、发布你的短剧集",
+  "home.aiStudioTitle": "创作",
+  "home.aiStudioDesc": "撰写剧本、设计角色、构建你的故事",
+  "home.theaterTitle": "剧场",
+  "home.theaterDesc": "Seedance 2.0 将剧本变成电影级视频",
+  "home.discoverTitle": "发现",
+  "home.discoverDesc": "分享短剧、吸引观众、赚取金币",
 
   // Home - Lerfilm 品牌
   "home.lerfilmProduction": "A Lerfilm.com Production",

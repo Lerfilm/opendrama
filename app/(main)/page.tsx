@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Play, Coins, PenTool, Video, Film, Sparkles, Zap, Crown } from "@/components/icons"
+import { Play, Coins, PenTool, Film, Sparkles, Zap, Crown, Compass } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
 import { t } from "@/lib/i18n"
@@ -122,10 +122,10 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* ===== AI 玩法分流 ===== */}
+      {/* ===== 三大模块: Create · Theater · Discover ===== */}
       <div className="px-4 -mt-6 relative z-20">
         <div className="grid grid-cols-3 gap-3">
-          {/* AI 编剧 */}
+          {/* ① Create — 剧本创作 */}
           <Link href="/studio">
             <div className="ai-card bg-card rounded-2xl p-4 text-center shadow-lg border animate-fade-up-delay-1">
               <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-indigo-500/10 flex items-center justify-center">
@@ -136,25 +136,25 @@ export default async function HomePage() {
             </div>
           </Link>
 
-          {/* 文生视频 */}
-          <Link href="/studio/text-to-video">
+          {/* ② Theater — Seedance 2.0 视频生成 */}
+          <Link href="/generate">
             <div className="ai-card bg-card rounded-2xl p-4 text-center shadow-lg border animate-fade-up-delay-2">
               <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                <Video className="w-5 h-5 text-violet-500" />
-              </div>
-              <h3 className="text-xs font-bold mb-0.5 line-clamp-1">{t("home.aiT2VTitle")}</h3>
-              <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{t("home.aiT2VDesc")}</p>
-            </div>
-          </Link>
-
-          {/* Video Theater */}
-          <Link href="/generate">
-            <div className="ai-card bg-card rounded-2xl p-4 text-center shadow-lg border animate-fade-up-delay-3">
-              <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-rose-500/10 flex items-center justify-center">
-                <Film className="w-5 h-5 text-rose-500" />
+                <Film className="w-5 h-5 text-violet-500" />
               </div>
               <h3 className="text-xs font-bold mb-0.5 line-clamp-1">{t("home.theaterTitle")}</h3>
               <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{t("home.theaterDesc")}</p>
+            </div>
+          </Link>
+
+          {/* ③ Discover — 分享推广赚金币 */}
+          <Link href="/discover">
+            <div className="ai-card bg-card rounded-2xl p-4 text-center shadow-lg border animate-fade-up-delay-3">
+              <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                <Compass className="w-5 h-5 text-rose-500" />
+              </div>
+              <h3 className="text-xs font-bold mb-0.5 line-clamp-1">{t("home.discoverTitle")}</h3>
+              <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{t("home.discoverDesc")}</p>
             </div>
           </Link>
         </div>
