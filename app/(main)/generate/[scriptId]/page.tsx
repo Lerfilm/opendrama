@@ -47,7 +47,7 @@ export default async function GenerateScriptPage({
   return (
     <div className="p-4 space-y-6 pb-24">
       <div className="flex items-center gap-3">
-        <Link href="/studio">
+        <Link href="/generate">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1 min-w-0">
