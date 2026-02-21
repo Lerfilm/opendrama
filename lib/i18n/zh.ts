@@ -40,7 +40,7 @@ const zh = {
 
   // Home - Hero & Slogan
   "home.slogan": "每一秒，都是一个元宇宙",
-  "home.sloganSub": "24小时不间断更新 · 创作者享有最大收益",
+  "home.sloganSub": "开源 AI 影视创作 · 从剧本到成片只需几分钟",
   "home.exploreNow": "开始探索",
   "home.startCreate": "创作剧本",
 
@@ -55,7 +55,7 @@ const zh = {
 
   // Home - Lerfilm 品牌
   "home.lerfilmProduction": "A Lerfilm.com Production",
-  "home.lerfilmCopyright": "© 2024 Lerfilm.com · All rights reserved",
+  "home.lerfilmCopyright": "© 2026 Lerfilm.com · All rights reserved",
   "home.lerfilmSlogan": "Lerfilm — 用 AI 重新定义影视创作",
 
   // Series detail
@@ -520,6 +520,12 @@ const zh = {
   "generate.readyBadge": "可以生成",
   "generate.startGenerate": "开始生成视频",
   "generate.costSummary": "费用确认",
+  "generate.confirmTitle": "确认生成视频",
+  "generate.confirmDesc": "此操作将消耗你的金币余额，请确认后再继续。",
+  "generate.confirmCost": "消耗金币",
+  "generate.confirmBalance": "当前余额",
+  "generate.confirmBalanceAfter": "剩余余额",
+  "generate.confirmProceed": "确认并生成",
 
   // 工作流步骤条
   "studio.workflowScenes": "编写场景",

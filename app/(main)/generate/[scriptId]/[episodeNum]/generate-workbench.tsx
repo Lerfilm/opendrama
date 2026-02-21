@@ -5,6 +5,10 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter,
+} from "@/components/ui/dialog"
+import {
   ArrowLeft, Loader2, Zap,
   CheckCircle, XIcon, Coins, PenTool,
 } from "@/components/icons"
@@ -67,6 +71,7 @@ export function GenerateWorkbench({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [balance, setBalance] = useState(initialBalance)
   const [pollingActive, setPollingActive] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   // Derived state
   const hasExistingSegments = existingSegments.length > 0
@@ -120,13 +125,17 @@ export function GenerateWorkbench({
     return () => clearInterval(interval)
   }, [hasGenerating, script.id, episodeNum])
 
-  // Submit all pending segments for video generation
-  async function handleSubmitAll() {
+  // Open confirmation dialog before submitting
+  function handleRequestSubmit() {
     if (pendingSegments.length === 0) return
-    if (totalCost > balance) {
-      alert(t("episode.insufficientCoins"))
-      return
-    }
+    if (totalCost > balance) return
+    setShowConfirm(true)
+  }
+
+  // Submit all pending segments for video generation (after user confirms)
+  async function handleConfirmSubmit() {
+    setShowConfirm(false)
+    if (pendingSegments.length === 0) return
 
     setIsSubmitting(true)
     try {
@@ -275,7 +284,7 @@ export function GenerateWorkbench({
             )}
 
             <Button
-              onClick={handleSubmitAll}
+              onClick={handleRequestSubmit}
               disabled={isSubmitting || totalCost > balance}
               className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
             >
@@ -434,6 +443,51 @@ export function GenerateWorkbench({
           </CardContent>
         </Card>
       )}
+
+      {/* ── Coin confirmation dialog ── */}
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Coins className="w-5 h-5 text-amber-500" />
+              {t("generate.confirmTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("generate.confirmDesc")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t("generate.confirmCost")}</span>
+              <span className="font-bold text-amber-600 flex items-center gap-1">
+                <Coins className="w-4 h-4" /> -{totalCost}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t("generate.confirmBalance")}</span>
+              <span className="font-medium">{balance}</span>
+            </div>
+            <div className="border-t pt-2 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t("generate.confirmBalanceAfter")}</span>
+              <span className="font-bold text-green-600">{balance - totalCost}</span>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowConfirm(false)} className="flex-1">
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={handleConfirmSubmit}
+              className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
+            >
+              <Zap className="w-4 h-4 mr-1" />
+              {t("generate.confirmProceed")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

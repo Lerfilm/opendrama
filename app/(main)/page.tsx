@@ -106,7 +106,7 @@ export default async function HomePage() {
               </Button>
             </Link>
             <Link href="/studio">
-              <Button variant="outline" className="rounded-full border-white/30 text-white hover:bg-white/10 px-6">
+              <Button variant="outline" className="rounded-full border-white/60 text-white bg-white/10 hover:bg-white/20 px-6 font-semibold">
                 <Sparkles className="w-4 h-4 mr-1.5" />
                 {t("home.startCreate")}
               </Button>

@@ -40,7 +40,7 @@ const en: Record<string, string> = {
 
   // Home - Hero & Slogan
   "home.slogan": "Every Second, A Universe",
-  "home.sloganSub": "Non-stop drama, every hour · Where creators earn the most",
+  "home.sloganSub": "Open-source AI filmmaking · From script to screen in minutes",
   "home.exploreNow": "Explore Now",
   "home.startCreate": "Start Creating",
 
@@ -55,7 +55,7 @@ const en: Record<string, string> = {
 
   // Home - Lerfilm Brand
   "home.lerfilmProduction": "A Lerfilm.com Production",
-  "home.lerfilmCopyright": "© 2024 Lerfilm.com · All rights reserved",
+  "home.lerfilmCopyright": "© 2026 Lerfilm.com · All rights reserved",
   "home.lerfilmSlogan": "Lerfilm — Redefining filmmaking with AI",
 
   // Series detail
@@ -518,6 +518,12 @@ const en: Record<string, string> = {
   "generate.readyBadge": "Ready",
   "generate.startGenerate": "Start Video Generation",
   "generate.costSummary": "Cost Summary",
+  "generate.confirmTitle": "Confirm Video Generation",
+  "generate.confirmDesc": "This will deduct coins from your balance. Please confirm to proceed.",
+  "generate.confirmCost": "Total Cost",
+  "generate.confirmBalance": "Your Balance",
+  "generate.confirmBalanceAfter": "Balance After",
+  "generate.confirmProceed": "Confirm & Generate",
 
   // Workflow stepper
   "studio.workflowScenes": "Write Scenes",

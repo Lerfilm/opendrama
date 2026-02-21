@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { volcRequest } from "@/lib/volcengine"
 
 // Unified video generation interface
 export interface VideoGenerationRequest {
@@ -35,9 +36,9 @@ export async function submitVideoTask(req: VideoGenerationRequest): Promise<{ ta
  */
 export async function queryVideoTask(model: string, taskId: string): Promise<VideoGenerationResult> {
   if (model.startsWith("seedance")) {
-    return querySeedanceTask(taskId)
+    return querySeedanceTask(model, taskId)
   } else {
-    return queryJimengTask(taskId)
+    return queryJimengTask(model, taskId)
   }
 }
 
@@ -84,46 +85,154 @@ export async function enrichSegmentWithCharacters(
   return { prompt: enhancedPrompt, imageUrls: allImageUrls }
 }
 
-// ====== Seedance (Volcengine Ark SDK) ======
+// ====== Model → req_key mapping ======
 
-async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId: string }> {
-  // TODO: Implement Seedance 1.5 Pro / 2.0 integration
-  // Uses Volcengine Ark SDK
-  // Supports: text_prompt, image_url, reference_video_url
-  throw new Error("Seedance integration pending - use Jimeng as fallback")
-}
-
-async function querySeedanceTask(taskId: string): Promise<VideoGenerationResult> {
-  // TODO: Implement Seedance status query
-  throw new Error("Seedance integration pending")
-}
-
-// ====== Jimeng Series (Volcengine Visual REST API) ======
-// Auth: Region=cn-north-1, Service=cv
-// Requires VOLC_ACCESSKEY and VOLC_SECRETKEY
-
-const JIMENG_REQ_KEYS: Record<string, string> = {
+const MODEL_REQ_KEYS: Record<string, string> = {
+  // Jimeng series
   jimeng_3_0_pro: "jimeng_vgfm_t2v_l20",
   jimeng_3_0: "jimeng_vgfm_t2v_l20",
   jimeng_s2_pro: "jimeng_vgfm_t2v_l20",
+  // Seedance series (via Volcengine Visual API, same endpoint)
+  seedance_2_0: "jimeng_vgfm_t2v_l20",
+  seedance_1_5_pro: "jimeng_vgfm_t2v_l20",
 }
+
+// Resolution → aspect_ratio mapping
+function getAspectRatio(resolution: string): string {
+  if (resolution === "1080p") return "16:9"
+  if (resolution === "720p") return "16:9"
+  return "16:9"
+}
+
+// ====== Seedance (via Volcengine Visual REST API) ======
+
+async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId: string }> {
+  const reqKey = MODEL_REQ_KEYS[req.model]
+  if (!reqKey) throw new Error(`Unknown Seedance model: ${req.model}`)
+
+  const body: Record<string, unknown> = {
+    req_key: reqKey,
+    prompt: req.prompt,
+    aspect_ratio: req.aspectRatio || getAspectRatio(req.resolution),
+    seed: -1,
+  }
+
+  // Image-to-video mode
+  if (req.imageUrls && req.imageUrls.length > 0) {
+    body.image_urls = req.imageUrls
+  }
+
+  console.log(`[Seedance] Submitting task: model=${req.model}, reqKey=${reqKey}`)
+
+  const result = await volcRequest<{ task_id: string }>(
+    "CVSync2AsyncSubmitTask",
+    body
+  )
+
+  if (!result.task_id) {
+    throw new Error(`Seedance submission failed: no task_id returned. Response: ${JSON.stringify(result)}`)
+  }
+
+  console.log(`[Seedance] Task submitted: ${result.task_id}`)
+  return { taskId: result.task_id }
+}
+
+async function querySeedanceTask(model: string, taskId: string): Promise<VideoGenerationResult> {
+  const reqKey = MODEL_REQ_KEYS[model] || "jimeng_vgfm_t2v_l20"
+
+  const result = await volcRequest<{
+    task_id: string
+    status: string
+    resp_data?: string
+  }>(
+    "CVSync2AsyncGetResult",
+    { req_key: reqKey, task_id: taskId }
+  )
+
+  return mapTaskResult(taskId, result)
+}
+
+// ====== Jimeng Series (Volcengine Visual REST API) ======
 
 async function submitJimengTask(req: VideoGenerationRequest): Promise<{ taskId: string }> {
-  const reqKey = JIMENG_REQ_KEYS[req.model]
+  const reqKey = MODEL_REQ_KEYS[req.model]
   if (!reqKey) throw new Error(`Unknown Jimeng model: ${req.model}`)
 
-  // TODO: Implement Volcengine API signing and submission
-  // POST https://visual.volcengineapi.com?Action=CVSync2AsyncSubmitTask&Version=2022-08-31
-  // Body: { req_key, prompt, aspect_ratio, image_urls?, seed: -1 }
-  // Header: HMAC-SHA256 signature auth
-  // Returns: { code: 10000, data: { task_id: "xxx" } }
-  throw new Error("Jimeng integration - implement volcengine API signing")
+  const body: Record<string, unknown> = {
+    req_key: reqKey,
+    prompt: req.prompt,
+    aspect_ratio: req.aspectRatio || getAspectRatio(req.resolution),
+    seed: -1,
+  }
+
+  // Image-to-video mode
+  if (req.imageUrls && req.imageUrls.length > 0) {
+    body.image_urls = req.imageUrls
+  }
+
+  console.log(`[Jimeng] Submitting task: model=${req.model}, reqKey=${reqKey}`)
+
+  const result = await volcRequest<{ task_id: string }>(
+    "CVSync2AsyncSubmitTask",
+    body
+  )
+
+  if (!result.task_id) {
+    throw new Error(`Jimeng submission failed: no task_id returned. Response: ${JSON.stringify(result)}`)
+  }
+
+  console.log(`[Jimeng] Task submitted: ${result.task_id}`)
+  return { taskId: result.task_id }
 }
 
-async function queryJimengTask(taskId: string): Promise<VideoGenerationResult> {
-  // TODO: Implement Volcengine API query
-  // POST https://visual.volcengineapi.com?Action=CVSync2AsyncGetResult&Version=2022-08-31
-  // Body: { req_key, task_id }
-  // Returns: { code: 10000, data: { status: "done", video_url: "..." } }
-  throw new Error("Jimeng query - implement volcengine API signing")
+async function queryJimengTask(model: string, taskId: string): Promise<VideoGenerationResult> {
+  const reqKey = MODEL_REQ_KEYS[model] || "jimeng_vgfm_t2v_l20"
+
+  const result = await volcRequest<{
+    task_id: string
+    status: string
+    resp_data?: string
+  }>(
+    "CVSync2AsyncGetResult",
+    { req_key: reqKey, task_id: taskId }
+  )
+
+  return mapTaskResult(taskId, result)
+}
+
+// ====== Shared: map Volcengine task result to our format ======
+
+function mapTaskResult(
+  taskId: string,
+  result: { task_id?: string; status?: string; resp_data?: string }
+): VideoGenerationResult {
+  const status = result.status || "unknown"
+
+  // Volcengine status mapping:
+  // "done" → done, "generating" / "running" / "submitted" → generating, "failed" → failed
+  if (status === "done") {
+    // Parse resp_data to extract video URL
+    let videoUrl: string | undefined
+    if (result.resp_data) {
+      try {
+        const respData = JSON.parse(result.resp_data)
+        // resp_data may contain { video_urls: [...] } or { output_video_urls: [...] }
+        videoUrl =
+          respData.video_urls?.[0] ||
+          respData.output_video_urls?.[0] ||
+          respData.video_url ||
+          undefined
+      } catch {
+        console.warn("[VideoGen] Failed to parse resp_data:", result.resp_data)
+      }
+    }
+    return { taskId, status: "done", videoUrl }
+  }
+
+  if (status === "failed" || status === "error") {
+    return { taskId, status: "failed", error: `Task failed: ${JSON.stringify(result)}` }
+  }
+
+  // Any other status (generating, running, submitted, pending) → generating
+  return { taskId, status: "generating" }
 }
