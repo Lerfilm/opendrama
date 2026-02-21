@@ -19,6 +19,7 @@ const zh = {
   "common.processing": "处理中...",
   "common.ongoing": "连载中",
   "common.completed": "已完结",
+  "common.failed": "失败",
   "common.noCover": "暂无封面",
 
   // Nav

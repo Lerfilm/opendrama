@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Film, CheckCircle, Loader2, Zap, PenTool } from "@/components/icons"
+import { Film, CheckCircle, Loader2, Zap, PenTool, XIcon } from "@/components/icons"
 import Link from "next/link"
 import { t } from "@/lib/i18n"
 
@@ -61,10 +61,11 @@ export default async function TheaterPage() {
           <h2 className="text-sm font-semibold mb-3">{t("theater.selectScript")}</h2>
           <div className="space-y-3">
             {scriptsReady.map((script) => {
-              const { total, done, generating, pending } = script.segmentStats
+              const { total, done, generating, pending, failed } = script.segmentStats
               const allDone = done > 0 && done === total
               const isGenerating = generating > 0
               const hasPending = pending > 0
+              const hasFailed = failed > 0
 
               return (
                 <Link key={script.id} href={`/generate/${script.id}`}>
@@ -90,6 +91,12 @@ export default async function TheaterPage() {
                               <Badge className="text-[10px] bg-blue-100 text-blue-700 shrink-0">
                                 <Zap className="w-3 h-3 mr-0.5" />
                                 {t("generate.readyBadge")}
+                              </Badge>
+                            )}
+                            {hasFailed && !isGenerating && (
+                              <Badge className="text-[10px] bg-red-100 text-red-700 shrink-0">
+                                <XIcon className="w-3 h-3 mr-0.5" />
+                                {failed} {t("common.failed")}
                               </Badge>
                             )}
                           </div>

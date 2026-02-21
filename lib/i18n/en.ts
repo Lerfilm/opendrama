@@ -19,6 +19,7 @@ const en: Record<string, string> = {
   "common.processing": "Processing...",
   "common.ongoing": "Ongoing",
   "common.completed": "Completed",
+  "common.failed": "Failed",
   "common.noCover": "No cover",
 
   // Nav

@@ -358,14 +358,16 @@ export function GenerateWorkbench({
                   </div>
                 )}
 
-                {/* Error message */}
-                {seg.status === "failed" && seg.errorMessage && (
+                {/* Error message + retry */}
+                {seg.status === "failed" && (
                   <div className="mt-2 p-2 rounded bg-red-50 dark:bg-red-950/20">
-                    <p className="text-xs text-red-600">{seg.errorMessage}</p>
+                    {seg.errorMessage && (
+                      <p className="text-xs text-red-600 mb-1">{seg.errorMessage}</p>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
-                      className="mt-1 text-xs"
+                      className="text-xs"
                       onClick={() => handleSubmitSingle(seg.id)}
                     >
                       {t("common.retry")}
