@@ -47,13 +47,19 @@ async function syncActiveSegments(
         if (result.error) updateData.errorMessage = result.error
         if (result.status === "done") updateData.completedAt = new Date()
 
-        await prisma.videoSegment.update({
-          where: { id: seg.id },
+        // Use atomic conditional update: only update if still in an active state.
+        // This prevents race conditions where two concurrent pollers both see the
+        // same "generating" segment and both attempt to refund/confirm tokens.
+        const { count } = await prisma.videoSegment.updateMany({
+          where: {
+            id: seg.id,
+            status: { in: ["submitted", "generating"] },
+          },
           data: updateData,
         })
 
-        // Token handling
-        if (userId && seg.tokenCost) {
+        // Only handle tokens if WE were the one to update the status (count === 1)
+        if (count > 0 && userId && seg.tokenCost) {
           if (result.status === "done") {
             await confirmDeduction(userId, seg.tokenCost, { segmentId: seg.id })
           }
