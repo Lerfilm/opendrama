@@ -20,20 +20,24 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  purchases     Purchase[]
-  episodeUnlocks EpisodeUnlock[]
-  watchEvents   WatchEvent[]
-  userCards     UserCard[]
-  scripts       Script[]
-  aiJobs        AIJob[]
-  theaters      Theater[]      @relation("theaterCreator")
-  theaterVotes  TheaterVote[]
-  seriesLikes   SeriesLike[]
+  accounts        Account[]
+  sessions        Session[]
+  purchases       Purchase[]
+  episodeUnlocks  EpisodeUnlock[]
+  watchEvents     WatchEvent[]
+  userCards       UserCard[]
+  scripts         Script[]
+  aiJobs          AIJob[]
+  theaters        Theater[]      @relation("theaterCreator")
+  theaterVotes    TheaterVote[]
+  seriesLikes     SeriesLike[]
   seriesFavorites SeriesFavorite[]
-  seriesRatings  SeriesRating[]
-  seriesComments SeriesComment[]
+  seriesRatings   SeriesRating[]
+  seriesComments  SeriesComment[]
+  balance         UserBalance?
+  tokenTransactions TokenTransaction[]
+  publishedScripts  PublishedScript[]
+  achievementCards  AchievementCard[]
 
   @@map("users")
 }
@@ -290,17 +294,22 @@ model Script {
   format         String   @default("shortdrama") // shortdrama, movie, stageplay
   logline        String?  @db.Text
   synopsis       String?  @db.Text
+  coverImage     String?
+  coverWide      String?  // 宽版封面 16:9
+  coverTall      String?  // 窄版封面 3:4
   targetEpisodes Int      @default(10)
   language       String   @default("zh")
-  status         String   @default("draft") // draft, generating, completed, published
+  status         String   @default("draft") // draft, generating, completed, ready, producing, published
   metadata       String?  @db.Text // JSON
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scenes ScriptScene[]
-  roles  ScriptRole[]
-  jobs   AIJob[]
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenes        ScriptScene[]
+  roles         ScriptRole[]
+  jobs          AIJob[]
+  videoSegments VideoSegment[]
+  published     PublishedScript?
 
   @@index([userId])
   @@index([status])
@@ -317,6 +326,10 @@ model ScriptScene {
   action         String?  @db.Text
   dialogue       String?  @db.Text // JSON: [{character, line, direction}]
   stageDirection String?  @db.Text
+  mood           String?  // 场景情绪氛围
+  location       String?  // 拍摄地点
+  timeOfDay      String?  // 时间段
+  promptHint     String?  @db.Text // 给视频生成的镜头提示
   duration       Int?
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
@@ -331,16 +344,17 @@ model ScriptScene {
 
 // 剧本角色
 model ScriptRole {
-  id          String   @id @default(cuid())
-  scriptId    String
-  name        String
-  role        String   @default("supporting") // protagonist, antagonist, supporting, minor
-  description String?  @db.Text
-  voiceType   String?
-  avatarUrl   String?
-  metadata    String?  @db.Text // JSON
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  scriptId        String
+  name            String
+  role            String   @default("supporting") // protagonist, antagonist, supporting, minor
+  description     String?  @db.Text
+  voiceType       String?
+  avatarUrl       String?
+  referenceImages String[] // 角色参考图 URL 数组
+  metadata        String?  @db.Text // JSON
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
 
@@ -484,4 +498,135 @@ model TheaterVote {
   @@index([theaterId])
   @@index([optionId])
   @@map("theater_votes")
+}
+
+// ============================================
+// 视频生成
+// ============================================
+
+// 视频片段
+model VideoSegment {
+  id              String    @id @default(cuid())
+  scriptId        String
+  episodeNum      Int       // 对应 ScriptScene.episodeNum
+  segmentIndex    Int       // 片段序号 0-based
+  durationSec     Int       @default(15)
+  prompt          String    @db.Text
+  shotType        String?   // wide | medium | close-up | extreme-close-up
+  cameraMove      String?   // static | pan | tilt | dolly | tracking | orbit
+  referenceImages String[]
+  referenceVideo  String?
+
+  // 生成参数
+  model           String?   // seedance_2_0 | seedance_1_5_pro | jimeng_3_0_pro | jimeng_3_0 | jimeng_s2_pro
+  resolution      String?   // 1080p | 720p
+
+  // 生成结果
+  status          String    @default("pending") // pending | reserved | submitted | generating | done | failed
+  providerTaskId  String?
+  videoUrl        String?
+  thumbnailUrl    String?
+  tokenCost       Int?
+  apiCostCents    Int?
+  errorMessage    String?
+
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  script          Script    @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  @@unique([scriptId, episodeNum, segmentIndex])
+  @@index([scriptId])
+  @@index([scriptId, episodeNum])
+  @@index([status])
+  @@map("video_segments")
+}
+
+// ============================================
+// 金币系统（预扣/确认/退还）
+// ============================================
+
+// 用户金币余额
+model UserBalance {
+  id             String @id @default(cuid())
+  userId         String @unique
+  balance        Int    @default(0)     // 当前可用余额
+  reserved       Int    @default(0)     // 预扣冻结
+  totalPurchased Int    @default(0)     // 累计充值
+  totalConsumed  Int    @default(0)     // 累计消耗
+
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_balances")
+}
+
+// 金币交易记录
+model TokenTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // purchase | consume | refund | reserve | release | bonus
+  amount      Int      // 正数=增加，负数=减少
+  balanceAfter Int
+  description String?
+  metadata    Json?    // {model, resolution, segmentId, stripePaymentId, ...}
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("token_transactions")
+}
+
+// ============================================
+// 发布 & 社区
+// ============================================
+
+// 已发布的作品（关联 Script）
+model PublishedScript {
+  id              String    @id @default(cuid())
+  scriptId        String    @unique
+  userId          String
+  status          String    @default("published") // published | featured | unlisted
+  publishedAt     DateTime  @default(now())
+  viewCount       Int       @default(0)
+  likeCount       Int       @default(0)
+  commentCount    Int       @default(0)
+  ratingSum       Int       @default(0)
+  ratingCount     Int       @default(0)
+  recommendScore  Float     @default(0)
+  tags            String[]
+  featuredAt      DateTime?
+
+  script          Script          @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementCard AchievementCard?
+
+  @@index([userId])
+  @@index([status, recommendScore])
+  @@index([publishedAt])
+  @@map("published_scripts")
+}
+
+// ============================================
+// 成就卡系统
+// ============================================
+
+// 成就卡
+model AchievementCard {
+  id                String    @id @default(cuid())
+  userId            String
+  publishedScriptId String    @unique // 每部剧只有一张成就卡
+  cardImage         String    // 卡面图片 URL（窄版封面 coverTall）
+  rarity            String    @default("common") // common | rare | epic | legendary
+  title             String    // 剧名
+  subtitle          String?   // 副标题（如 "First Creation" "10-Episode Epic"）
+  earnedAt          DateTime  @default(now())
+  viewCount         Int       @default(0) // 被浏览次数
+
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publishedScript   PublishedScript @relation(fields: [publishedScriptId], references: [id], onDelete: Cascade)
+
+  @@index([userId, earnedAt])
+  @@map("achievement_cards")
 }

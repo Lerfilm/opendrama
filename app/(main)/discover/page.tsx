@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic"
 import prisma from "@/lib/prisma"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Play } from "@/components/icons"
+import { Play, Star } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
@@ -15,6 +15,12 @@ const GENRES = [
   { key: "romance", label: "discover.romance" },
   { key: "thriller", label: "discover.thriller" },
   { key: "fantasy", label: "discover.fantasy" },
+]
+
+const TABS = [
+  { key: "trending", label: "discover.trending" },
+  { key: "topRated", label: "discover.topRated" },
+  { key: "latest", label: "discover.latest" },
 ]
 
 export default async function DiscoverPage({
@@ -31,6 +37,9 @@ export default async function DiscoverPage({
   if (query) {
     where.title = { contains: query, mode: "insensitive" }
   }
+  if (genre !== "all") {
+    where.genre = genre
+  }
 
   const seriesList = await prisma.series.findMany({
     where,
@@ -39,32 +48,55 @@ export default async function DiscoverPage({
       title: true,
       coverUrl: true,
       description: true,
+      genre: true,
+      viewCount: true,
       createdAt: true,
       _count: { select: { episodes: true } },
     },
-    orderBy: tab === "latest" ? { createdAt: "desc" } : { createdAt: "desc" },
+    orderBy: tab === "latest" ? { createdAt: "desc" } : { viewCount: "desc" },
     take: 30,
   })
 
-  // 统计每个系列的观看数
-  const episodeList = await prisma.episode.findMany({
-    where: { seriesId: { in: seriesList.map((s) => s.id) } },
-    select: { id: true, seriesId: true },
+  // Get rating stats for all series
+  const seriesIds = seriesList.map(s => s.id)
+  const ratingStats = await prisma.seriesRating.groupBy({
+    by: ["seriesId"],
+    where: { seriesId: { in: seriesIds } },
+    _avg: { rating: true },
+    _count: { rating: true },
   })
-  const watchCounts = await prisma.watchEvent.groupBy({
-    by: ["episodeId"],
-    _count: { id: true },
-  })
-  const viewMap: Record<string, number> = {}
-  for (const ep of episodeList) {
-    const cnt = watchCounts.find((w) => w.episodeId === ep.id)?._count.id || 0
-    viewMap[ep.seriesId] = (viewMap[ep.seriesId] || 0) + cnt
+  const ratingMap: Record<string, { avg: number; count: number }> = {}
+  for (const r of ratingStats) {
+    ratingMap[r.seriesId] = {
+      avg: Math.round((r._avg.rating || 0) * 10) / 10,
+      count: r._count.rating,
+    }
   }
 
-  const sorted =
-    tab === "trending"
-      ? [...seriesList].sort((a, b) => (viewMap[b.id] || 0) - (viewMap[a.id] || 0))
-      : seriesList
+  // Get like counts
+  const likeCounts = await prisma.seriesLike.groupBy({
+    by: ["seriesId"],
+    where: { seriesId: { in: seriesIds } },
+    _count: { id: true },
+  })
+  const likeMap: Record<string, number> = {}
+  for (const l of likeCounts) {
+    likeMap[l.seriesId] = l._count.id
+  }
+
+  // Sort based on tab
+  let sorted = [...seriesList]
+  if (tab === "trending") {
+    sorted.sort((a, b) => {
+      const scoreA = a.viewCount + (likeMap[a.id] || 0) * 2
+      const scoreB = b.viewCount + (likeMap[b.id] || 0) * 2
+      return scoreB - scoreA
+    })
+  } else if (tab === "topRated") {
+    sorted = sorted
+      .filter(s => (ratingMap[s.id]?.count || 0) >= 1)
+      .sort((a, b) => (ratingMap[b.id]?.avg || 0) - (ratingMap[a.id]?.avg || 0))
+  }
 
   return (
     <div className="space-y-4 p-4">
@@ -72,7 +104,7 @@ export default async function DiscoverPage({
 
       <DiscoverSearch defaultValue={query} />
 
-      {/* 分类标签 */}
+      {/* Genre tags */}
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
         {GENRES.map((g) => (
           <Link
@@ -90,21 +122,21 @@ export default async function DiscoverPage({
         ))}
       </div>
 
-      {/* 热门/最新 */}
+      {/* Tabs */}
       <div className="flex gap-2 border-b border-border">
-        {["trending", "latest"].map((t2) => (
+        {TABS.map((t2) => (
           <Link
-            key={t2}
-            href={`/discover?tab=${t2}${genre !== "all" ? `&genre=${genre}` : ""}${query ? `&q=${query}` : ""}`}
+            key={t2.key}
+            href={`/discover?tab=${t2.key}${genre !== "all" ? `&genre=${genre}` : ""}${query ? `&q=${query}` : ""}`}
           >
             <button
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                tab === t2
+                tab === t2.key
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t(`discover.${t2}`)}
+              {t(t2.label)}
             </button>
           </Link>
         ))}
@@ -116,43 +148,55 @@ export default async function DiscoverPage({
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {sorted.map((series) => (
-            <Link key={series.id} href={`/series/${series.id}`}>
-              <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-                <CardHeader className="p-0">
-                  <div className="relative aspect-[2/3] bg-muted">
-                    {series.coverUrl ? (
-                      <Image
-                        src={series.coverUrl}
-                        alt={series.title}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 50vw, 33vw"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                        {t("common.noCover")}
+          {sorted.map((series) => {
+            const rating = ratingMap[series.id]
+
+            return (
+              <Link key={series.id} href={`/series/${series.id}`}>
+                <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <CardHeader className="p-0">
+                    <div className="relative aspect-[2/3] bg-muted">
+                      {series.coverUrl ? (
+                        <Image
+                          src={series.coverUrl}
+                          alt={series.title}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 50vw, 33vw"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+                          {t("common.noCover")}
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-white text-xs">
+                            {t("discover.viewCount", { count: series.viewCount })}
+                          </p>
+                          {rating && rating.count > 0 && (
+                            <div className="flex items-center gap-0.5">
+                              <Star className="w-3 h-3 text-amber-400" />
+                              <span className="text-white text-xs font-medium">{rating.avg}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                      <p className="text-white text-xs">
-                        {t("discover.viewCount", { count: viewMap[series.id] || 0 })}
-                      </p>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-3">
-                  <h3 className="font-medium text-sm line-clamp-2 mb-1">{series.title}</h3>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      {t("home.episodeCount", { count: series._count.episodes })}
-                    </p>
-                    <Play className="w-4 h-4 text-primary" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                  </CardHeader>
+                  <CardContent className="p-3">
+                    <h3 className="font-medium text-sm line-clamp-2 mb-1">{series.title}</h3>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        {t("home.episodeCount", { count: series._count.episodes })}
+                      </p>
+                      <Play className="w-4 h-4 text-primary" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>

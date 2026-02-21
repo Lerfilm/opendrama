@@ -4,8 +4,7 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 
 /**
- * 发布剧本为系列剧集
- * 将已完成的剧本转化为 Series + Episodes
+ * Publish a script — creates PublishedScript + Series + Episodes
  */
 export async function POST(
   req: NextRequest,
@@ -19,12 +18,12 @@ export async function POST(
   const { id } = await params
 
   try {
-    // 获取剧本及其场景和角色
     const script = await prisma.script.findFirst({
       where: { id, userId: session.user.id },
       include: {
         scenes: { orderBy: { sortOrder: "asc" } },
         roles: true,
+        published: true,
       },
     })
 
@@ -32,16 +31,26 @@ export async function POST(
       return NextResponse.json({ error: "Script not found" }, { status: 404 })
     }
 
-    if (script.status !== "completed") {
+    // Allow publishing from completed, ready, or producing status
+    if (!["completed", "ready", "producing"].includes(script.status)) {
       return NextResponse.json(
-        { error: "Script must be completed before publishing" },
+        { error: "Script must be completed or ready before publishing" },
         { status: 400 }
       )
     }
 
-    const { title, coverUrl, description, unlockCost } = await req.json()
+    // Prevent duplicate publish
+    if (script.published) {
+      return NextResponse.json(
+        { error: "Script is already published", publishedId: script.published.id },
+        { status: 409 }
+      )
+    }
 
-    // 按集数分组场景
+    const body = await req.json()
+    const { tags } = body
+
+    // Group scenes by episode
     const episodeMap = new Map<number, typeof script.scenes>()
     for (const scene of script.scenes) {
       const ep = scene.episodeNum
@@ -49,17 +58,19 @@ export async function POST(
       episodeMap.get(ep)!.push(scene)
     }
 
-    // 创建系列
+    // Create Series
     const series = await prisma.series.create({
       data: {
-        title: title || script.title,
-        description: description || script.logline || script.synopsis || "",
-        coverUrl: coverUrl || null,
+        title: script.title,
+        description: script.logline || script.synopsis || "",
+        coverUrl: script.coverWide || script.coverTall || script.coverImage || null,
+        genre: script.genre,
+        tags: tags ? JSON.stringify(tags) : JSON.stringify([script.genre]),
         status: "active",
       },
     })
 
-    // 为每一集创建 Episode
+    // Create Episodes
     const episodes = []
     for (const [episodeNum, scenes] of episodeMap) {
       const totalDuration = scenes.reduce((acc, s) => acc + (s.duration || 60), 0)
@@ -69,17 +80,27 @@ export async function POST(
         data: {
           seriesId: series.id,
           episodeNum,
-          title: firstScene?.heading || `第${episodeNum}集`,
+          title: firstScene?.heading || `Episode ${episodeNum}`,
           description: scenes.map((s) => s.action).filter(Boolean).join("\n"),
           duration: totalDuration,
-          unlockCost: episodeNum <= 5 ? 0 : (unlockCost || 10), // 前5集免费
+          unlockCost: episodeNum <= 5 ? 0 : 10, // First 5 episodes free
           status: "active",
         },
       })
       episodes.push(episode)
     }
 
-    // 更新剧本状态
+    // Create PublishedScript record
+    const published = await prisma.publishedScript.create({
+      data: {
+        scriptId: id,
+        userId: session.user.id,
+        status: "published",
+        tags: tags || [script.genre],
+      },
+    })
+
+    // Update script status
     await prisma.script.update({
       where: { id },
       data: {
@@ -87,15 +108,46 @@ export async function POST(
         metadata: JSON.stringify({
           ...(script.metadata ? JSON.parse(script.metadata) : {}),
           publishedSeriesId: series.id,
+          publishedScriptId: published.id,
           publishedAt: new Date().toISOString(),
         }),
       },
     })
 
+    // Create achievement card
+    const userCardCount = await prisma.achievementCard.count({
+      where: { userId: session.user.id },
+    })
+    const episodeCount = episodeMap.size
+    const subtitle = userCardCount === 0
+      ? "First Creation"
+      : episodeCount >= 10
+        ? "10-Episode Epic"
+        : episodeCount >= 5
+          ? "5-Episode Series"
+          : null
+
+    const card = await prisma.achievementCard.create({
+      data: {
+        userId: session.user.id,
+        publishedScriptId: published.id,
+        cardImage: script.coverTall || script.coverWide || script.coverImage || "",
+        rarity: "common", // starts as common, upgrades via cron
+        title: script.title,
+        subtitle,
+      },
+    })
+
     return NextResponse.json({
+      publishedId: published.id,
       seriesId: series.id,
       episodesCreated: episodes.length,
-      message: "Script published as series successfully",
+      newCard: {
+        id: card.id,
+        cardImage: card.cardImage,
+        title: card.title,
+        rarity: card.rarity,
+      },
     })
   } catch (error) {
     console.error("Publish script error:", error)
