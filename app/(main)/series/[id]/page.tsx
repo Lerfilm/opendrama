@@ -105,7 +105,7 @@ export default async function SeriesDetailPage({ params }: Props) {
         <div className="space-y-2">
           {series.episodes.map((episode) => {
             const isUnlocked = unlockedEpisodeIds.includes(episode.id)
-            const isFirst = episode.episodeNum === 1
+            const isFreeEpisode = episode.episodeNum <= 5
 
             return (
               <Link
@@ -121,12 +121,12 @@ export default async function SeriesDetailPage({ params }: Props) {
                           <span className="font-semibold">
                             {t("series.episode", { num: episode.episodeNum })}
                           </span>
-                          {isFirst && (
+                          {isFreeEpisode && (
                             <Badge variant="secondary" className="text-xs">
                               {t("common.free")}
                             </Badge>
                           )}
-                          {isUnlocked && !isFirst && (
+                          {isUnlocked && !isFreeEpisode && (
                             <Badge variant="secondary" className="text-xs">
                               {t("common.unlocked")}
                             </Badge>
@@ -142,7 +142,7 @@ export default async function SeriesDetailPage({ params }: Props) {
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-2">
-                        {isFirst || isUnlocked ? (
+                        {isFreeEpisode || isUnlocked ? (
                           <Button size="sm" variant="default">
                             <Play className="w-4 h-4 mr-1" />
                             {t("common.play")}

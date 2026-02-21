@@ -76,8 +76,8 @@ export default async function EpisodePage({ params }: Props) {
     },
   })
 
-  const isFirst = episode.episodeNum === 1
-  const isUnlocked = !!unlock || isFirst
+  const isFreeEpisode = episode.episodeNum <= 5
+  const isUnlocked = !!unlock || isFreeEpisode
 
   const user = await prisma.user.findUnique({
     where: { id: userId },

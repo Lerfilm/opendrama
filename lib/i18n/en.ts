@@ -103,15 +103,15 @@ const en: Record<string, string> = {
   "recharge.now": "Top Up Now",
   "recharge.info": "Top Up Info",
   "recharge.info1": "1 coin unlocks 1 episode",
-  "recharge.info2": "First episode is always free",
+  "recharge.info2": "First 5 episodes are always free",
   "recharge.info3": "Coins never expire",
-  "recharge.info4": "Supports Alipay, WeChat Pay, and credit cards",
+  "recharge.info4": "Supports credit and debit cards",
   "recharge.failed": "Top up failed, please retry",
 
   // Recharge success
   "recharge.successTitle": "Top Up Successful!",
   "recharge.successDesc": "Your coins have been added. Go unlock exciting episodes!",
-  "recharge.payAmount": "Paid: ¥{amount}",
+  "recharge.payAmount": "Paid: ${amount}",
   "recharge.startWatch": "Start Watching",
   "recharge.viewHistory": "View Purchase History",
 

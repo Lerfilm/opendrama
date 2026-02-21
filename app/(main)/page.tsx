@@ -55,9 +55,9 @@ export default async function HomePage() {
         </div>
 
         {/* 装饰光晕 */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-48 h-48 bg-pink-500/15 rounded-full blur-3xl" />
-        <div className="absolute top-0 left-0 w-32 h-32 bg-blue-500/15 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-48 h-48 bg-violet-500/12 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-0 w-32 h-32 bg-sky-500/10 rounded-full blur-3xl" />
 
         <div className="relative z-10 px-6 pt-12 pb-10 text-center">
           {/* 用户状态栏 */}
@@ -127,8 +127,8 @@ export default async function HomePage() {
           {/* AI 编剧 */}
           <Link href="/studio">
             <div className="ai-card bg-card rounded-2xl p-4 text-center shadow-lg border animate-fade-up-delay-1">
-              <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                <PenTool className="w-5 h-5 text-purple-500" />
+              <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+                <PenTool className="w-5 h-5 text-indigo-500" />
               </div>
               <h3 className="text-xs font-bold mb-0.5 line-clamp-1">{t("home.aiStudioTitle")}</h3>
               <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{t("home.aiStudioDesc")}</p>
@@ -138,8 +138,8 @@ export default async function HomePage() {
           {/* 文生视频 */}
           <Link href="/studio/text-to-video">
             <div className="ai-card bg-card rounded-2xl p-4 text-center shadow-lg border animate-fade-up-delay-2">
-              <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-pink-500/10 flex items-center justify-center">
-                <Video className="w-5 h-5 text-pink-500" />
+              <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                <Video className="w-5 h-5 text-violet-500" />
               </div>
               <h3 className="text-xs font-bold mb-0.5 line-clamp-1">{t("home.aiT2VTitle")}</h3>
               <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{t("home.aiT2VDesc")}</p>
@@ -149,8 +149,8 @@ export default async function HomePage() {
           {/* AI 剧场 */}
           <Link href="/theater">
             <div className="ai-card bg-card rounded-2xl p-4 text-center shadow-lg border animate-fade-up-delay-3">
-              <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                <TheaterIcon className="w-5 h-5 text-orange-500" />
+              <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                <TheaterIcon className="w-5 h-5 text-rose-500" />
               </div>
               <h3 className="text-xs font-bold mb-0.5 line-clamp-1">{t("home.aiTheaterTitle")}</h3>
               <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{t("home.aiTheaterDesc")}</p>
@@ -162,7 +162,7 @@ export default async function HomePage() {
       {/* ===== 充值横幅 ===== */}
       <div className="px-4 mt-6">
         <Link href="/recharge">
-          <div className="relative bg-gradient-to-r from-purple-600 to-pink-500 rounded-2xl p-5 overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
+          <div className="relative bg-gradient-to-r from-indigo-600 to-violet-500 rounded-2xl p-5 overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
             <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-4 -translate-x-4" />
             <div className="relative z-10 flex items-center justify-between">
@@ -208,7 +208,7 @@ export default async function HomePage() {
                           sizes="(max-width: 768px) 50vw, 33vw"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-gradient-to-br from-purple-100 to-pink-50">
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-gradient-to-br from-indigo-100 to-violet-50">
                           <Play className="w-8 h-8 opacity-30" />
                         </div>
                       )}

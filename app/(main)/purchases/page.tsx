@@ -93,7 +93,7 @@ export default async function PurchasesPage() {
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Calendar className="w-3 h-3" />
                             {new Date(purchase.createdAt).toLocaleString(
-                              "zh-CN",
+                              "en-US",
                               {
                                 year: "numeric",
                                 month: "2-digit",
@@ -107,7 +107,7 @@ export default async function PurchasesPage() {
                       </div>
                       <div className="text-right">
                         <div className="font-bold text-lg">
-                          ¥{(purchase.amount / 100).toFixed(2)}
+                          ${(purchase.amount / 100).toFixed(2)}
                         </div>
                       </div>
                     </div>

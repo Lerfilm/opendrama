@@ -3,22 +3,22 @@ import "./globals.css"
 
 export const metadata: Metadata = {
   title: {
-    default: "OpenDrama - 精彩短剧随时看",
+    default: "OpenDrama - Short Dramas Anytime",
     template: "%s | OpenDrama",
   },
-  description: "OpenDrama 是专注短剧内容的视频平台，海量精彩短剧随时随地观看。",
-  keywords: ["短剧", "OpenDrama", "视频", "在线观看", "热门短剧"],
+  description: "OpenDrama is an AI-powered short drama platform. Watch amazing short dramas anytime, anywhere.",
+  keywords: ["short drama", "OpenDrama", "video", "streaming", "AI drama", "web series"],
   openGraph: {
     type: "website",
-    locale: "zh_CN",
+    locale: "en_US",
     siteName: "OpenDrama",
-    title: "OpenDrama - 精彩短剧随时看",
-    description: "OpenDrama 是专注短剧内容的视频平台，海量精彩短剧随时随地观看。",
+    title: "OpenDrama - Short Dramas Anytime",
+    description: "OpenDrama is an AI-powered short drama platform. Watch amazing short dramas anytime, anywhere.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "OpenDrama - 精彩短剧随时看",
-    description: "OpenDrama 是专注短剧内容的视频平台，海量精彩短剧随时随地观看。",
+    title: "OpenDrama - Short Dramas Anytime",
+    description: "OpenDrama is an AI-powered short drama platform. Watch amazing short dramas anytime, anywhere.",
   },
   manifest: "/manifest.json",
 }
@@ -29,7 +29,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#7c3aed",
+  themeColor: "#4f46e5",
 }
 
 export default function RootLayout({
@@ -38,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body className="antialiased">{children}</body>
     </html>
   )

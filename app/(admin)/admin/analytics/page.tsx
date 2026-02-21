@@ -107,7 +107,7 @@ function formatDuration(seconds: number): string {
 }
 
 function formatCents(cents: number): string {
-  return `¥${(cents / 100).toLocaleString("zh-CN", { minimumFractionDigits: 2 })}`
+  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
 }
 
 export default async function AnalyticsPage() {

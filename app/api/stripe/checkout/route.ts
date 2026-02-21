@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       line_items: [
         {
           price_data: {
-            currency: "cny",
+            currency: "usd",
             product_data: {
               name: pkg.name,
               description: pkg.description,

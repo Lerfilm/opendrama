@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Already unlocked" }, { status: 400 })
     }
 
-    // 第一集免费
-    if (episode.episodeNum === 1) {
+    // 前5集免费
+    if (episode.episodeNum <= 5) {
       await prisma.episodeUnlock.create({
         data: {
           userId: session.user.id,

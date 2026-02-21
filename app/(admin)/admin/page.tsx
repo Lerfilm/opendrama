@@ -33,7 +33,7 @@ export default async function AdminDashboardPage() {
     },
     {
       title: t("admin.totalRevenue"),
-      value: `¥${(totalRevenue / 100).toFixed(2)}`,
+      value: `$${(totalRevenue / 100).toFixed(2)}`,
       icon: Coins,
       description: t("admin.totalRecharge"),
     },

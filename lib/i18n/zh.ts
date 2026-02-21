@@ -103,15 +103,15 @@ const zh = {
   "recharge.now": "立即充值",
   "recharge.info": "充值说明",
   "recharge.info1": "1 金币可解锁观看 1 集剧集",
-  "recharge.info2": "第一集永久免费观看",
+  "recharge.info2": "前5集永久免费观看",
   "recharge.info3": "金币永不过期",
-  "recharge.info4": "支持支付宝、微信、银行卡支付",
+  "recharge.info4": "支持信用卡、借记卡支付",
   "recharge.failed": "充值失败，请重试",
 
   // Recharge success
   "recharge.successTitle": "充值成功！",
   "recharge.successDesc": "您的金币已到账，快去解锁精彩剧集吧",
-  "recharge.payAmount": "支付金额：¥{amount}",
+  "recharge.payAmount": "支付金额：${amount}",
   "recharge.startWatch": "开始观看",
   "recharge.viewHistory": "查看充值记录",
 

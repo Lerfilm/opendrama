@@ -96,7 +96,7 @@ export default async function RechargePage() {
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-bold mb-2">
-                          ¥{(pkg.price / 100).toFixed(0)}
+                          ${(pkg.price / 100).toFixed(2)}
                         </div>
                         <RechargeButton packageId={pkg.id} />
                       </div>

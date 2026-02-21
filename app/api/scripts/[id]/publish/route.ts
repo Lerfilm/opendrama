@@ -72,7 +72,7 @@ export async function POST(
           title: firstScene?.heading || `第${episodeNum}集`,
           description: scenes.map((s) => s.action).filter(Boolean).join("\n"),
           duration: totalDuration,
-          unlockCost: episodeNum === 1 ? 0 : (unlockCost || 10), // 第一集免费
+          unlockCost: episodeNum <= 5 ? 0 : (unlockCost || 10), // 前5集免费
           status: "active",
         },
       })

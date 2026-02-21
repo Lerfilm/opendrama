@@ -178,8 +178,8 @@ html {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(124, 58, 237, 0.6); }
+  0%, 100% { box-shadow: 0 0 20px rgba(79, 70, 229, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(79, 70, 229, 0.6); }
 }
 
 @keyframes twinkle {
@@ -188,13 +188,13 @@ html {
 }
 
 .hero-gradient {
-  background: linear-gradient(-45deg, #0f0517, #1a0533, #0d1b3e, #120338, #0a0a2e);
+  background: linear-gradient(-45deg, #0a0e27, #0f1642, #0c1445, #151b4a, #0d0f30);
   background-size: 400% 400%;
   animation: gradient-shift 12s ease infinite;
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #c084fc, #f472b6, #fb923c, #c084fc);
+  background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6, #60a5fa);
   background-size: 200% 200%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -238,7 +238,7 @@ html {
 }
 .ai-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(124, 58, 237, 0.2);
+  box-shadow: 0 12px 40px rgba(79, 70, 229, 0.15);
 }
 .ai-card:active {
   transform: translateY(-1px);
