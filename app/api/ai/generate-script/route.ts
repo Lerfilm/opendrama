@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
-import { aiComplete, buildScriptSystemPrompt } from "@/lib/ai"
+import { aiComplete, buildScriptSystemPrompt, extractJSON } from "@/lib/ai"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -94,19 +94,8 @@ Generate all characters and scenes for Episode 1.`
         responseFormat: "json",
       })
 
-      // 解析 AI 返回的 JSON
-      let parsed: { roles?: Array<Record<string, string>>; scenes?: Array<Record<string, unknown>> }
-      try {
-        parsed = JSON.parse(result.content)
-      } catch {
-        // 尝试提取 JSON 块
-        const jsonMatch = result.content.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[0])
-        } else {
-          throw new Error("Failed to parse AI response as JSON")
-        }
-      }
+      // 解析 AI 返回的 JSON（处理 markdown 代码块等）
+      const parsed = extractJSON<{ roles?: Array<Record<string, string>>; scenes?: Array<Record<string, unknown>> }>(result.content)
 
       const roles = parsed.roles || []
       const scenes = parsed.scenes || []

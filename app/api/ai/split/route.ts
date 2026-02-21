@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
-import { aiComplete } from "@/lib/ai"
+import { aiComplete, extractJSON } from "@/lib/ai"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -83,7 +83,9 @@ Prompt 写作要求：
 - 描述要包括：画面构图、人物动作、表情、服装、场景环境、光线、运镜方式
 - 每个片段 15 秒，整集通常拆分为 4-8 个片段
 - 保持镜头语言的连贯性和节奏感
-- 注意：prompt 不要包含对白文字，只描述画面`
+- 注意：prompt 不要包含对白文字，只描述画面
+
+重要：只输出纯 JSON，不要添加 markdown 代码块标记、注释或任何其他文字。`
       : `You are a professional storyboard artist for short videos. Split the following script scenes into multiple 15-second video segments.
 
 Each segment needs a detailed video generation prompt for an AI video generation model.
@@ -106,7 +108,9 @@ Prompt requirements:
 - Describe: framing, character actions, expressions, clothing, environment, lighting, camera movement
 - Each segment is 15 seconds, typically 4-8 segments per episode
 - Maintain visual continuity and pacing between segments
-- Note: prompt describes visuals only, no dialogue text`
+- Note: prompt describes visuals only, no dialogue text
+
+IMPORTANT: Output ONLY the raw JSON object. No markdown code blocks, no comments, no other text.`
 
     const userPrompt = lang === "zh"
       ? `请将以下剧本拆分为视频片段：
@@ -142,17 +146,7 @@ ${sceneDescriptions}`
       responseFormat: "json",
     })
 
-    let parsed: { segments?: Array<Record<string, unknown>> }
-    try {
-      parsed = JSON.parse(result.content)
-    } catch {
-      const jsonMatch = result.content.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0])
-      } else {
-        throw new Error("Failed to parse AI response")
-      }
-    }
+    const parsed = extractJSON<{ segments?: Array<Record<string, unknown>> }>(result.content)
 
     const segments = (parsed.segments || []).map((seg, i) => ({
       segmentIndex: (seg.segmentIndex as number) ?? i,

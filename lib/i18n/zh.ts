@@ -523,7 +523,7 @@ const zh = {
 
   // 工作流步骤条
   "studio.workflowScenes": "编写场景",
-  "studio.workflowSegments": "拆分片段",
+  "studio.workflowSegments": "拆分片段 (Shots)",
   "studio.workflowTheater": "生成视频",
   "studio.viewRoles": "角色 ({count})",
 

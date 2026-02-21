@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
-import { aiComplete } from "@/lib/ai"
+import { aiComplete, extractJSON } from "@/lib/ai"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
   "stageDirection": "润色后的舞台指示",
   "mood": "场景情绪",
   "promptHint": "镜头提示"
-}`
+}
+重要：只输出纯 JSON，不要添加 markdown 代码块标记、注释或任何其他文字。`
       : `You are a professional short drama script polisher. Improve the following scene's descriptions and dialogue to be more vivid and cinematic.
 Keep the original story direction and character relationships intact.
 Output format (JSON):
@@ -51,7 +52,8 @@ Output format (JSON):
   "stageDirection": "Polished stage direction",
   "mood": "Scene mood",
   "promptHint": "Camera/shot hint"
-}`
+}
+IMPORTANT: Output ONLY the raw JSON object. No markdown code blocks, no comments, no other text.`
 
     const userPrompt = lang === "zh"
       ? `请润色以下场景（剧名：${scene.script.title}，类型：${scene.script.genre}）：
@@ -81,17 +83,7 @@ Current location: ${scene.location || "Not set"}`
       responseFormat: "json",
     })
 
-    let polished: Record<string, unknown>
-    try {
-      polished = JSON.parse(result.content)
-    } catch {
-      const jsonMatch = result.content.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        polished = JSON.parse(jsonMatch[0])
-      } else {
-        throw new Error("Failed to parse AI response")
-      }
-    }
+    const polished = extractJSON<Record<string, unknown>>(result.content)
 
     // Normalize dialogue to string
     if (polished.dialogue && typeof polished.dialogue !== "string") {

@@ -521,7 +521,7 @@ const en: Record<string, string> = {
 
   // Workflow stepper
   "studio.workflowScenes": "Write Scenes",
-  "studio.workflowSegments": "Split Segments",
+  "studio.workflowSegments": "Split Segments (Shots)",
   "studio.workflowTheater": "Generate Video",
   "studio.viewRoles": "Characters ({count})",
 

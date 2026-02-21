@@ -93,6 +93,66 @@ export async function aiComplete(options: AICompletionOptions): Promise<AIComple
 }
 
 /**
+ * 从 AI 回复中提取 JSON（处理 markdown 代码块、前后缀文字等）
+ */
+export function extractJSON<T = Record<string, unknown>>(text: string): T {
+  // 1. Try direct parse first
+  try {
+    return JSON.parse(text)
+  } catch {
+    // continue to fallback
+  }
+
+  // 2. Try extracting from markdown code block: ```json ... ``` or ``` ... ```
+  const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/)
+  if (codeBlockMatch) {
+    try {
+      return JSON.parse(codeBlockMatch[1].trim())
+    } catch {
+      // continue
+    }
+  }
+
+  // 3. Try extracting the outermost { ... } or [ ... ]
+  // Find first { or [, then find its matching closing bracket
+  const startIdx = text.search(/[{[]/)
+  if (startIdx >= 0) {
+    const startChar = text[startIdx]
+    const endChar = startChar === '{' ? '}' : ']'
+    let depth = 0
+    let inString = false
+    let escape = false
+
+    for (let i = startIdx; i < text.length; i++) {
+      const ch = text[i]
+      if (escape) { escape = false; continue }
+      if (ch === '\\' && inString) { escape = true; continue }
+      if (ch === '"' && !escape) { inString = !inString; continue }
+      if (inString) continue
+      if (ch === startChar) depth++
+      if (ch === endChar) {
+        depth--
+        if (depth === 0) {
+          try {
+            return JSON.parse(text.slice(startIdx, i + 1))
+          } catch {
+            break
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Last resort: greedy regex
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0])
+  }
+
+  throw new Error(`Failed to extract JSON from AI response. Response starts with: ${text.slice(0, 200)}`)
+}
+
+/**
  * AI 剧本生成 - 系统 prompt
  */
 export function buildScriptSystemPrompt(language: string = "zh") {
@@ -130,7 +190,9 @@ export function buildScriptSystemPrompt(language: string = "zh") {
 - 竖屏构图（9:16），注意特写和近景
 - 每集 3-5 场戏，总时长 2-3 分钟
 - 台词口语化，贴近生活
-- 每集结尾设置悬念/反转`
+- 每集结尾设置悬念/反转
+
+重要：只输出纯 JSON，不要添加 markdown 代码块标记、注释或任何其他文字。`
   }
 
   return `You are a professional short drama scriptwriter. Create high-quality vertical short drama scripts based on user input.
@@ -166,5 +228,7 @@ Requirements:
 - Vertical framing (9:16), focus on close-ups
 - 3-5 scenes per episode, 2-3 minutes total
 - Natural, conversational dialogue
-- Each episode ends with a cliffhanger`
+- Each episode ends with a cliffhanger
+
+IMPORTANT: Output ONLY the raw JSON object. No markdown code blocks, no comments, no other text.`
 }
