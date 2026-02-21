@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -11,8 +11,11 @@ import {
 import {
   ArrowLeft, Loader2, Zap,
   CheckCircle, XIcon, Coins, PenTool,
+  Play, RefreshCw, ChevronDown, ChevronUp,
+  Upload,
 } from "@/components/icons"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { t } from "@/lib/i18n"
 import { MODEL_PRICING } from "@/lib/model-pricing"
 
@@ -67,11 +70,15 @@ export function GenerateWorkbench({
   episodeNum: number
   balance: number
 }) {
+  const router = useRouter()
   const [existingSegments, setExistingSegments] = useState<VideoSegment[]>(script.videoSegments)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [balance, setBalance] = useState(initialBalance)
-  const [pollingActive, setPollingActive] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set())
+  const [previewVideo, setPreviewVideo] = useState<{ url: string; title: string } | null>(null)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const autoStartedRef = useRef(false)
 
   // Derived state
   const hasExistingSegments = existingSegments.length > 0
@@ -81,8 +88,16 @@ export function GenerateWorkbench({
   const hasGenerating = existingSegments.some(
     s => s.status === "generating" || s.status === "submitted" || s.status === "reserved"
   )
+  const doneCount = existingSegments.filter(s => s.status === "done").length
+  const failedCount = existingSegments.filter(s => s.status === "failed").length
+  const generatingCount = existingSegments.filter(
+    s => s.status === "generating" || s.status === "submitted" || s.status === "reserved"
+  ).length
+  const total = existingSegments.length
+  const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0
+  const isWorking = generatingCount > 0
 
-  // Calculate cost for pending segments (model/resolution from segment records)
+  // Calculate cost for pending segments
   const calculateTotalCost = useCallback(() => {
     if (pendingSegments.length === 0) return 0
     const firstSeg = pendingSegments[0]
@@ -95,33 +110,34 @@ export function GenerateWorkbench({
 
   const totalCost = calculateTotalCost()
 
-  // Poll for status updates
+  // Auto-trigger on first entry: if only pending segments exist, auto-show confirm dialog
   useEffect(() => {
-    if (!hasGenerating) {
-      setPollingActive(false)
-      return
+    if (autoStartedRef.current) return
+    if (hasPending && !hasGenerating && !allDone) {
+      autoStartedRef.current = true
+      setShowConfirm(true)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-    setPollingActive(true)
+  // Poll for status updates when generating
+  useEffect(() => {
+    if (!hasGenerating) return
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/video/status?scriptId=${script.id}&episodeNum=${episodeNum}`)
         if (res.ok) {
           const data = await res.json()
           setExistingSegments(data.segments || [])
-
           const allComplete = (data.segments || []).every(
             (s: VideoSegment) => s.status === "done" || s.status === "failed"
           )
-          if (allComplete) {
-            setPollingActive(false)
-          }
+          if (allComplete) clearInterval(interval)
         }
       } catch {
         // Ignore polling errors
       }
     }, 5000)
-
     return () => clearInterval(interval)
   }, [hasGenerating, script.id, episodeNum])
 
@@ -132,7 +148,7 @@ export function GenerateWorkbench({
     setShowConfirm(true)
   }
 
-  // Submit all pending segments for video generation (after user confirms)
+  // Submit all pending segments for video generation
   async function handleConfirmSubmit() {
     setShowConfirm(false)
     if (pendingSegments.length === 0) return
@@ -180,7 +196,7 @@ export function GenerateWorkbench({
     }
   }
 
-  // Submit single segment (retry)
+  // Submit single segment (retry/re-generate)
   async function handleSubmitSingle(segmentId: string) {
     try {
       const res = await fetch("/api/video/submit", {
@@ -188,7 +204,6 @@ export function GenerateWorkbench({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ segmentId }),
       })
-
       if (res.ok) {
         const data = await res.json()
         setExistingSegments(prev =>
@@ -200,6 +215,43 @@ export function GenerateWorkbench({
     }
   }
 
+  // Toggle segment prompt expansion
+  function toggleExpand(segId: string) {
+    setExpandedSegments(prev => {
+      const next = new Set(prev)
+      if (next.has(segId)) next.delete(segId)
+      else next.add(segId)
+      return next
+    })
+  }
+
+  // Publish script → Series
+  async function handlePublish() {
+    setIsPublishing(true)
+    try {
+      const res = await fetch(`/api/scripts/${script.id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        router.push(`/series/${data.seriesId}`)
+      } else {
+        const data = await res.json()
+        if (res.status === 409 && data.publishedId) {
+          alert(t("generate.alreadyPublished"))
+        } else {
+          alert(data.error || "Publish failed")
+        }
+      }
+    } catch {
+      alert("Publish failed")
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   const statusColors: Record<string, string> = {
     pending: "bg-gray-100 text-gray-600",
     reserved: "bg-yellow-100 text-yellow-700",
@@ -207,6 +259,20 @@ export function GenerateWorkbench({
     generating: "bg-amber-100 text-amber-700",
     done: "bg-green-100 text-green-700",
     failed: "bg-red-100 text-red-700",
+  }
+
+  // Status hint text for floating card
+  let statusHint = ""
+  if (allDone) {
+    statusHint = t("generate.allDone")
+  } else if (failedCount > 0 && generatingCount === 0) {
+    statusHint = t("generate.progressFailed", { count: failedCount })
+  } else if (generatingCount > 0 && doneCount === 0) {
+    statusHint = t("generate.progressSubmitting")
+  } else if (doneCount > 0 && doneCount < total) {
+    statusHint = t("generate.progressWorking", { done: doneCount, total })
+  } else if (doneCount === 0) {
+    statusHint = t("generate.progressWaiting")
   }
 
   return (
@@ -259,7 +325,6 @@ export function GenerateWorkbench({
               </p>
             </div>
 
-            {/* Segment summary */}
             <div className="space-y-1">
               {pendingSegments.map(seg => (
                 <div key={seg.id} className="flex items-center gap-2 text-xs p-1.5 rounded bg-muted/50">
@@ -270,7 +335,6 @@ export function GenerateWorkbench({
               ))}
             </div>
 
-            {/* Cost info */}
             <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
               <span className="text-sm font-medium">{t("generate.costSummary")}</span>
               <span className="flex items-center gap-1 font-bold text-amber-600">
@@ -299,156 +363,145 @@ export function GenerateWorkbench({
         </Card>
       )}
 
-      {/* Existing segments — progress view */}
+      {/* Existing segments list */}
       {hasExistingSegments && !hasPending && (
         <div className="space-y-3">
-          {/* ── Progress overview card ── */}
-          {(() => {
-            const doneCount = existingSegments.filter(s => s.status === "done").length
-            const failedCount = existingSegments.filter(s => s.status === "failed").length
-            const generatingCount = existingSegments.filter(
-              s => s.status === "generating" || s.status === "submitted" || s.status === "reserved"
-            ).length
-            const total = existingSegments.length
-            const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0
-            const isWorking = generatingCount > 0
+          {/* Re-generate all button (when failures exist and not working) */}
+          {failedCount > 0 && !isWorking && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-dashed"
+              onClick={() => {
+                // Re-submit all failed as single requests
+                existingSegments
+                  .filter(s => s.status === "failed")
+                  .forEach(s => handleSubmitSingle(s.id))
+              }}
+            >
+              <RefreshCw className="w-3 h-3 mr-1.5" />
+              {t("generate.retryAll")} ({failedCount})
+            </Button>
+          )}
 
-            // Status hint text
-            let statusHint = ""
-            if (allDone) {
-              statusHint = t("generate.allDone")
-            } else if (failedCount > 0 && generatingCount === 0) {
-              statusHint = t("generate.progressFailed", { count: failedCount })
-            } else if (generatingCount > 0 && doneCount === 0) {
-              statusHint = t("generate.progressSubmitting")
-            } else if (doneCount > 0 && doneCount < total) {
-              statusHint = t("generate.progressWorking", { done: doneCount, total })
-            } else if (doneCount === 0) {
-              statusHint = t("generate.progressWaiting")
-            }
+          {/* Segment cards */}
+          {existingSegments.map((seg) => {
+            const isExpanded = expandedSegments.has(seg.id)
+            const isDone = seg.status === "done"
+            const isFailed = seg.status === "failed"
+            const isSegGenerating = seg.status === "generating" || seg.status === "submitted" || seg.status === "reserved"
 
             return (
-              <Card className={isWorking ? "border-amber-200 dark:border-amber-800" : ""}>
-                <CardContent className="p-4 space-y-3">
-                  {/* Title row */}
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold">
-                      {t("generate.progressTitle")}
-                    </h2>
-                    <span className="text-lg font-bold text-primary">{percent}%</span>
+              <Card
+                key={seg.id}
+                className={`transition-all duration-200 ${
+                  isDone
+                    ? "border-green-200 dark:border-green-800"
+                    : isFailed
+                      ? "border-red-200 dark:border-red-800"
+                      : isSegGenerating
+                        ? "border-amber-200 dark:border-amber-800"
+                        : ""
+                }`}
+              >
+                <CardContent className="p-3 space-y-2">
+                  {/* Top row: index + prompt + status + expand toggle */}
+                  <div
+                    className="flex items-start gap-2 cursor-pointer"
+                    onClick={() => toggleExpand(seg.id)}
+                  >
+                    <span className="text-xs font-mono font-bold text-primary w-6 shrink-0 mt-0.5">
+                      #{seg.segmentIndex + 1}
+                    </span>
+
+                    {/* Prompt (1 line collapsed, full when expanded) */}
+                    <p className={`flex-1 text-xs text-muted-foreground min-w-0 ${isExpanded ? "whitespace-pre-wrap break-words" : "line-clamp-1"}`}>
+                      {seg.prompt}
+                    </p>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge className={`text-[10px] px-1.5 py-0.5 ${statusColors[seg.status] || ""}`}>
+                        {isDone && <CheckCircle className="w-3 h-3 mr-0.5" />}
+                        {isSegGenerating && <Loader2 className="w-3 h-3 mr-0.5 animate-spin" />}
+                        {isFailed && <XIcon className="w-3 h-3 mr-0.5" />}
+                        {seg.status}
+                      </Badge>
+                      {isExpanded
+                        ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+                        : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                      }
+                    </div>
                   </div>
 
-                  {/* Progress bar */}
-                  <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-                    <div
-                      className={`h-3 rounded-full transition-all duration-700 ease-out ${
-                        allDone
-                          ? "bg-gradient-to-r from-green-400 to-green-500"
-                          : failedCount > 0 && generatingCount === 0
-                            ? "bg-gradient-to-r from-amber-400 to-orange-500"
-                            : "bg-gradient-to-r from-indigo-400 to-purple-500"
-                      } ${isWorking ? "animate-pulse" : ""}`}
-                      style={{ width: `${Math.max(percent, isWorking ? 3 : 0)}%` }}
-                    />
-                  </div>
+                  {/* Thumbnail + duration (done state) */}
+                  {isDone && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-11 rounded overflow-hidden bg-black shrink-0">
+                        {seg.thumbnailUrl ? (
+                          <img
+                            src={seg.thumbnailUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Play className="w-4 h-4 text-white/60" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        {seg.durationSec}s
+                        {seg.tokenCost ? ` · ${seg.tokenCost} coins` : ""}
+                      </p>
+                    </div>
+                  )}
 
-                  {/* Status hint */}
+                  {/* Error message (failed state) */}
+                  {isFailed && seg.errorMessage && (
+                    <p className="text-[11px] text-red-500 bg-red-50 dark:bg-red-950/20 rounded px-2 py-1">
+                      {seg.errorMessage}
+                    </p>
+                  )}
+
+                  {/* Action buttons */}
                   <div className="flex items-center gap-2">
-                    {isWorking && <Loader2 className="w-4 h-4 animate-spin text-amber-500" />}
-                    {allDone && <CheckCircle className="w-4 h-4 text-green-500" />}
-                    {failedCount > 0 && generatingCount === 0 && !allDone && (
-                      <XIcon className="w-4 h-4 text-red-500" />
-                    )}
-                    <p className="text-xs text-muted-foreground">{statusHint}</p>
-                  </div>
+                    {/* Re-generate — always visible */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-7 px-2"
+                      onClick={() => handleSubmitSingle(seg.id)}
+                      disabled={isSegGenerating}
+                    >
+                      {isSegGenerating
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <RefreshCw className="w-3 h-3" />
+                      }
+                      <span className="ml-1">{t("generate.regenerate")}</span>
+                    </Button>
 
-                  {/* Segment count chips */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {doneCount > 0 && (
-                      <Badge className="bg-green-100 text-green-700 text-[10px]">
-                        <CheckCircle className="w-3 h-3 mr-0.5" />
-                        {doneCount} {t("generate.progressDone")}
-                      </Badge>
-                    )}
-                    {generatingCount > 0 && (
-                      <Badge className="bg-amber-100 text-amber-700 text-[10px]">
-                        <Loader2 className="w-3 h-3 mr-0.5 animate-spin" />
-                        {generatingCount} {t("generate.progressGenerating")}
-                      </Badge>
-                    )}
-                    {failedCount > 0 && (
-                      <Badge className="bg-red-100 text-red-700 text-[10px]">
-                        <XIcon className="w-3 h-3 mr-0.5" />
-                        {failedCount} {t("common.failed")}
-                      </Badge>
+                    {/* Preview — done state only */}
+                    {isDone && seg.videoUrl && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="text-xs h-7 px-2 bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => setPreviewVideo({
+                          url: seg.videoUrl!,
+                          title: `${t("studio.segment")} #${seg.segmentIndex + 1}`,
+                        })}
+                      >
+                        <Play className="w-3 h-3 mr-1" />
+                        {t("generate.preview")}
+                      </Button>
                     )}
                   </div>
                 </CardContent>
               </Card>
             )
-          })()}
+          })}
 
-          {existingSegments.map((seg) => (
-            <Card key={seg.id} className={seg.status === "done" ? "border-green-200 dark:border-green-800" : ""}>
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-primary w-6">
-                    #{seg.segmentIndex + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs truncate">{seg.prompt.substring(0, 60)}...</p>
-                  </div>
-                  <Badge className={`text-[10px] ${statusColors[seg.status] || ""}`}>
-                    {seg.status === "done" && <CheckCircle className="w-3 h-3 mr-0.5" />}
-                    {(seg.status === "generating" || seg.status === "submitted") && (
-                      <Loader2 className="w-3 h-3 mr-0.5 animate-spin" />
-                    )}
-                    {seg.status === "failed" && <XIcon className="w-3 h-3 mr-0.5" />}
-                    {seg.status}
-                  </Badge>
-                </div>
-
-                {/* Video preview */}
-                {seg.status === "done" && seg.videoUrl && (
-                  <div className="mt-2 rounded-lg overflow-hidden bg-black">
-                    <video
-                      src={seg.videoUrl}
-                      controls
-                      className="w-full"
-                      poster={seg.thumbnailUrl || undefined}
-                    />
-                  </div>
-                )}
-
-                {/* Error message + retry */}
-                {seg.status === "failed" && (
-                  <div className="mt-2 p-2 rounded bg-red-50 dark:bg-red-950/20">
-                    {seg.errorMessage && (
-                      <p className="text-xs text-red-600 mb-1">{seg.errorMessage}</p>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs"
-                      onClick={() => handleSubmitSingle(seg.id)}
-                    >
-                      {t("common.retry")}
-                    </Button>
-                  </div>
-                )}
-
-                {/* Cost info */}
-                {seg.tokenCost && (
-                  <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-0.5">
-                    <Coins className="w-3 h-3" />
-                    {seg.tokenCost} coins
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* All done celebration */}
+          {/* All done — Publish button */}
           {allDone && (
             <Card className="border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-950/20">
               <CardContent className="p-4 text-center space-y-3">
@@ -459,19 +512,24 @@ export function GenerateWorkbench({
                 <p className="text-xs text-muted-foreground">
                   {t("generate.segmentsReady", { count: existingSegments.length })}
                 </p>
-
                 <div className="flex gap-2 justify-center pt-1">
                   <Link href={`/generate/${script.id}`}>
                     <Button size="sm" variant="outline">
                       {t("common.back")}
                     </Button>
                   </Link>
-                  <Link href={`/studio/script/${script.id}`}>
-                    <Button size="sm" variant="outline">
-                      <PenTool className="w-3 h-3 mr-1" />
-                      {t("common.edit")}
-                    </Button>
-                  </Link>
+                  <Button
+                    size="sm"
+                    onClick={handlePublish}
+                    disabled={isPublishing}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
+                  >
+                    {isPublishing
+                      ? <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      : <Upload className="w-3 h-3 mr-1" />
+                    }
+                    {isPublishing ? t("common.processing") : t("generate.mergePublish")}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -506,6 +564,93 @@ export function GenerateWorkbench({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* ── Floating progress card (bottom-right, hidden when all done or all pending) ── */}
+      {hasExistingSegments && !hasPending && !allDone && (
+        <div className="fixed bottom-24 right-4 z-40 w-44">
+          <Card className={`shadow-xl border-2 ${
+            isWorking
+              ? "border-blue-300 dark:border-blue-700"
+              : failedCount > 0
+                ? "border-red-300 dark:border-red-700"
+                : "border-green-300 dark:border-green-700"
+          }`}>
+            <CardContent className="p-3 space-y-2">
+              {/* Current / Total */}
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground font-medium">
+                  {t("generate.progressTitle")}
+                </span>
+                <span className="text-xs font-bold">
+                  {doneCount}/{total}
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                <div
+                  className={`h-1.5 rounded-full transition-all duration-700 ${
+                    failedCount > 0 && !isWorking
+                      ? "bg-red-500"
+                      : isWorking
+                        ? "bg-blue-500"
+                        : "bg-green-500"
+                  } ${isWorking ? "animate-pulse" : ""}`}
+                  style={{ width: `${Math.max(percent, isWorking ? 5 : 0)}%` }}
+                />
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center gap-1.5">
+                {isWorking && <Loader2 className="w-3 h-3 animate-spin text-blue-500 shrink-0" />}
+                {failedCount > 0 && !isWorking && <XIcon className="w-3 h-3 text-red-500 shrink-0" />}
+                <span className="text-[10px] text-muted-foreground line-clamp-2">{statusHint}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Bottom sheet video preview ── */}
+      {previewVideo && (
+        <div
+          className="fixed inset-0 z-50 flex items-end"
+          onClick={() => setPreviewVideo(null)}
+        >
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="relative w-full bg-background rounded-t-2xl overflow-hidden max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+            </div>
+            {/* Title + close */}
+            <div className="flex items-center justify-between px-4 pb-3">
+              <h3 className="font-semibold text-sm">{previewVideo.title}</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setPreviewVideo(null)}
+              >
+                <XIcon className="w-4 h-4" />
+              </Button>
+            </div>
+            {/* Video player */}
+            <div className="px-4 pb-8">
+              <video
+                src={previewVideo.url}
+                controls
+                autoPlay
+                className="w-full rounded-xl bg-black"
+                style={{ maxHeight: "60vh" }}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Coin confirmation dialog ── */}

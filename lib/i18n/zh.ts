@@ -545,6 +545,12 @@ const zh = {
   "generate.progressFailed": "{count} 个片段失败，点击重试可重新生成",
   "generate.progressDone": "已完成",
   "generate.progressGenerating": "生成中",
+  "generate.regenerate": "重新生成",
+  "generate.retryAll": "重试全部失败",
+  "generate.preview": "预览",
+  "generate.mergePublish": "合并发布",
+  "generate.alreadyPublished": "该剧本已发布，请前往系列页面查看",
+  "studio.segment": "片段",
 
   // 集数管理
   "studio.addEpisode": "添加集",

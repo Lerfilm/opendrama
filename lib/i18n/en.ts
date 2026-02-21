@@ -543,6 +543,12 @@ const en: Record<string, string> = {
   "generate.progressFailed": "{count} segment(s) failed — tap Retry to regenerate.",
   "generate.progressDone": "done",
   "generate.progressGenerating": "generating",
+  "generate.regenerate": "Regenerate",
+  "generate.retryAll": "Retry failed",
+  "generate.preview": "Preview",
+  "generate.mergePublish": "Publish Series",
+  "generate.alreadyPublished": "This script is already published. Check the Series page.",
+  "studio.segment": "Segment",
 
   // Episode management
   "studio.addEpisode": "Add Episode",
