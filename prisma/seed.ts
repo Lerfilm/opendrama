@@ -1,11 +1,7 @@
 import { Pool } from "pg"
 
 const pool = new Pool({
-  host: "aws-1-us-west-1.pooler.supabase.com",
-  port: 6543,
-  database: "postgres",
-  user: "postgres.ttkbptrovgrxyodiojno",
-  password: "FKrzId6Uu5U4uHaf",
+  connectionString: process.env.DATABASE_URL || "postgresql://postgres.ttkbptrovgrxyodiojno:5FCn6mhzLh3zPGzR@aws-1-us-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true",
   ssl: { rejectUnauthorized: false },
 })
 
@@ -32,47 +28,47 @@ async function seed() {
       await client.query("DELETE FROM purchases")
     }
 
-    // Create 6 series with Chinese drama themes
+    // Create 6 series
     const seriesData = [
       {
         id: cuid(),
-        title: "都市逆袭",
-        description: "落魄青年意外获得神秘系统，从此走上逆袭之路。从街边小摊到商业帝国，每一步都惊心动魄。",
+        title: "Urban Rise",
+        description: "A down-on-his-luck young man gains a mysterious system and begins his journey from street vendor to business empire builder.",
         coverUrl: "https://picsum.photos/seed/drama1/400/600",
         status: "active",
       },
       {
         id: cuid(),
-        title: "重生千金",
-        description: "前世被害身亡的千金小姐重生回到十年前，这一次她要改变命运，守护家人，向所有背叛者复仇。",
+        title: "Reborn Heiress",
+        description: "Betrayed and killed in her past life, a wealthy heiress is reborn 10 years earlier — this time, she fights back.",
         coverUrl: "https://picsum.photos/seed/drama2/400/600",
         status: "active",
       },
       {
         id: cuid(),
-        title: "龙王归来",
-        description: "隐忍三年的上门女婿，真实身份竟是龙王集团继承人。当他不再隐藏，整个城市都将为之颤抖。",
+        title: "Dragon King Returns",
+        description: "After enduring three years as a stay-at-home husband, his true identity as heir to the Dragon Group is finally revealed.",
         coverUrl: "https://picsum.photos/seed/drama3/400/600",
         status: "active",
       },
       {
         id: cuid(),
-        title: "闪婚总裁",
-        description: "为了逃避相亲，她随手拉了个路人领证。没想到这个路人竟是全城最神秘的霸道总裁。",
+        title: "Flash Marriage CEO",
+        description: "To escape a blind date, she grabs a stranger to get married — only to discover he's the city's most powerful CEO.",
         coverUrl: "https://picsum.photos/seed/drama4/400/600",
         status: "active",
       },
       {
         id: cuid(),
-        title: "医妃惊天下",
-        description: "现代天才女医穿越古代，成为被退婚的废材郡主。凭一手神医术，搅动朝堂风云。",
+        title: "The Royal Physician",
+        description: "A modern genius doctor is transported to ancient times as a disgraced princess, shaking up the imperial court with her skills.",
         coverUrl: "https://picsum.photos/seed/drama5/400/600",
         status: "active",
       },
       {
         id: cuid(),
-        title: "至尊兵王",
-        description: "战场上的传奇兵王回归都市，本想低调生活，却被卷入一场场惊天阴谋之中。",
+        title: "Supreme Warrior",
+        description: "A legendary special forces soldier returns to civilian life, but keeps getting dragged into dangerous conspiracies.",
         coverUrl: "https://picsum.photos/seed/drama6/400/600",
         status: "completed",
       },
@@ -88,12 +84,12 @@ async function seed() {
 
     // Create episodes for each series (8-16 episodes each)
     const episodeTitles: Record<string, string[]> = {
-      都市逆袭: ["初遇系统", "第一桶金", "商场风云", "强敌来袭", "绝地反击", "暗潮涌动", "合纵连横", "巅峰对决", "新的征程", "帝国崛起"],
-      重生千金: ["重回十年前", "步步为营", "真假千金", "复仇开始", "商战博弈", "旧爱重逢", "惊天秘密", "终极对决", "真相大白", "凤凰涅槃", "新的人生", "完美结局"],
-      龙王归来: ["隐忍三年", "身份暴露", "震惊全场", "龙王之怒", "商业帝国", "家族秘辛", "王者归来", "最终决战"],
-      闪婚总裁: ["闪婚风波", "同居日常", "身份曝光", "甜蜜误解", "前任来袭", "真心告白", "豪门风波", "幸福结局", "番外篇"],
-      医妃惊天下: ["穿越古代", "初显医术", "王府风云", "朝堂暗涌", "瘟疫危机", "神医之名", "宫廷阴谋", "逆转乾坤", "天下归心", "盛世太平"],
-      至尊兵王: ["兵王归来", "初入都市", "暗夜追踪", "地下势力", "生死对决", "真相浮出", "最终任务", "和平归来", "新的生活", "英雄落幕", "彩蛋篇", "番外一", "番外二", "番外三", "番外四", "终章"],
+      "Urban Rise": ["The System Awakens", "First Fortune", "Corporate Storm", "A Powerful Rival", "The Counterattack", "Undercurrents", "Alliance of Power", "The Summit Battle", "A New Journey", "Empire Rising"],
+      "Reborn Heiress": ["Back to Ten Years Ago", "Step by Step", "The Real Heiress", "Revenge Begins", "Business Warfare", "Old Flame Returns", "A Shocking Secret", "The Final Showdown", "Truth Revealed", "Phoenix Reborn", "A New Life", "Perfect Ending"],
+      "Dragon King Returns": ["Three Years of Patience", "Identity Exposed", "Shocking Everyone", "The Dragon's Fury", "Business Empire", "Family Secrets", "The King Returns", "Final Battle"],
+      "Flash Marriage CEO": ["The Flash Wedding", "Living Together", "Identity Revealed", "Sweet Misunderstandings", "The Ex Returns", "True Confession", "Elite Family Drama", "Happy Ending", "Bonus Episode"],
+      "The Royal Physician": ["Journey to the Past", "Medical Talent Emerges", "Palace Intrigues", "Court Conspiracies", "The Plague Crisis", "Divine Healer's Fame", "Imperial Plot", "Turning the Tide", "Winning the World", "A Prosperous Era"],
+      "Supreme Warrior": ["The Warrior Returns", "Entering the City", "Night Pursuit", "Underground Forces", "Life or Death Battle", "Truth Surfaces", "The Final Mission", "Return to Peace", "A New Life", "Hero's Curtain Call", "Post-Credits", "Side Story I", "Side Story II", "Side Story III", "Side Story IV", "The Finale"],
     }
 
     let totalEpisodes = 0
@@ -102,7 +98,7 @@ async function seed() {
       for (let i = 0; i < titles.length; i++) {
         const epId = cuid()
         const duration = 180 + Math.floor(Math.random() * 420) // 3-10 min
-        const unlockCost = i === 0 ? 0 : [5, 8, 10, 15][Math.floor(Math.random() * 4)]
+        const unlockCost = i < 5 ? 0 : [5, 8, 10, 15][Math.floor(Math.random() * 4)]
         await client.query(
           `INSERT INTO episodes (id, "seriesId", "episodeNum", title, duration, "unlockCost", status, "createdAt", "updatedAt") 
            VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), NOW())`,
@@ -127,10 +123,10 @@ async function seed() {
           [
             cardId,
             s.id,
-            `${s.title} - 角色卡${i + 1}`,
+            `${s.title} - Character Card ${i + 1}`,
             rarity,
             `https://picsum.photos/seed/card${s.id}${i}/300/400`,
-            `${s.title}系列收藏卡牌`,
+            `${s.title} Series Collectible Card`,
           ]
         )
         totalCards++
@@ -167,11 +163,11 @@ async function seed() {
     }
     console.log(`  ✓ Watch events: ${watchCount}`)
 
-    // Create some purchases for analytics
+    // Create some purchases for analytics (USD cents)
     const packages = [
-      { amount: 600, coins: 60 },
-      { amount: 1800, coins: 200 },
-      { amount: 4500, coins: 550 },
+      { amount: 99, coins: 60 },
+      { amount: 499, coins: 300 },
+      { amount: 1499, coins: 1000 },
     ]
     for (let i = 0; i < 8; i++) {
       const pkg = packages[Math.floor(Math.random() * packages.length)]
