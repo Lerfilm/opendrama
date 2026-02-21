@@ -102,6 +102,15 @@ const SEEDANCE_MODEL_IDS: Record<string, string> = {
   seedance_1_0_pro: "doubao-seedance-1-0-pro-250528",
 }
 
+// Duration limits per Seedance model (seconds)
+// seedance_1_5_pro / seedance_1_0_pro: 4–12s
+// seedance_2_0: 4–15s
+const SEEDANCE_MAX_DURATION: Record<string, number> = {
+  seedance_2_0:     15,
+  seedance_1_5_pro: 12,
+  seedance_1_0_pro: 12,
+}
+
 // Resolution → aspect_ratio mapping
 function getAspectRatio(resolution: string): string {
   if (resolution === "1080p") return "16:9"
@@ -156,12 +165,15 @@ async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId
     content.unshift(...imageItems)
   }
 
+  const maxDuration = SEEDANCE_MAX_DURATION[req.model] ?? 12
+  const duration = Math.min(Math.max(Math.round(req.durationSec), 4), maxDuration)
+
   const body: Record<string, unknown> = {
     model: modelId,
     content,
     resolution: req.resolution === "1080p" ? "1080p" : "720p",
     ratio: req.aspectRatio || "16:9",
-    duration: Math.round(req.durationSec),
+    duration,
     seed: -1,
     watermark: false,
     camera_fixed: false,
