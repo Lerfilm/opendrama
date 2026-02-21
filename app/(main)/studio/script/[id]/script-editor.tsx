@@ -149,39 +149,37 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
 
   // Save scene to server
   const saveScene = useCallback(async (sceneId: string) => {
+    // Grab the current edits synchronously from the ref-like closure
+    let edits: Partial<Scene> | undefined
+    setEditingScenes(prev => {
+      edits = prev[sceneId]
+      if (!edits) return prev
+      const next = { ...prev }
+      delete next[sceneId]
+      return next
+    })
+
+    if (!edits) return
+
     setSavingScenes(prev => new Set(prev).add(sceneId))
 
     try {
-      setEditingScenes(prev => {
-        const edits = prev[sceneId]
-        if (!edits) return prev
-
-        fetch("/api/scenes", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: sceneId, ...edits }),
-        }).then(res => {
-          if (res.ok) {
-            res.json().then(({ scene: updated }) => {
-              setScript(p => ({
-                ...p,
-                scenes: p.scenes.map(s => s.id === sceneId ? { ...s, ...updated } : s),
-              }))
-            })
-          }
-        }).finally(() => {
-          setSavingScenes(p => {
-            const next = new Set(p)
-            next.delete(sceneId)
-            return next
-          })
-        })
-
-        const next = { ...prev }
-        delete next[sceneId]
-        return next
+      const res = await fetch("/api/scenes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: sceneId, ...edits }),
       })
+
+      if (res.ok) {
+        const { scene: updated } = await res.json()
+        setScript(p => ({
+          ...p,
+          scenes: p.scenes.map(s => s.id === sceneId ? { ...s, ...updated } : s),
+        }))
+      }
     } catch {
+      // silent fail
+    } finally {
       setSavingScenes(prev => {
         const next = new Set(prev)
         next.delete(sceneId)
@@ -190,10 +188,17 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
     }
   }, [])
 
-  // Force save all editing scenes
+  // Force save all editing scenes (clears debounce timers first)
   const saveAllScenes = useCallback(async () => {
+    // Clear all pending debounce timers
+    for (const key of Object.keys(saveTimeoutRef.current)) {
+      clearTimeout(saveTimeoutRef.current[key])
+      delete saveTimeoutRef.current[key]
+    }
     const sceneIds = Object.keys(editingScenes)
-    await Promise.all(sceneIds.map(id => saveScene(id)))
+    if (sceneIds.length > 0) {
+      await Promise.all(sceneIds.map(id => saveScene(id)))
+    }
   }, [editingScenes, saveScene])
 
   // Refresh script data from server (used by SegmentsTab after save)
@@ -508,7 +513,10 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
 
         {/* Step 2: Segments */}
         <button
-          onClick={() => setActiveTab("segments")}
+          onClick={async () => {
+            await saveAllScenes()
+            setActiveTab("segments")
+          }}
           className="flex items-center gap-1.5 flex-1 min-w-0"
         >
           <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold transition-colors ${
@@ -911,7 +919,10 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
                 <Zap className="w-6 h-6 mx-auto mb-2 text-primary" />
                 <p className="text-sm font-semibold mb-1">{t("studio.nextStepSegments")}</p>
                 <p className="text-xs text-muted-foreground mb-3">{t("studio.nextStepSegmentsDesc")}</p>
-                <Button size="sm" onClick={() => setActiveTab("segments")}>
+                <Button size="sm" onClick={async () => {
+                  await saveAllScenes()
+                  setActiveTab("segments")
+                }}>
                   {t("studio.goToSegments")}
                   <ChevronDown className="w-4 h-4 ml-1 -rotate-90" />
                 </Button>
@@ -998,7 +1009,10 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
                 {episodeSegmentCount === 0 ? (
                   <Button
                     size="sm"
-                    onClick={() => setActiveTab("segments")}
+                    onClick={async () => {
+                      await saveAllScenes()
+                      setActiveTab("segments")
+                    }}
                     className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs"
                   >
                     <Zap className="w-3 h-3 mr-1" />
