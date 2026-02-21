@@ -109,12 +109,12 @@ function getAspectRatio(resolution: string): string {
   return "16:9"
 }
 
-// ====== Seedance (Volcengine Operator API) ======
-// Submit:  POST https://operator.las.cn-beijing.volces.com/api/v1/contents/generations/tasks
-// Query:   GET  https://operator.las.cn-beijing.volces.com/api/v1/contents/generations/tasks/{id}
+// ====== Seedance (Volcengine Ark API) ======
+// Submit:  POST https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+// Query:   GET  https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/{id}
 // Auth:    Bearer ARK_API_KEY
 
-const SEEDANCE_BASE = "https://operator.las.cn-beijing.volces.com/api/v1"
+const SEEDANCE_BASE = "https://ark.cn-beijing.volces.com/api/v3"
 
 async function seedanceRequest<T>(path: string, body?: Record<string, unknown>, method = "POST"): Promise<T> {
   const apiKey = process.env.ARK_API_KEY
