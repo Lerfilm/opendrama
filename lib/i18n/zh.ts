@@ -37,6 +37,26 @@ const zh = {
   "home.startWatch": "开始观看",
   "home.episodeCount": "{count} 集",
 
+  // Home - Hero & Slogan
+  "home.slogan": "每一秒，都是一个元宇宙",
+  "home.sloganSub": "AI 驱动的下一代短剧平台",
+  "home.exploreNow": "开始探索",
+  "home.startCreate": "创作剧本",
+
+  // Home - AI 玩法分流
+  "home.aiFeatures": "AI 创作引擎",
+  "home.aiStudioTitle": "AI 编剧工坊",
+  "home.aiStudioDesc": "AI 一键生成剧本，从创意到成片",
+  "home.aiT2VTitle": "文生视频",
+  "home.aiT2VDesc": "文字描述画面，AI 生成视频",
+  "home.aiTheaterTitle": "AI 互动剧场",
+  "home.aiTheaterDesc": "观众投票决定剧情走向，实时互动",
+
+  // Home - Lerfilm 品牌
+  "home.lerfilmProduction": "A Lerfilm.com Production",
+  "home.lerfilmCopyright": "© 2024 Lerfilm.com · All rights reserved",
+  "home.lerfilmSlogan": "Lerfilm — 用 AI 重新定义影视创作",
+
   // Series detail
   "series.episodeList": "剧集列表",
   "series.episode": "第 {num} 集",

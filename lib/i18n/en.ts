@@ -37,6 +37,26 @@ const en: Record<string, string> = {
   "home.startWatch": "Start Watching",
   "home.episodeCount": "{count} episodes",
 
+  // Home - Hero & Slogan
+  "home.slogan": "Every Second, A Universe",
+  "home.sloganSub": "AI-Powered Next-Gen Short Drama Platform",
+  "home.exploreNow": "Explore Now",
+  "home.startCreate": "Start Creating",
+
+  // Home - AI Features
+  "home.aiFeatures": "AI Creative Engine",
+  "home.aiStudioTitle": "AI Screenwriter",
+  "home.aiStudioDesc": "Generate scripts with AI, from idea to production",
+  "home.aiT2VTitle": "Text to Video",
+  "home.aiT2VDesc": "Describe your vision, AI creates the video",
+  "home.aiTheaterTitle": "AI Live Theater",
+  "home.aiTheaterDesc": "Audience votes decide the plot, real-time interaction",
+
+  // Home - Lerfilm Brand
+  "home.lerfilmProduction": "A Lerfilm.com Production",
+  "home.lerfilmCopyright": "© 2024 Lerfilm.com · All rights reserved",
+  "home.lerfilmSlogan": "Lerfilm — Redefining filmmaking with AI",
+
   // Series detail
   "series.episodeList": "Episodes",
   "series.episode": "Episode {num}",
