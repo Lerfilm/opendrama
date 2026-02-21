@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import {
   ArrowLeft, Plus, Sparkles, Trash2, Loader2,
   ChevronDown, ChevronUp, Wand2, Lightbulb,
-  Play, Save,
+  Play, Save, Zap, CheckCircle, PenTool, Users,
 } from "@/components/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -214,6 +214,10 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
     s => s.episodeNum === selectedEpisode
   ).length || 0
 
+  // Workflow completion flags
+  const scenesComplete = currentScenes.length > 0
+  const segmentsComplete = episodeSegmentCount > 0
+
   // AI Generate script
   async function handleAIGenerate() {
     if (isGenerating) return
@@ -403,6 +407,18 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
             {t("common.save")}
           </Button>
         )}
+        {/* Roles badge */}
+        <button
+          onClick={() => setActiveTab("roles")}
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+            activeTab === "roles"
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          }`}
+        >
+          <Users className="w-3 h-3" />
+          {script.roles.length}
+        </button>
         <Button
           size="sm"
           onClick={handleAIGenerate}
@@ -432,46 +448,112 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
         </Card>
       )}
 
-      {/* Episode selector (shared across all tabs) */}
+      {/* Episode selector with completeness dots */}
       {episodes.length > 0 && (
         <div className="flex items-center gap-2">
           <div className="flex gap-2 overflow-x-auto flex-1 no-scrollbar">
-            {episodes.map((ep) => (
-              <button
-                key={ep}
-                onClick={() => {
-                  setSelectedEpisode(ep)
-                  setSuggestions(null)
-                  setPolishResult(null)
-                }}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  selectedEpisode === ep
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {t("studio.episode", { num: ep })}
-              </button>
-            ))}
+            {episodes.map((ep) => {
+              const epHasScenes = (episodeMap[ep] || []).length > 0
+              const epHasSegments = (script.videoSegments?.filter(s => s.episodeNum === ep) || []).length > 0
+              return (
+                <button
+                  key={ep}
+                  onClick={() => {
+                    setSelectedEpisode(ep)
+                    setSuggestions(null)
+                    setPolishResult(null)
+                  }}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    selectedEpisode === ep
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {t("studio.episode", { num: ep })}
+                  <span className="inline-flex gap-0.5">
+                    <span className={`w-1.5 h-1.5 rounded-full inline-block ${epHasScenes ? "bg-green-400" : "bg-muted-foreground/30"}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full inline-block ${epHasSegments ? "bg-green-400" : "bg-muted-foreground/30"}`} />
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* Scenes/Roles/Segments tabs */}
-      <div className="flex border-b border-border">
-        {(["scenes", "roles", "segments"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground"
-            }`}
-          >
-            {t(`studio.${tab}`)} ({tab === "scenes" ? currentScenes.length : tab === "roles" ? script.roles.length : episodeSegmentCount})
-          </button>
-        ))}
+      {/* Workflow stepper: ① Scenes → ② Segments → ③ Theater */}
+      <div className="flex items-center gap-0 py-3">
+        {/* Step 1: Scenes */}
+        <button
+          onClick={() => setActiveTab("scenes")}
+          className="flex items-center gap-1.5 flex-1 min-w-0"
+        >
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold transition-colors ${
+            activeTab === "scenes"
+              ? "bg-primary text-primary-foreground"
+              : scenesComplete
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                : "bg-muted text-muted-foreground"
+          }`}>
+            {scenesComplete && activeTab !== "scenes" ? <CheckCircle className="w-3.5 h-3.5" /> : "1"}
+          </div>
+          <div className="min-w-0">
+            <p className={`text-[10px] font-medium truncate ${activeTab === "scenes" ? "text-primary" : "text-muted-foreground"}`}>
+              {t("studio.workflowScenes")}
+            </p>
+            <p className="text-[10px] text-muted-foreground">{currentScenes.length}</p>
+          </div>
+        </button>
+        <div className={`h-0.5 w-6 flex-shrink-0 ${scenesComplete ? "bg-green-400" : "bg-muted"}`} />
+
+        {/* Step 2: Segments */}
+        <button
+          onClick={() => setActiveTab("segments")}
+          className="flex items-center gap-1.5 flex-1 min-w-0"
+        >
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold transition-colors ${
+            activeTab === "segments"
+              ? "bg-primary text-primary-foreground"
+              : segmentsComplete
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                : "bg-muted text-muted-foreground"
+          }`}>
+            {segmentsComplete && activeTab !== "segments" ? <CheckCircle className="w-3.5 h-3.5" /> : "2"}
+          </div>
+          <div className="min-w-0">
+            <p className={`text-[10px] font-medium truncate ${activeTab === "segments" ? "text-primary" : "text-muted-foreground"}`}>
+              {t("studio.workflowSegments")}
+            </p>
+            <p className="text-[10px] text-muted-foreground">{episodeSegmentCount}</p>
+          </div>
+        </button>
+        <div className={`h-0.5 w-6 flex-shrink-0 ${segmentsComplete ? "bg-green-400" : "bg-muted"}`} />
+
+        {/* Step 3: Theater (link) */}
+        <Link
+          href={`/generate/${script.id}/${selectedEpisode}`}
+          onClick={() => {
+            fetch(`/api/scripts/${script.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "ready" }),
+            })
+          }}
+          className="flex items-center gap-1.5 flex-1 min-w-0"
+        >
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+            segmentsComplete
+              ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+              : "bg-muted text-muted-foreground"
+          }`}>
+            <Play className="w-3 h-3" />
+          </div>
+          <div className="min-w-0">
+            <p className={`text-[10px] font-medium truncate ${segmentsComplete ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground"}`}>
+              {t("studio.workflowTheater")}
+            </p>
+          </div>
+        </Link>
       </div>
 
       {/* SCENES TAB */}
@@ -790,13 +872,22 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
 
           {/* Empty state */}
           {script.scenes.length === 0 && (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                <p className="mb-2">{t("studio.noScripts")}</p>
-                <Button size="sm" onClick={handleAIGenerate} disabled={isGenerating}>
-                  <Sparkles className="w-4 h-4 mr-1" />
-                  {t("studio.generateScript")}
-                </Button>
+            <Card className="border-dashed">
+              <CardContent className="p-8 text-center">
+                <PenTool className="w-8 h-8 mx-auto mb-3 text-muted-foreground/50" />
+                <p className="font-semibold mb-1">{t("studio.emptySceneTitle")}</p>
+                <p className="text-xs text-muted-foreground mb-4">{t("studio.emptySceneDesc")}</p>
+                <div className="flex flex-col gap-2 items-center">
+                  <Button size="sm" onClick={handleAIGenerate} disabled={isGenerating} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                    <Sparkles className="w-4 h-4 mr-1" />
+                    {t("studio.generateScript")}
+                  </Button>
+                  <span className="text-[10px] text-muted-foreground">{t("studio.orAddManually")}</span>
+                  <Button size="sm" variant="outline" onClick={() => handleAddScene()}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    {t("studio.addScene")}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -811,6 +902,21 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
               <Plus className="w-4 h-4 mr-1" />
               {t("studio.addScene")}
             </Button>
+          )}
+
+          {/* Next-step prompt: go to Segments */}
+          {currentScenes.length > 0 && episodeSegmentCount === 0 && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4 text-center">
+                <Zap className="w-6 h-6 mx-auto mb-2 text-primary" />
+                <p className="text-sm font-semibold mb-1">{t("studio.nextStepSegments")}</p>
+                <p className="text-xs text-muted-foreground mb-3">{t("studio.nextStepSegmentsDesc")}</p>
+                <Button size="sm" onClick={() => setActiveTab("segments")}>
+                  {t("studio.goToSegments")}
+                  <ChevronDown className="w-4 h-4 ml-1 -rotate-90" />
+                </Button>
+              </CardContent>
+            </Card>
           )}
         </div>
       )}
@@ -869,8 +975,8 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
         />
       )}
 
-      {/* Floating action bar */}
-      {(activeTab === "scenes" || activeTab === "segments") && currentScenes.length > 0 && (
+      {/* Contextual floating action bar */}
+      {activeTab === "scenes" && currentScenes.length > 0 && (
         <div className="fixed bottom-20 left-0 right-0 px-4 z-40">
           <div className="max-w-screen-md mx-auto">
             <Card className="shadow-lg border-2">
@@ -889,6 +995,43 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
                   )}
                   {isSuggesting ? t("studio.suggesting") : t("studio.aiSuggest")}
                 </Button>
+                {episodeSegmentCount === 0 ? (
+                  <Button
+                    size="sm"
+                    onClick={() => setActiveTab("segments")}
+                    className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs"
+                  >
+                    <Zap className="w-3 h-3 mr-1" />
+                    {t("studio.goToSegments")}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      fetch(`/api/scripts/${script.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: "ready" }),
+                      }).then(() => {
+                        router.push(`/generate/${script.id}/${selectedEpisode}`)
+                      })
+                    }}
+                    className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs"
+                  >
+                    <Play className="w-3 h-3 mr-1" />
+                    {t("studio.goToTheater")}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+      {activeTab === "segments" && episodeSegmentCount > 0 && (
+        <div className="fixed bottom-20 left-0 right-0 px-4 z-40">
+          <div className="max-w-screen-md mx-auto">
+            <Card className="shadow-lg border-2">
+              <CardContent className="p-2 flex items-center gap-2">
                 <Button
                   size="sm"
                   onClick={() => {
@@ -903,7 +1046,26 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
                   className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs"
                 >
                   <Play className="w-3 h-3 mr-1" />
-                  {episodeSegmentCount > 0 ? t("studio.goToTheater") : t("studio.needsSegments")}
+                  {t("studio.goToTheater")}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+      {activeTab === "roles" && (
+        <div className="fixed bottom-20 left-0 right-0 px-4 z-40">
+          <div className="max-w-screen-md mx-auto">
+            <Card className="shadow-lg border-2">
+              <CardContent className="p-2 flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setActiveTab("scenes")}
+                  className="flex-1 text-xs"
+                >
+                  <ArrowLeft className="w-3 h-3 mr-1" />
+                  {t("studio.backToScenes")}
                 </Button>
               </CardContent>
             </Card>

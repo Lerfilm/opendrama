@@ -289,7 +289,7 @@ model Script {
   userId         String
   title          String
   genre          String   @default("drama") // drama, comedy, romance, thriller, scifi, fantasy
-  format         String   @default("shortdrama") // shortdrama, movie, stageplay
+  format         String   @default("shortdrama") // shortdrama, movie, animation, stageplay
   logline        String?  @db.Text
   synopsis       String?  @db.Text
   coverImage     String?

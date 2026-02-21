@@ -5,6 +5,7 @@ const zh = {
   "common.play": "播放",
   "common.retry": "重试",
   "common.back": "返回",
+  "common.next": "下一步",
   "common.close": "关闭",
   "common.loading": "加载中...",
   "common.noData": "暂无数据",
@@ -519,6 +520,40 @@ const zh = {
   "generate.readyBadge": "可以生成",
   "generate.startGenerate": "开始生成视频",
   "generate.costSummary": "费用确认",
+
+  // 工作流步骤条
+  "studio.workflowScenes": "编写场景",
+  "studio.workflowSegments": "拆分片段",
+  "studio.workflowTheater": "生成视频",
+  "studio.viewRoles": "角色 ({count})",
+
+  // 下一步引导
+  "studio.nextStepSegments": "场景已就绪！下一步：拆分为视频片段",
+  "studio.nextStepSegmentsDesc": "AI 将场景转化为视频提示词",
+  "studio.goToSegments": "前往片段",
+  "studio.segmentsReadyTitle": "片段已保存！可以生成视频了",
+  "studio.segmentsReadyDesc": "前往剧场生成并合成你的视频",
+
+  // 上下文操作栏
+  "studio.backToScenes": "返回场景",
+
+  // 改进空状态
+  "studio.emptySceneTitle": "开始创作你的故事",
+  "studio.emptySceneDesc": "使用 AI 生成场景或手动添加",
+  "studio.orAddManually": "或手动添加场景",
+  "studio.emptySegmentTitle": "还没有视频片段",
+  "studio.emptySegmentReady": "场景已就绪！点击上方 AI 拆分生成视频提示词",
+  "studio.emptySegmentNeedScenes": "先添加场景，然后回来拆分为视频片段",
+
+  // 格式
+  "studio.animation": "动画",
+
+  // 新建剧本步骤
+  "studio.step": "步骤 {num}",
+  "studio.stepBasicInfo": "基本信息",
+  "studio.stepStory": "故事大纲",
+  "studio.stepSettings": "设置",
+  "studio.stepCreate": "创建",
 } as const
 
 export type TranslationKey = keyof typeof zh

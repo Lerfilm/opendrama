@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Video, Edit } from "@/components/icons"
+import { Plus, Edit, CheckCircle } from "@/components/icons"
 import Link from "next/link"
 import { t } from "@/lib/i18n"
 
@@ -17,7 +17,7 @@ export default async function StudioPage() {
     where: { userId: session.user.id },
     orderBy: { updatedAt: "desc" },
     include: {
-      _count: { select: { scenes: true, roles: true } },
+      _count: { select: { scenes: true, roles: true, videoSegments: true } },
     },
   })
 
@@ -44,28 +44,20 @@ export default async function StudioPage() {
       </div>
 
       {/* 快捷入口 */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link href="/studio/script/new">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-dashed">
-            <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Edit className="w-6 h-6 text-primary" />
-              </div>
-              <span className="text-sm font-medium">{t("studio.newScript")}</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/studio/text-to-video">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-dashed">
-            <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-              <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <Video className="w-6 h-6 text-purple-500" />
-              </div>
-              <span className="text-sm font-medium">{t("studio.textToVideo")}</span>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+      <Link href="/studio/script/new">
+        <Card className="hover:shadow-md transition-shadow cursor-pointer border-dashed">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Edit className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <span className="text-sm font-semibold">{t("studio.newScript")}</span>
+              <p className="text-xs text-muted-foreground">{t("studio.emptySceneDesc")}</p>
+            </div>
+            <Plus className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
+          </CardContent>
+        </Card>
+      </Link>
 
       {/* 我的剧本列表 */}
       <div>
@@ -100,11 +92,36 @@ export default async function StudioPage() {
                             {script.logline}
                           </p>
                         )}
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
                           <span>{t(genreLabels[script.genre] || "discover.drama")}</span>
                           <span>{t("studio.episode", { num: script.targetEpisodes })}</span>
                           <span>{script._count.scenes} {t("studio.scenes")}</span>
                           <span>{script._count.roles} {t("studio.roles")}</span>
+                        </div>
+                        {/* Mini workflow progress */}
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <div className={`flex items-center gap-0.5 ${script._count.scenes > 0 ? "text-green-600" : "text-muted-foreground/50"}`}>
+                            {script._count.scenes > 0 ? (
+                              <CheckCircle className="w-3 h-3" />
+                            ) : (
+                              <div className="w-3 h-3 rounded-full border border-current flex items-center justify-center"><span className="text-[7px]">1</span></div>
+                            )}
+                            <span>{t("studio.workflowScenes")}</span>
+                          </div>
+                          <div className="w-3 h-px bg-muted-foreground/30" />
+                          <div className={`flex items-center gap-0.5 ${script._count.videoSegments > 0 ? "text-green-600" : "text-muted-foreground/50"}`}>
+                            {script._count.videoSegments > 0 ? (
+                              <CheckCircle className="w-3 h-3" />
+                            ) : (
+                              <div className="w-3 h-3 rounded-full border border-current flex items-center justify-center"><span className="text-[7px]">2</span></div>
+                            )}
+                            <span>{t("studio.workflowSegments")}</span>
+                          </div>
+                          <div className="w-3 h-px bg-muted-foreground/30" />
+                          <div className="flex items-center gap-0.5 text-muted-foreground/50">
+                            <div className="w-3 h-3 rounded-full border border-current flex items-center justify-center"><span className="text-[7px]">3</span></div>
+                            <span>{t("studio.workflowTheater")}</span>
+                          </div>
                         </div>
                       </div>
                     </div>

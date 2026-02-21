@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Zap, Loader2, ChevronDown, ChevronUp, Coins,
-  Save, ImageIcon, Sparkles,
+  Save, ImageIcon, Sparkles, CheckCircle, Play,
 } from "@/components/icons"
+import Link from "next/link"
 import { t } from "@/lib/i18n"
 import { MODEL_PRICING } from "@/lib/model-pricing"
 
@@ -565,15 +566,36 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
               </div>
             </div>
           )}
+
+          {/* Go to Theater prompt */}
+          <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
+            <CardContent className="p-4 text-center">
+              <CheckCircle className="w-6 h-6 mx-auto mb-2 text-green-500" />
+              <p className="text-sm font-semibold mb-1">{t("studio.segmentsReadyTitle")}</p>
+              <p className="text-xs text-muted-foreground mb-3">{t("studio.segmentsReadyDesc")}</p>
+              <Link href={`/generate/${script.id}/${selectedEpisode}`}>
+                <Button size="sm" className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white">
+                  <Play className="w-4 h-4 mr-1" />
+                  {t("studio.goToTheater")}
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* E. Empty state */}
       {!hasUnsavedSegments && existingSegments.length === 0 && (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <p className="mb-1">{t("studio.noSegments")}</p>
-            <p className="text-xs">{t("studio.noSegmentsHint")}</p>
+        <Card className="border-dashed">
+          <CardContent className="p-8 text-center">
+            <Zap className="w-8 h-8 mx-auto mb-3 text-muted-foreground/50" />
+            <p className="font-semibold mb-1">{t("studio.emptySegmentTitle")}</p>
+            <p className="text-xs text-muted-foreground">
+              {currentScenes.length > 0
+                ? t("studio.emptySegmentReady")
+                : t("studio.emptySegmentNeedScenes")
+              }
+            </p>
           </CardContent>
         </Card>
       )}

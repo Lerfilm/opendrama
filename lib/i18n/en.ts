@@ -5,6 +5,7 @@ const en: Record<string, string> = {
   "common.play": "Play",
   "common.retry": "Retry",
   "common.back": "Back",
+  "common.next": "Next",
   "common.close": "Close",
   "common.loading": "Loading...",
   "common.noData": "No data",
@@ -517,6 +518,40 @@ const en: Record<string, string> = {
   "generate.readyBadge": "Ready",
   "generate.startGenerate": "Start Video Generation",
   "generate.costSummary": "Cost Summary",
+
+  // Workflow stepper
+  "studio.workflowScenes": "Write Scenes",
+  "studio.workflowSegments": "Split Segments",
+  "studio.workflowTheater": "Generate Video",
+  "studio.viewRoles": "Characters ({count})",
+
+  // Next-step prompts
+  "studio.nextStepSegments": "Scenes ready! Next: Split into video segments",
+  "studio.nextStepSegmentsDesc": "AI will convert your scenes into video prompts",
+  "studio.goToSegments": "Go to Segments",
+  "studio.segmentsReadyTitle": "Segments saved! Ready for Theater",
+  "studio.segmentsReadyDesc": "Head to Theater to generate your episode videos",
+
+  // Contextual bar
+  "studio.backToScenes": "Back to Scenes",
+
+  // Improved empty states
+  "studio.emptySceneTitle": "Start building your story",
+  "studio.emptySceneDesc": "Generate scenes with AI or add them manually",
+  "studio.orAddManually": "or add scenes manually",
+  "studio.emptySegmentTitle": "No video segments yet",
+  "studio.emptySegmentReady": "Scenes ready! Click AI Split above to generate video prompts",
+  "studio.emptySegmentNeedScenes": "Add scenes first, then split them into video segments",
+
+  // Format
+  "studio.animation": "Animation",
+
+  // New script steps
+  "studio.step": "Step {num}",
+  "studio.stepBasicInfo": "Basic Info",
+  "studio.stepStory": "Story Outline",
+  "studio.stepSettings": "Settings",
+  "studio.stepCreate": "Create",
 }
 
 export default en
