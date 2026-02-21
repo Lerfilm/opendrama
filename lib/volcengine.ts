@@ -80,8 +80,8 @@ export function signRequest(
     "content-type": "application/json",
   }
 
-  // Signed headers (sorted, lowercase)
-  const signedHeaderKeys = ["host", "x-content-sha256", "x-date"]
+  // Signed headers (sorted, lowercase) — host is NOT signed, matching official SDK behavior
+  const signedHeaderKeys = ["x-content-sha256", "x-date"]
   const signedHeaders = signedHeaderKeys.join(";")
   const canonicalHeaders = signedHeaderKeys
     .map((k) => `${k}:${headers[k]}`)
