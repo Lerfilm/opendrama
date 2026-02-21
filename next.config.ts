@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 // Use build-time ID to version static assets and bust CDN cache across deployments.
 // Fly.io CDN caches /_next/static/* with immutable headers from old deploys;
 // changing the assetPrefix ensures browsers request new URLs that aren't in CDN cache.
-const ASSET_VERSION = process.env.ASSET_VERSION || "v7";
+const ASSET_VERSION = process.env.ASSET_VERSION || "v8";
 
 const nextConfig: NextConfig = {
   output: "standalone",
