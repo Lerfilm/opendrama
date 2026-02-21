@@ -555,6 +555,9 @@ const zh = {
   "generate.resetAllTitle": "重置全部片段",
   "generate.resetAllDesc": "将删除全部 {count} 个片段并退还未使用的金币。重置后需重新前往创作中心配置片段。",
   "generate.resetAllConfirm": "确认重置",
+  "generate.chainMode": "链式模式",
+  "generate.chainModeHint": "串行生成，每段末帧作为下一段首帧，保证视觉连贯",
+  "generate.chainProcessing": "链式：第 {current}/{total} 段",
   "studio.segment": "片段",
 
   // 集数管理

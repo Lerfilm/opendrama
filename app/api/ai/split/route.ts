@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
   "segments": [
     {
       "segmentIndex": 0,
+      "sceneNum": 1,
       "durationSec": 15,
       "prompt": "详细的视频画面描述...",
       "shotType": "wide|medium|close-up|extreme-close-up",
@@ -77,6 +78,8 @@ export async function POST(req: NextRequest) {
     }
   ]
 }
+
+注意：sceneNum 是整数，表示该片段属于第几个场景（1-based，与输入 Scene 编号对应）。同一 scene 下的多个片段 sceneNum 相同。
 
 Prompt 写作要求：
 - 必须明确描述画面中出现的角色名字（与剧本角色名完全一致）
@@ -95,6 +98,7 @@ Output format (JSON):
   "segments": [
     {
       "segmentIndex": 0,
+      "sceneNum": 1,
       "durationSec": 15,
       "prompt": "Detailed video scene description...",
       "shotType": "wide|medium|close-up|extreme-close-up",
@@ -102,6 +106,8 @@ Output format (JSON):
     }
   ]
 }
+
+Note: sceneNum is 1-based and corresponds to the Scene number from the input. Multiple segments from the same scene share the same sceneNum.
 
 Prompt requirements:
 - Must explicitly name characters appearing in each segment (matching script character names exactly)
@@ -150,6 +156,7 @@ ${sceneDescriptions}`
 
     const segments = (parsed.segments || []).map((seg, i) => ({
       segmentIndex: (seg.segmentIndex as number) ?? i,
+      sceneNum: (seg.sceneNum as number) ?? 1,
       durationSec: (seg.durationSec as number) ?? 15,
       prompt: (seg.prompt as string) || "",
       shotType: (seg.shotType as string) || "medium",

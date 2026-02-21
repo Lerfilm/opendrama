@@ -553,6 +553,9 @@ const en: Record<string, string> = {
   "generate.resetAllTitle": "Reset All Segments",
   "generate.resetAllDesc": "This will delete all {count} segments and refund any unused coins. You will need to re-configure segments in Studio.",
   "generate.resetAllConfirm": "Confirm Reset",
+  "generate.chainMode": "Chain Mode",
+  "generate.chainModeHint": "Sequential: each clip's last frame becomes the next clip's first frame",
+  "generate.chainProcessing": "Chain: clip {current} of {total}",
   "studio.segment": "Segment",
 
   // Episode management

@@ -59,12 +59,13 @@ export async function POST(req: NextRequest) {
 
     // Create all segments in DB
     const createdSegments = await prisma.$transaction(
-      segsInput.map((seg: { segmentIndex: number; durationSec?: number; prompt: string; shotType?: string; cameraMove?: string }, i: number) =>
+      segsInput.map((seg: { segmentIndex: number; sceneNum?: number; durationSec?: number; prompt: string; shotType?: string; cameraMove?: string }, i: number) =>
         prisma.videoSegment.create({
           data: {
             scriptId,
             episodeNum,
             segmentIndex: seg.segmentIndex ?? i,
+            sceneNum: seg.sceneNum ?? 0,
             durationSec: seg.durationSec || 15,
             prompt: seg.prompt,
             shotType: seg.shotType || "medium",

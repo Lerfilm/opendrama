@@ -406,6 +406,7 @@ model VideoSegment {
   scriptId        String
   episodeNum      Int       // 对应 ScriptScene.episodeNum
   segmentIndex    Int       // 片段序号 0-based
+  sceneNum        Int       @default(0)  // 所属 scene 编号（1-based，对应 ScriptScene.sceneNum）
   durationSec     Int       @default(15)
   prompt          String    @db.Text
   shotType        String?   // wide | medium | close-up | extreme-close-up
@@ -425,6 +426,10 @@ model VideoSegment {
   tokenCost       Int?
   apiCostCents    Int?
   errorMessage    String?
+
+  // 链式生成
+  chainMode       Boolean   @default(false)  // 是否链式生成模式
+  seedImageUrl    String?                    // 本 clip 的 I2V 起始图（base64 data URL 或 https URL）
 
   createdAt       DateTime  @default(now())
   completedAt     DateTime?

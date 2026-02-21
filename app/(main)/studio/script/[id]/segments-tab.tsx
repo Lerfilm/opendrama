@@ -51,6 +51,7 @@ interface VideoSegment {
 
 interface GeneratedSegment {
   segmentIndex: number
+  sceneNum: number
   durationSec: number
   prompt: string
   shotType: string
@@ -225,6 +226,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
       const segs: GeneratedSegment[] = (data.segments || []).map(
         (seg: GeneratedSegment, i: number) => ({
           segmentIndex: seg.segmentIndex ?? i,
+          sceneNum: seg.sceneNum ?? 1,
           durationSec: seg.durationSec || 15,
           prompt: seg.prompt || "",
           shotType: seg.shotType || "medium",
@@ -245,6 +247,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
     if (isSaving) return
     const segsToSave = generatedSegments.map(seg => ({
       segmentIndex: seg.segmentIndex,
+      sceneNum: seg.sceneNum,
       durationSec: editingDurations[seg.segmentIndex] ?? seg.durationSec,
       prompt: editingPrompts[seg.segmentIndex] ?? seg.prompt,
       shotType: editingShotTypes[seg.segmentIndex] ?? seg.shotType,

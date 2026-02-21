@@ -12,7 +12,7 @@ import {
   ArrowLeft, Loader2, Zap,
   CheckCircle, XIcon, Coins, PenTool,
   Play, RefreshCw, ChevronDown, ChevronUp,
-  Upload, Trash2,
+  Upload, Trash2, Link2,
 } from "@/components/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -48,6 +48,7 @@ interface Role {
 interface VideoSegment {
   id: string
   segmentIndex: number
+  sceneNum: number
   durationSec: number
   prompt: string
   shotType: string | null
@@ -59,6 +60,8 @@ interface VideoSegment {
   thumbnailUrl: string | null
   tokenCost: number | null
   errorMessage: string | null
+  chainMode: boolean
+  seedImageUrl: string | null
 }
 
 export function GenerateWorkbench({
@@ -82,6 +85,7 @@ export function GenerateWorkbench({
   const [isResettingAll, setIsResettingAll] = useState(false)
   const [showResetAllConfirm, setShowResetAllConfirm] = useState(false)
   const autoStartedRef = useRef(false)
+  const [showChainConfirm, setShowChainConfirm] = useState(false)
 
   // Derived state
   const hasExistingSegments = existingSegments.length > 0
@@ -99,6 +103,10 @@ export function GenerateWorkbench({
   const total = existingSegments.length
   const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0
   const isWorking = generatingCount > 0
+  const isChainMode = existingSegments.some(s => s.chainMode)
+  const chainCurrentIdx = isChainMode
+    ? existingSegments.findIndex(s => s.chainMode && (s.status === "submitted" || s.status === "generating"))
+    : -1
 
   // Calculate cost for pending segments
   const calculateTotalCost = useCallback(() => {
@@ -194,6 +202,52 @@ export function GenerateWorkbench({
       setBalance(prev => prev - totalCost)
     } catch {
       alert("Submit failed")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Chain mode submit
+  async function handleConfirmChainSubmit() {
+    setShowChainConfirm(false)
+    if (pendingSegments.length === 0) return
+
+    setIsSubmitting(true)
+    try {
+      const firstSeg = pendingSegments[0]
+      const model = firstSeg.model || "seedance_2_0"
+      const resolution = firstSeg.resolution || "720p"
+
+      const res = await fetch("/api/video/chain-submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scriptId: script.id,
+          episodeNum,
+          model,
+          resolution,
+          segments: pendingSegments.map(seg => ({
+            segmentIndex: seg.segmentIndex,
+            sceneNum: seg.sceneNum ?? 0,
+            durationSec: seg.durationSec,
+            prompt: seg.prompt,
+            shotType: seg.shotType || "medium",
+            cameraMove: seg.cameraMove || "static",
+          })),
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || "Chain submit failed")
+        return
+      }
+
+      const data = await res.json()
+      setExistingSegments(data.segments || [])
+      setBalance(prev => prev - totalCost)
+    } catch {
+      alert("Chain submit failed")
     } finally {
       setIsSubmitting(false)
     }
@@ -424,6 +478,20 @@ export function GenerateWorkbench({
               )}
               {isSubmitting ? t("common.processing") : t("generate.startGenerate")}
             </Button>
+
+            {/* Chain Mode button */}
+            <Button
+              variant="outline"
+              onClick={() => setShowChainConfirm(true)}
+              disabled={isSubmitting || totalCost > balance}
+              className="w-full border-purple-400 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+            >
+              <Link2 className="w-4 h-4 mr-2" />
+              {t("generate.chainMode")}
+            </Button>
+            <p className="text-[10px] text-center text-muted-foreground -mt-1">
+              {t("generate.chainModeHint")}
+            </p>
           </CardContent>
         </Card>
       )}
@@ -689,6 +757,14 @@ export function GenerateWorkbench({
                 {failedCount > 0 && !isWorking && <XIcon className="w-3 h-3 text-red-500 shrink-0" />}
                 <span className="text-[10px] text-muted-foreground line-clamp-2">{statusHint}</span>
               </div>
+
+              {/* Chain mode progress */}
+              {isChainMode && chainCurrentIdx >= 0 && (
+                <div className="flex items-center gap-1 text-[10px] text-purple-600 font-medium">
+                  <Link2 className="w-3 h-3 shrink-0" />
+                  <span>{t("generate.chainProcessing", { current: chainCurrentIdx + 1, total })}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -758,6 +834,51 @@ export function GenerateWorkbench({
             >
               <Trash2 className="w-4 h-4 mr-1" />
               {t("generate.resetAllConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Chain Mode confirmation dialog ── */}
+      <Dialog open={showChainConfirm} onOpenChange={setShowChainConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-purple-500" />
+              {t("generate.chainMode")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("generate.chainModeHint")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t("generate.confirmCost")}</span>
+              <span className="font-bold text-amber-600 flex items-center gap-1">
+                <Coins className="w-4 h-4" /> -{totalCost}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t("generate.confirmBalance")}</span>
+              <span className="font-medium">{balance}</span>
+            </div>
+            <div className="border-t pt-2 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t("generate.confirmBalanceAfter")}</span>
+              <span className="font-bold text-green-600">{balance - totalCost}</span>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowChainConfirm(false)} className="flex-1">
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={handleConfirmChainSubmit}
+              className="flex-1 border-purple-400 bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <Link2 className="w-4 h-4 mr-1" />
+              {t("generate.confirmProceed")}
             </Button>
           </DialogFooter>
         </DialogContent>

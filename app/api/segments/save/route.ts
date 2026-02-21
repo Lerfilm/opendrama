@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
       segsInput.map(
         (seg: {
           segmentIndex: number
+          sceneNum?: number
           durationSec?: number
           prompt: string
           shotType?: string
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
               scriptId,
               episodeNum,
               segmentIndex: seg.segmentIndex ?? i,
+              sceneNum: seg.sceneNum ?? 0,
               durationSec: seg.durationSec || 15,
               prompt: seg.prompt,
               shotType: seg.shotType || "medium",
