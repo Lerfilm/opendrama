@@ -159,12 +159,13 @@ async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId
   const body: Record<string, unknown> = {
     model: modelId,
     content,
-    resolution: req.resolution === "1080p" ? "1920x1080" : "1280x720",
+    resolution: req.resolution === "1080p" ? "1080p" : "720p",
+    ratio: req.aspectRatio || "16:9",
     duration: Math.round(req.durationSec),
     seed: -1,
+    watermark: false,
+    camera_fixed: false,
   }
-
-  if (req.aspectRatio) body.aspect_ratio = req.aspectRatio
 
   console.log(`[Seedance] Submitting: model=${modelId}`)
 
