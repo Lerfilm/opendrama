@@ -2,11 +2,8 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/lib/auth"
 import { notFound } from "next/navigation"
 import prisma from "@/lib/prisma"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, Coins, Eye } from "@/components/icons"
-import Link from "next/link"
+import { Eye } from "@/components/icons"
 import Image from "next/image"
 import type { Metadata } from "next"
 import { t } from "@/lib/i18n"
@@ -15,6 +12,7 @@ import StarRating from "@/components/star-rating"
 import CommentSection from "@/components/comment-section"
 import SeriesTags from "@/components/series-tags"
 import SeriesViewTracker from "./view-tracker"
+import EpisodeListClient from "@/components/episode-list-client"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -69,6 +67,7 @@ export default async function SeriesDetailPage({ params }: Props) {
           episodeNum: true,
           duration: true,
           unlockCost: true,
+          muxPlaybackId: true,
         },
       },
     },
@@ -78,9 +77,10 @@ export default async function SeriesDetailPage({ params }: Props) {
     notFound()
   }
 
-  // Parallel data fetching for stats and user state
+  // Parallel data fetching for stats, user state, and coins
   const [
     unlockedEpisodeIds,
+    userCoins,
     likeCount,
     favoriteCount,
     ratingAgg,
@@ -95,6 +95,9 @@ export default async function SeriesDetailPage({ params }: Props) {
           .findMany({ where: { userId }, select: { episodeId: true } })
           .then((u) => u.map((x) => x.episodeId))
       : Promise.resolve([]),
+    userId
+      ? prisma.user.findUnique({ where: { id: userId }, select: { coins: true } }).then((u) => u?.coins || 0)
+      : Promise.resolve(0),
     prisma.seriesLike.count({ where: { seriesId: id } }),
     prisma.seriesFavorite.count({ where: { seriesId: id } }),
     prisma.seriesRating.aggregate({
@@ -179,69 +182,14 @@ export default async function SeriesDetailPage({ params }: Props) {
         />
       </div>
 
-      {/* Episode List */}
-      <div className="p-4 space-y-3">
-        <h2 className="text-lg font-semibold">{t("series.episodeList")}</h2>
-        <div className="space-y-2">
-          {series.episodes.map((episode) => {
-            const isUnlocked = unlockedEpisodeIds.includes(episode.id)
-            const isFreeEpisode = episode.episodeNum <= 5
-
-            return (
-              <Link
-                key={episode.id}
-                href={`/episode/${episode.id}`}
-                className="block"
-              >
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold">
-                            {t("series.episode", { num: episode.episodeNum })}
-                          </span>
-                          {isFreeEpisode && (
-                            <Badge variant="secondary" className="text-xs">
-                              {t("common.free")}
-                            </Badge>
-                          )}
-                          {isUnlocked && !isFreeEpisode && (
-                            <Badge variant="secondary" className="text-xs">
-                              {t("common.unlocked")}
-                            </Badge>
-                          )}
-                        </div>
-                        <h3 className="font-medium text-sm mb-1">
-                          {episode.title}
-                        </h3>
-                        {episode.duration && (
-                          <p className="text-xs text-muted-foreground">
-                            {t("series.minutes", { min: Math.floor(episode.duration / 60) })}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        {isFreeEpisode || isUnlocked ? (
-                          <Button size="sm" variant="default">
-                            <Play className="w-4 h-4 mr-1" />
-                            {t("common.play")}
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="outline">
-                            <Coins className="w-4 h-4 mr-1" />
-                            {t("recharge.coinsAmount", { coins: episode.unlockCost })}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            )
-          })}
-        </div>
-      </div>
+      {/* Episode List (Client Component with inline player) */}
+      <EpisodeListClient
+        seriesId={id}
+        episodes={series.episodes}
+        unlockedEpisodeIds={unlockedEpisodeIds}
+        userId={userId || null}
+        userCoins={userCoins}
+      />
 
       {/* Comments Section */}
       <div className="px-4 pb-4">

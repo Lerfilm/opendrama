@@ -383,6 +383,12 @@ const en: Record<string, string> = {
   "home.continueWatching": "Continue Watching",
   "home.progress": "{percent}% watched",
   "home.resumeEp": "Ep {num}",
+
+  // Player (V0.6)
+  "player.prev": "Previous",
+  "player.next": "Next",
+  "player.episode": "E{num}",
+  "player.noVideo": "Video not available",
 }
 
 export default en

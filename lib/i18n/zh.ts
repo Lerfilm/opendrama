@@ -383,6 +383,12 @@ const zh = {
   "home.continueWatching": "继续观看",
   "home.progress": "已看 {percent}%",
   "home.resumeEp": "第{num}集",
+
+  // 播放器 (V0.6)
+  "player.prev": "上一集",
+  "player.next": "下一集",
+  "player.episode": "第{num}集",
+  "player.noVideo": "视频暂不可用",
 } as const
 
 export type TranslationKey = keyof typeof zh
