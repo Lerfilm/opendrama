@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -110,6 +110,50 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
 
   // Cover state
   const [coverStatus, setCoverStatus] = useState<"idle" | "generating" | "done" | "failed">("idle")
+  const [coverTaskIds, setCoverTaskIds] = useState<{ wideTaskId?: string; tallTaskId?: string }>({})
+  const [coverWide, setCoverWide] = useState<string | null>(script.coverWide)
+  const [coverTall, setCoverTall] = useState<string | null>(script.coverTall)
+  const coverPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ─── Cover polling effect ─────────────────────
+  useEffect(() => {
+    const { wideTaskId, tallTaskId } = coverTaskIds
+    if (coverStatus !== "generating" || (!wideTaskId && !tallTaskId)) return
+
+    if (coverPollRef.current) clearInterval(coverPollRef.current)
+
+    coverPollRef.current = setInterval(async () => {
+      try {
+        const params = new URLSearchParams({ scriptId: script.id })
+        if (wideTaskId) params.set("wideTaskId", wideTaskId)
+        if (tallTaskId) params.set("tallTaskId", tallTaskId)
+
+        const res = await fetch(`/api/cover/status?${params}`)
+        if (!res.ok) return
+        const data = await res.json()
+
+        if (data.status === "done") {
+          clearInterval(coverPollRef.current!)
+          coverPollRef.current = null
+          setCoverStatus("done")
+          if (data.coverWide) setCoverWide(data.coverWide)
+          if (data.coverTall) setCoverTall(data.coverTall)
+          onDataChanged()
+        } else if (data.status === "failed") {
+          clearInterval(coverPollRef.current!)
+          coverPollRef.current = null
+          setCoverStatus("failed")
+        }
+      } catch {
+        // ignore transient poll errors
+      }
+    }, 5000)
+
+    return () => {
+      if (coverPollRef.current) clearInterval(coverPollRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coverTaskIds, coverStatus])
 
   // ─── Derived data ─────────────────────────────
 
@@ -246,6 +290,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
   // Generate cover
   async function handleGenerateCover() {
     setCoverStatus("generating")
+    setCoverTaskIds({})
     try {
       const res = await fetch("/api/cover/generate", {
         method: "POST",
@@ -255,10 +300,19 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
           episodeNum: selectedEpisode,
         }),
       })
-      if (!res.ok) throw new Error("Cover generation failed")
-      setCoverStatus("done")
-      onDataChanged()
-    } catch {
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Cover generation failed")
+      }
+      const data = await res.json()
+      // Save task IDs to start polling
+      setCoverTaskIds({
+        wideTaskId: data.wideTaskId,
+        tallTaskId: data.tallTaskId,
+      })
+      // coverStatus stays "generating" — polling effect handles done/failed
+    } catch (err) {
+      console.error("[Cover] Submit error:", err)
       setCoverStatus("failed")
     }
   }
@@ -602,30 +656,55 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
 
       {/* F. Cover generation section */}
       <Card>
-        <CardContent className="p-3">
-          <div className="flex items-center gap-2 mb-3">
+        <CardContent className="p-3 space-y-3">
+          <div className="flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-rose-500" />
-            <h3 className="text-sm font-bold">{t("studio.coverSection")}</h3>
+            <h3 className="text-sm font-bold flex-1">{t("studio.coverSection")}</h3>
+            {coverStatus === "done" && (
+              <span className="text-[10px] text-green-600 flex items-center gap-0.5">
+                <CheckCircle className="w-3 h-3" />
+                {t("common.done")}
+              </span>
+            )}
           </div>
 
-          {/* Cover previews */}
-          {(script.coverWide || script.coverTall) && (
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {script.coverWide && (
+          {/* Generating: progress bar + status */}
+          {coverStatus === "generating" && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500 shrink-0" />
+                <p className="text-xs text-muted-foreground">{t("studio.generatingCover")}</p>
+              </div>
+              {/* Animated indeterminate bar */}
+              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-rose-400 to-pink-500 rounded-full animate-[shimmer_1.5s_ease-in-out_infinite]"
+                  style={{ width: "60%", animation: "pulse 1.5s ease-in-out infinite" }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {t("studio.coverGeneratingHint")}
+              </p>
+            </div>
+          )}
+
+          {/* Cover previews (use local state so they update without page refresh) */}
+          {(coverWide || coverTall) && coverStatus !== "generating" && (
+            <div className="grid grid-cols-2 gap-2">
+              {coverWide && (
                 <div>
                   <p className="text-[10px] text-muted-foreground mb-1">16:9</p>
                   <img
-                    src={script.coverWide}
+                    src={coverWide}
                     alt="Wide cover"
                     className="w-full rounded-md border object-cover aspect-video"
                   />
                 </div>
               )}
-              {script.coverTall && (
+              {coverTall && (
                 <div>
                   <p className="text-[10px] text-muted-foreground mb-1">3:4</p>
                   <img
-                    src={script.coverTall}
+                    src={coverTall}
                     alt="Tall cover"
                     className="w-full rounded-md border object-cover aspect-[3/4]"
                   />
@@ -634,8 +713,9 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
             </div>
           )}
 
+          {/* Generate button */}
           <Button
-            variant={script.coverWide ? "outline" : "default"}
+            variant={coverWide ? "outline" : "default"}
             size="sm"
             onClick={handleGenerateCover}
             disabled={coverStatus === "generating"}
@@ -644,19 +724,19 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
             {coverStatus === "generating" ? (
               <>
                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                {t("studio.generatingCover") || "Generating..."}
+                {t("studio.generatingCover")}
               </>
             ) : (
               <>
                 <ImageIcon className="w-3 h-3 mr-1" />
-                {script.coverWide ? t("studio.regenerateCover") : t("studio.generateCover")}
+                {coverWide ? t("studio.regenerateCover") : t("studio.generateCover")}
               </>
             )}
           </Button>
 
           {coverStatus === "failed" && (
-            <p className="text-xs text-destructive mt-1 text-center">
-              {t("studio.coverFailed") || "Cover generation failed"}
+            <p className="text-xs text-destructive text-center">
+              {t("studio.coverFailed")}
             </p>
           )}
         </CardContent>

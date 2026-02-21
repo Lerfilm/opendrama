@@ -525,6 +525,7 @@ const zh = {
   "generate.totalCost": "总费用",
   "generate.generateAll": "生成全部（{count} 个片段）",
   "generate.allDone": "全部片段已生成！",
+  "generate.partialDone": "{done}/{total} 个片段完成 — 可以发布",
   "generate.segmentsReady": "{count} 个视频片段已就绪",
   "generate.noSegments": "尚未准备片段",
   "generate.noSegmentsHint": "前往创作中心 > 片段标签页准备视频提示词",

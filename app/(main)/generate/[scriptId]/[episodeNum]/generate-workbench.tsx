@@ -580,16 +580,19 @@ export function GenerateWorkbench({
             )
           })}
 
-          {/* All done — Publish button */}
-          {allDone && (
-            <Card className="border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-950/20">
+          {/* Publish button — show when at least some segments are done and nothing is running */}
+          {doneCount > 0 && !isWorking && (
+            <Card className={allDone
+              ? "border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-950/20"
+              : "border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20"
+            }>
               <CardContent className="p-4 text-center space-y-3">
-                <CheckCircle className="w-8 h-8 text-green-500 mx-auto" />
-                <h3 className="font-bold text-green-700 dark:text-green-300">
-                  {t("generate.allDone")}
+                <CheckCircle className={`w-8 h-8 mx-auto ${allDone ? "text-green-500" : "text-amber-500"}`} />
+                <h3 className={`font-bold ${allDone ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"}`}>
+                  {allDone ? t("generate.allDone") : t("generate.partialDone", { done: doneCount, total })}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  {t("generate.segmentsReady", { count: existingSegments.length })}
+                  {t("generate.segmentsReady", { count: doneCount })}
                 </p>
                 <div className="flex gap-2 justify-center pt-1">
                   <Link href={`/generate/${script.id}`}>

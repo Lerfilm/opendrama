@@ -36,8 +36,11 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    // Refund tokens if not yet done (reserved/submitted/generating/failed)
-    if (segment.tokenCost && segment.status !== "done") {
+    // Refund tokens only for segments still holding a reservation.
+    // "failed" segments have already been refunded by the status poller,
+    // so we only refund "reserved" / "submitted" / "generating" states.
+    const stillReserved = ["reserved", "submitted", "generating"].includes(segment.status)
+    if (segment.tokenCost && stillReserved) {
       await refundReservation(
         session.user.id,
         segment.tokenCost,
@@ -69,9 +72,10 @@ export async function DELETE(req: NextRequest) {
       where: { scriptId, episodeNum: epNum },
     })
 
-    // Refund tokens for any non-done segments with reserved cost
+    // Refund tokens only for segments still holding a reservation.
+    // "failed" segments have already been refunded by the status poller.
     const refundTotal = segments
-      .filter(s => s.status !== "done" && s.tokenCost)
+      .filter(s => ["reserved", "submitted", "generating"].includes(s.status) && s.tokenCost)
       .reduce((sum, s) => sum + (s.tokenCost ?? 0), 0)
 
     if (refundTotal > 0) {

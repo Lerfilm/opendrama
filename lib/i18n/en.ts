@@ -523,6 +523,7 @@ const en: Record<string, string> = {
   "generate.totalCost": "Total cost",
   "generate.generateAll": "Generate All ({count} segments)",
   "generate.allDone": "All segments generated!",
+  "generate.partialDone": "{done}/{total} segments done — ready to publish",
   "generate.segmentsReady": "{count} video segments ready for preview",
   "generate.noSegments": "No segments prepared",
   "generate.noSegmentsHint": "Go to Studio > Segments tab to prepare video prompts",

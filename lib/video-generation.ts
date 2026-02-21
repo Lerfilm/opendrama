@@ -85,16 +85,21 @@ export async function enrichSegmentWithCharacters(
   return { prompt: enhancedPrompt, imageUrls: allImageUrls }
 }
 
-// ====== Model → req_key mapping ======
+// ====== Model → req_key mapping (Jimeng Visual API) ======
 
 const MODEL_REQ_KEYS: Record<string, string> = {
   // Jimeng series
   jimeng_3_0_pro: "jimeng_vgfm_t2v_l20",
   jimeng_3_0: "jimeng_vgfm_t2v_l20",
   jimeng_s2_pro: "jimeng_vgfm_t2v_l20",
-  // Seedance series (via Volcengine Visual API, same endpoint)
-  seedance_2_0: "jimeng_vgfm_t2v_l20",
-  seedance_1_5_pro: "jimeng_vgfm_t2v_l20",
+}
+
+// ====== Seedance → Ark model ID mapping ======
+
+const SEEDANCE_MODEL_IDS: Record<string, string> = {
+  seedance_2_0:     "doubao-seedance-2-0-t2v-250610",
+  seedance_1_5_pro: "doubao-seedance-1-5-pro-251215",
+  seedance_1_0_pro: "doubao-seedance-1-0-pro-250528",
 }
 
 // Resolution → aspect_ratio mapping
@@ -104,52 +109,109 @@ function getAspectRatio(resolution: string): string {
   return "16:9"
 }
 
-// ====== Seedance (via Volcengine Visual REST API) ======
+// ====== Seedance (Volcengine Operator API) ======
+// Submit:  POST https://operator.las.cn-beijing.volces.com/api/v1/contents/generations/tasks
+// Query:   GET  https://operator.las.cn-beijing.volces.com/api/v1/contents/generations/tasks/{id}
+// Auth:    Bearer ARK_API_KEY
+
+const SEEDANCE_BASE = "https://operator.las.cn-beijing.volces.com/api/v1"
+
+async function seedanceRequest<T>(path: string, body?: Record<string, unknown>, method = "POST"): Promise<T> {
+  const apiKey = process.env.ARK_API_KEY
+  if (!apiKey) throw new Error("ARK_API_KEY env var not set")
+
+  const url = `${SEEDANCE_BASE}${path}`
+  const res = await fetch(url, {
+    method,
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+
+  const json = await res.json() as Record<string, unknown>
+
+  if (!res.ok) {
+    throw new Error(`Seedance API error ${res.status}: ${JSON.stringify(json)}`)
+  }
+
+  return json as T
+}
 
 async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId: string }> {
-  const reqKey = MODEL_REQ_KEYS[req.model]
-  if (!reqKey) throw new Error(`Unknown Seedance model: ${req.model}`)
+  const modelId = SEEDANCE_MODEL_IDS[req.model]
+  if (!modelId) throw new Error(`Unknown Seedance model: ${req.model}`)
+
+  const content: Array<Record<string, unknown>> = [
+    { type: "text", text: req.prompt },
+  ]
+
+  // Image-to-video: prepend image references
+  if (req.imageUrls && req.imageUrls.length > 0) {
+    const imageItems = req.imageUrls.slice(0, 9).map(url => ({
+      type: "image_url",
+      image_url: { url },
+    }))
+    content.unshift(...imageItems)
+  }
 
   const body: Record<string, unknown> = {
-    req_key: reqKey,
-    prompt: req.prompt,
-    aspect_ratio: req.aspectRatio || getAspectRatio(req.resolution),
+    model: modelId,
+    content,
+    resolution: req.resolution === "1080p" ? "1920x1080" : "1280x720",
+    duration: Math.round(req.durationSec),
     seed: -1,
   }
 
-  // Image-to-video mode
-  if (req.imageUrls && req.imageUrls.length > 0) {
-    body.image_urls = req.imageUrls
-  }
+  if (req.aspectRatio) body.aspect_ratio = req.aspectRatio
 
-  console.log(`[Seedance] Submitting task: model=${req.model}, reqKey=${reqKey}`)
+  console.log(`[Seedance] Submitting: model=${modelId}`)
 
-  const result = await volcRequest<{ task_id: string }>(
-    "CVSync2AsyncSubmitTask",
+  const result = await seedanceRequest<{ id: string; status: string }>(
+    "/contents/generations/tasks",
     body
   )
 
-  if (!result.task_id) {
-    throw new Error(`Seedance submission failed: no task_id returned. Response: ${JSON.stringify(result)}`)
+  if (!result.id) {
+    throw new Error(`Seedance submission failed: no id returned. Response: ${JSON.stringify(result)}`)
   }
 
-  console.log(`[Seedance] Task submitted: ${result.task_id}`)
-  return { taskId: result.task_id }
+  console.log(`[Seedance] Task submitted: ${result.id}`)
+  return { taskId: result.id }
 }
 
 async function querySeedanceTask(model: string, taskId: string): Promise<VideoGenerationResult> {
-  const reqKey = MODEL_REQ_KEYS[model] || "jimeng_vgfm_t2v_l20"
-
-  const result = await volcRequest<{
-    task_id: string
+  const result = await seedanceRequest<{
+    id: string
     status: string
-    resp_data?: string
-  }>(
-    "CVSync2AsyncGetResult",
-    { req_key: reqKey, task_id: taskId }
-  )
+    content?: Array<{ type: string; video_url?: { url: string } }>
+    error?: { message?: string }
+  }>(`/contents/generations/tasks/${taskId}`, undefined, "GET")
 
-  return mapTaskResult(taskId, result)
+  const status = result.status || "pending"
+
+  // Statuses: pending | running | succeeded | failed | cancelled | expired
+  if (status === "succeeded") {
+    let videoUrl: string | undefined
+    if (result.content) {
+      for (const item of result.content) {
+        if (item.type === "video_url" && item.video_url?.url) {
+          videoUrl = item.video_url.url
+          break
+        }
+      }
+    }
+    return { taskId, status: "done", videoUrl }
+  }
+
+  if (["failed", "cancelled", "expired"].includes(status)) {
+    const errMsg = result.error?.message || `Task ${status}`
+    return { taskId, status: "failed", error: errMsg }
+  }
+
+  // pending | running → still generating
+  return { taskId, status: "generating" }
 }
 
 // ====== Jimeng Series (Volcengine Visual REST API) ======
