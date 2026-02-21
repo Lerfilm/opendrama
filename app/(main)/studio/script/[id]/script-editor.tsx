@@ -325,6 +325,35 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
     }
   }
 
+  // Add new episode (creates first empty scene in next episodeNum)
+  async function handleAddEpisode() {
+    const maxEp = episodes.length > 0 ? Math.max(...episodes) : 0
+    const nextEp = maxEp + 1
+    const maxAllowed = script.targetEpisodes || 10
+    if (nextEp > maxAllowed) {
+      alert(t("studio.maxEpisodesReached", { max: maxAllowed }))
+      return
+    }
+    try {
+      const res = await fetch("/api/scenes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptId: script.id, episodeNum: nextEp }),
+      })
+      if (res.ok) {
+        const { scene } = await res.json()
+        setScript(prev => ({
+          ...prev,
+          scenes: [...prev.scenes, scene].sort((a, b) =>
+            a.episodeNum - b.episodeNum || a.sceneNum - b.sceneNum
+          ),
+        }))
+        setSelectedEpisode(nextEp)
+        setExpandedScenes(prev => new Set(prev).add(scene.id))
+      }
+    } catch { /* silent */ }
+  }
+
   // Add new scene
   async function handleAddScene(afterSceneId?: string) {
     try {
@@ -453,10 +482,9 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
         </Card>
       )}
 
-      {/* Episode selector with completeness dots */}
-      {episodes.length > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="flex gap-2 overflow-x-auto flex-1 no-scrollbar">
+      {/* Episode selector with completeness dots + add episode */}
+      <div className="flex items-center gap-2">
+        <div className="flex gap-2 overflow-x-auto flex-1 no-scrollbar">
             {episodes.map((ep) => {
               const epHasScenes = (episodeMap[ep] || []).length > 0
               const epHasSegments = (script.videoSegments?.filter(s => s.episodeNum === ep) || []).length > 0
@@ -482,9 +510,16 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
                 </button>
               )
             })}
+            {/* Add Episode "+" button */}
+            <button
+              onClick={handleAddEpisode}
+              className="flex-shrink-0 w-8 h-8 rounded-full bg-muted hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              title={t("studio.addEpisode")}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
         </div>
-      )}
 
       {/* Workflow stepper: ① Scenes → ② Segments → ③ Theater */}
       <div className="flex items-center gap-0 py-3">

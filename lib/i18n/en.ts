@@ -525,6 +525,10 @@ const en: Record<string, string> = {
   "generate.confirmBalanceAfter": "Balance After",
   "generate.confirmProceed": "Confirm & Generate",
 
+  // Episode management
+  "studio.addEpisode": "Add Episode",
+  "studio.maxEpisodesReached": "Maximum episodes reached ({max})",
+
   // Workflow stepper
   "studio.workflowScenes": "Write Scenes",
   "studio.workflowSegments": "Split Segments (Shots)",

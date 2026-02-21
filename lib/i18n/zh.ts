@@ -527,6 +527,10 @@ const zh = {
   "generate.confirmBalanceAfter": "剩余余额",
   "generate.confirmProceed": "确认并生成",
 
+  // 集数管理
+  "studio.addEpisode": "添加集",
+  "studio.maxEpisodesReached": "已达最大集数 ({max})",
+
   // 工作流步骤条
   "studio.workflowScenes": "编写场景",
   "studio.workflowSegments": "拆分片段 (Shots)",
