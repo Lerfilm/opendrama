@@ -18,6 +18,7 @@ export default async function StudioPage() {
     orderBy: { updatedAt: "desc" },
     include: {
       _count: { select: { scenes: true, roles: true, videoSegments: true } },
+      scenes: { select: { episodeNum: true }, distinct: ["episodeNum"] },
     },
   })
 
@@ -78,7 +79,7 @@ export default async function StudioPage() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <h3 className="font-semibold">{script.title}</h3>
                           <Badge
                             variant="secondary"
@@ -86,6 +87,11 @@ export default async function StudioPage() {
                           >
                             {t(`studio.${script.status}`)}
                           </Badge>
+                          {script.scenes.length > 0 && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                              {t("studio.updatedToEpisode", { num: script.scenes.length })}
+                            </Badge>
+                          )}
                         </div>
                         {script.logline && (
                           <p className="text-sm text-muted-foreground line-clamp-1 mb-2">

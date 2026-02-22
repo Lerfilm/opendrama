@@ -251,6 +251,7 @@ const en: Record<string, string> = {
   "studio.addScene": "Add Scene",
   "studio.addRole": "Add Character",
   "studio.episode": "Episode {num}",
+  "studio.updatedToEpisode": "Updated to Ep.{num}",
   "studio.draft": "Draft",
   "studio.completed": "Completed",
   "studio.published": "Published",

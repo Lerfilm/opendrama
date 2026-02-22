@@ -251,6 +251,7 @@ const zh = {
   "studio.addScene": "添加场景",
   "studio.addRole": "添加角色",
   "studio.episode": "第 {num} 集",
+  "studio.updatedToEpisode": "已更新至第 {num} 集",
   "studio.draft": "草稿",
   "studio.completed": "已完成",
   "studio.published": "已发布",

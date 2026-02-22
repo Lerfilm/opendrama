@@ -149,17 +149,17 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
 
   // Save scene to server
   const saveScene = useCallback(async (sceneId: string) => {
-    // Grab the current edits synchronously from the ref-like closure
+    // Snapshot the current edits WITHOUT clearing them yet.
+    // We only clear editingScenes AFTER the API call succeeds, so that
+    // a concurrent refreshScript() can't overwrite input the user is still typing.
     let edits: Partial<Scene> | undefined
     setEditingScenes(prev => {
       edits = prev[sceneId]
-      if (!edits) return prev
-      const next = { ...prev }
-      delete next[sceneId]
-      return next
+      return prev // ← do NOT clear yet
     })
 
     if (!edits) return
+    const editsSnapshot = { ...edits }
 
     setSavingScenes(prev => new Set(prev).add(sceneId))
 
@@ -167,18 +167,34 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
       const res = await fetch("/api/scenes", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: sceneId, ...edits }),
+        body: JSON.stringify({ id: sceneId, ...editsSnapshot }),
       })
 
       if (res.ok) {
         const { scene: updated } = await res.json()
+        // Only remove the fields we just saved from editingScenes;
+        // any new edits the user typed while the request was in-flight are preserved.
+        setEditingScenes(prev => {
+          const current = prev[sceneId]
+          if (!current) return prev
+          const remaining = Object.fromEntries(
+            Object.entries(current).filter(([k]) => !(k in editsSnapshot))
+          )
+          const next = { ...prev }
+          if (Object.keys(remaining).length === 0) {
+            delete next[sceneId]
+          } else {
+            next[sceneId] = remaining
+          }
+          return next
+        })
         setScript(p => ({
           ...p,
           scenes: p.scenes.map(s => s.id === sceneId ? { ...s, ...updated } : s),
         }))
       }
     } catch {
-      // silent fail
+      // silent fail — keep edits in editingScenes so user doesn't lose input
     } finally {
       setSavingScenes(prev => {
         const next = new Set(prev)
