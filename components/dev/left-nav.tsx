@@ -131,36 +131,36 @@ export function LeftNav() {
   return (
     <nav
       className="flex flex-col items-center py-2"
-      style={{ background: "#252528", borderRight: "1px solid #1A1A1C" }}
+      style={{ background: "#1A1A1D", borderRight: "1px solid #0D0D0F" }}
     >
       {navItems.map((item) => (
         <div key={item.id} className="relative group">
           {item.enabled ? (
             <Link
               href={item.href}
-              className="relative flex flex-col items-center justify-center w-14 h-12 transition-colors"
-              style={{ color: item.active ? "#FFFFFF" : "#999" }}
+              className="relative flex flex-col items-center justify-center w-14 h-12 transition-all"
+              style={{ color: item.active ? "#E8E8EA" : "#6C6C72" }}
             >
               {item.active && (
-                <div className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r" style={{ background: "#6366F1" }} />
+                <div className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-r" style={{ background: "#5B8DEF" }} />
               )}
               {item.active && (
-                <div className="absolute inset-0 rounded-r" style={{ background: "rgba(99,102,241,0.08)" }} />
+                <div className="absolute inset-0" style={{ background: "rgba(91,141,239,0.07)" }} />
               )}
               {item.icon}
-              <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
+              <span className="text-[9px] mt-0.5 font-medium tracking-wide">{item.label}</span>
             </Link>
           ) : (
             <div
               className="relative flex flex-col items-center justify-center w-14 h-12 cursor-not-allowed"
-              style={{ color: "#4A4A50" }}
+              style={{ color: "#3A3A40" }}
             >
               {item.icon}
-              <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
+              <span className="text-[9px] mt-0.5 font-medium tracking-wide">{item.label}</span>
               {/* Tooltip */}
               <div
                 className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50"
-                style={{ background: "#3C3C3C", color: "#CCC" }}
+                style={{ background: "#2C2C30", color: "#AAA", border: "1px solid #3A3A3E" }}
               >
                 Open a project first
               </div>
@@ -173,17 +173,17 @@ export function LeftNav() {
       <div className="mt-auto">
         <button
           onClick={() => setShowSettings(true)}
-          className="flex flex-col items-center justify-center w-14 h-12 transition-colors hover:opacity-80"
-          style={{ color: showSettings ? "#FFFFFF" : "#888" }}
+          className="relative flex flex-col items-center justify-center w-14 h-12 transition-all hover:opacity-90"
+          style={{ color: showSettings ? "#E8E8EA" : "#5A5A62" }}
         >
           {showSettings && (
-            <div className="absolute left-0 w-[2px] rounded-r" style={{ background: "#6366F1", height: 32 }} />
+            <div className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-r" style={{ background: "#5B8DEF" }} />
           )}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
             <circle cx="12" cy="12" r="3" />
           </svg>
-          <span className="text-[9px] mt-0.5 font-medium">Settings</span>
+          <span className="text-[9px] mt-0.5 font-medium tracking-wide">Settings</span>
         </button>
       </div>
 

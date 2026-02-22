@@ -201,14 +201,14 @@ export function ScriptWorkspace({ script: initial }: { script: Script }) {
     } catch { /* silent */ }
   }
 
-  async function handleAIGenerate() {
+  async function handleAIGenerate(generateAll = false) {
     if (isGenerating) return
     setIsGenerating(true)
     try {
       const res = await fetch("/api/ai/generate-script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptId: script.id }),
+        body: JSON.stringify({ scriptId: script.id, generateAll }),
       })
       if (res.status === 402) { alert("Insufficient balance"); return }
       if (!res.ok) throw new Error("Failed")

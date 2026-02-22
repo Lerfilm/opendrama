@@ -20,6 +20,105 @@ function calcScriptCostCoins(totalTokens: number): number {
   return Math.max(1, Math.ceil(coins))
 }
 
+/** Generate a single episode's content and persist to DB */
+async function generateEpisode(
+  scriptId: string,
+  userId: string,
+  script: { title: string; genre: string; format: string; logline: string | null; synopsis: string | null; targetEpisodes: number; language: string },
+  targetEpisode: number,
+): Promise<{ rolesCreated: number; scenesCreated: number; coinsUsed: number; model: string }> {
+  const systemPrompt = buildScriptSystemPrompt(script.language)
+  const genreMap: Record<string, string> = {
+    drama: "都市情感", comedy: "喜剧", romance: "甜宠",
+    thriller: "悬疑", scifi: "科幻", fantasy: "奇幻",
+  }
+  const genre = script.language === "zh"
+    ? (genreMap[script.genre] || script.genre)
+    : script.genre
+
+  const userPrompt = script.language === "zh"
+    ? `请为以下短剧创作第${targetEpisode}集的完整剧本：
+
+标题：${script.title}
+类型：${genre}
+一句话梗概：${script.logline || "暂无"}
+故事大纲：${script.synopsis || "暂无"}
+目标集数：${script.targetEpisodes}集
+当前集数：第${targetEpisode}集（共${script.targetEpisodes}集）
+
+请生成第${targetEpisode}集的所有场景。${targetEpisode === 1 ? "同时生成角色列表。" : "角色列表已有，只需生成scenes即可，roles数组留空[]。"}`
+    : `Create the complete script for Episode ${targetEpisode} of this short drama:
+
+Title: ${script.title}
+Genre: ${genre}
+Logline: ${script.logline || "N/A"}
+Synopsis: ${script.synopsis || "N/A"}
+Target episodes: ${script.targetEpisodes}
+Current episode: ${targetEpisode} of ${script.targetEpisodes}
+
+Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also generate the roles list." : "Roles already exist — only generate scenes, return an empty roles array []."}`
+
+  const result = await aiComplete({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.85,
+    maxTokens: 8192,
+    responseFormat: "json",
+  })
+
+  const parsed = extractJSON<{ roles?: Array<Record<string, string>>; scenes?: Array<Record<string, unknown>> }>(result.content)
+  const roles = parsed.roles || []
+  const scenes = parsed.scenes || []
+
+  await Promise.all([
+    ...(targetEpisode === 1
+      ? roles.map((role) =>
+          prisma.scriptRole.create({
+            data: {
+              scriptId,
+              name: role.name || "未命名",
+              role: role.role || "supporting",
+              description: role.description || "",
+              voiceType: role.voiceType || null,
+            },
+          })
+        )
+      : []
+    ),
+    ...scenes.map((scene, i) =>
+      prisma.scriptScene.create({
+        data: {
+          scriptId,
+          episodeNum: targetEpisode,
+          sceneNum: (scene.sceneNum as number) || i + 1,
+          heading: (scene.heading as string) || "",
+          action: (scene.action as string) || "",
+          dialogue: typeof scene.dialogue === "string"
+            ? scene.dialogue
+            : JSON.stringify(scene.dialogue || []),
+          stageDirection: (scene.stageDirection as string) || "",
+          duration: (scene.duration as number) || 60,
+          sortOrder: i,
+        },
+      })
+    ),
+  ])
+
+  const coinsUsed = calcScriptCostCoins(result.usage.totalTokens)
+  await confirmDeduction(userId, coinsUsed, {
+    type: "script_generate",
+    episodeNum: targetEpisode,
+    totalTokens: result.usage.totalTokens,
+    model: result.model,
+  }).catch(err => {
+    console.error("[GenerateScript] coin deduction failed:", err)
+  })
+
+  return { rolesCreated: roles.length, scenesCreated: scenes.length, coinsUsed, model: result.model }
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
@@ -27,13 +126,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { scriptId } = await req.json()
+    const { scriptId, generateAll } = await req.json()
 
     if (!scriptId) {
       return NextResponse.json({ error: "scriptId is required" }, { status: 400 })
     }
 
-    // 验证所有权
+    // Verify ownership
     const script = await prisma.script.findFirst({
       where: { id: scriptId, userId: session.user.id },
     })
@@ -42,13 +141,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Script not found" }, { status: 404 })
     }
 
-    // Check the user has enough balance (require at least 1 coin)
+    // Check balance
     const available = await getAvailableBalance(session.user.id)
     if (available < 1) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 402 })
     }
 
-    // Determine which episode to generate next (max existing + 1, min 1)
+    // Determine which episodes to generate
     const existingEpisodes = await prisma.scriptScene.findMany({
       where: { scriptId },
       select: { episodeNum: true },
@@ -57,17 +156,18 @@ export async function POST(req: NextRequest) {
     const maxExistingEpisode = existingEpisodes.length > 0
       ? Math.max(...existingEpisodes.map(e => e.episodeNum))
       : 0
-    const targetEpisode = maxExistingEpisode + 1
 
-    // Enforce episode cap
-    if (targetEpisode > script.targetEpisodes) {
+    // Episodes to generate: if generateAll, all remaining; otherwise just the next one
+    const startEpisode = maxExistingEpisode + 1
+    if (startEpisode > script.targetEpisodes) {
       return NextResponse.json(
         { error: `All ${script.targetEpisodes} episodes have already been generated` },
         { status: 400 }
       )
     }
+    const endEpisode = generateAll ? script.targetEpisodes : startEpisode
 
-    // 创建 AI 任务
+    // Create AI job
     const job = await prisma.aIJob.create({
       data: {
         userId: session.user.id,
@@ -82,118 +182,45 @@ export async function POST(req: NextRequest) {
           logline: script.logline,
           synopsis: script.synopsis,
           targetEpisodes: script.targetEpisodes,
-          targetEpisode,
+          startEpisode,
+          endEpisode,
+          generateAll: !!generateAll,
           language: script.language,
         }),
       },
     })
 
-    // 更新剧本状态
     await prisma.script.update({
       where: { id: scriptId },
       data: { status: "generating" },
     })
 
-    // 构建 AI 请求
-    const systemPrompt = buildScriptSystemPrompt(script.language)
-    const genreMap: Record<string, string> = {
-      drama: "都市情感", comedy: "喜剧", romance: "甜宠",
-      thriller: "悬疑", scifi: "科幻", fantasy: "奇幻",
-    }
-    const genre = script.language === "zh"
-      ? (genreMap[script.genre] || script.genre)
-      : script.genre
-
-    const userPrompt = script.language === "zh"
-      ? `请为以下短剧创作第${targetEpisode}集的完整剧本：
-
-标题：${script.title}
-类型：${genre}
-一句话梗概：${script.logline || "暂无"}
-故事大纲：${script.synopsis || "暂无"}
-目标集数：${script.targetEpisodes}集
-当前集数：第${targetEpisode}集（共${script.targetEpisodes}集）
-
-请生成第${targetEpisode}集的所有场景。${targetEpisode === 1 ? "同时生成角色列表。" : "角色列表已有，只需生成scenes即可，roles数组留空[]。"}`
-      : `Create the complete script for Episode ${targetEpisode} of this short drama:
-
-Title: ${script.title}
-Genre: ${genre}
-Logline: ${script.logline || "N/A"}
-Synopsis: ${script.synopsis || "N/A"}
-Target episodes: ${script.targetEpisodes}
-Current episode: ${targetEpisode} of ${script.targetEpisodes}
-
-Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also generate the roles list." : "Roles already exist — only generate scenes, return an empty roles array []."}`
-
     try {
-      // 调用 OpenRouter MiniMax API
-      const result = await aiComplete({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.85,
-        maxTokens: 8192,
-        responseFormat: "json",
-      })
+      let totalRoles = 0
+      let totalScenes = 0
+      let totalCoins = 0
+      let lastModel = ""
+      let lastEpisode = startEpisode
 
-      // 解析 AI 返回的 JSON（处理 markdown 代码块等）
-      const parsed = extractJSON<{ roles?: Array<Record<string, string>>; scenes?: Array<Record<string, unknown>> }>(result.content)
+      // Generate episodes sequentially (important: each episode builds on previous context)
+      for (let ep = startEpisode; ep <= endEpisode; ep++) {
+        const res = await generateEpisode(scriptId, session.user.id, script, ep)
+        totalRoles += res.rolesCreated
+        totalScenes += res.scenesCreated
+        totalCoins += res.coinsUsed
+        lastModel = res.model
+        lastEpisode = ep
 
-      const roles = parsed.roles || []
-      const scenes = parsed.scenes || []
+        // Update job progress
+        const progress = Math.round(((ep - startEpisode + 1) / (endEpisode - startEpisode + 1)) * 100)
+        await prisma.aIJob.update({
+          where: { id: job.id },
+          data: { progress },
+        })
+      }
 
-      // 批量创建角色和场景（第1集同时创建角色）
-      await Promise.all([
-        ...(targetEpisode === 1
-          ? roles.map((role) =>
-              prisma.scriptRole.create({
-                data: {
-                  scriptId,
-                  name: role.name || "未命名",
-                  role: role.role || "supporting",
-                  description: role.description || "",
-                  voiceType: role.voiceType || null,
-                },
-              })
-            )
-          : []
-        ),
-        ...scenes.map((scene, i) =>
-          prisma.scriptScene.create({
-            data: {
-              scriptId,
-              episodeNum: targetEpisode,
-              sceneNum: (scene.sceneNum as number) || i + 1,
-              heading: (scene.heading as string) || "",
-              action: (scene.action as string) || "",
-              dialogue: typeof scene.dialogue === "string"
-                ? scene.dialogue
-                : JSON.stringify(scene.dialogue || []),
-              stageDirection: (scene.stageDirection as string) || "",
-              duration: (scene.duration as number) || 60,
-              sortOrder: i,
-            },
-          })
-        ),
-      ])
+      const isAllDone = lastEpisode >= script.targetEpisodes
 
-      // Deduct coins based on actual token usage
-      const coinsUsed = calcScriptCostCoins(result.usage.totalTokens)
-      await confirmDeduction(session.user.id, coinsUsed, {
-        jobId: job.id,
-        type: "script_generate",
-        episodeNum: targetEpisode,
-        totalTokens: result.usage.totalTokens,
-        model: result.model,
-      }).catch(err => {
-        // Non-fatal: log but don't fail the request
-        console.error("[GenerateScript] coin deduction failed:", err)
-      })
-
-      // 更新任务和剧本状态
-      const isAllDone = targetEpisode >= script.targetEpisodes
       await Promise.all([
         prisma.aIJob.update({
           where: { id: job.id },
@@ -201,14 +228,15 @@ Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also 
             status: "completed",
             completedAt: new Date(),
             progress: 100,
-            cost: coinsUsed,
+            cost: totalCoins,
             output: JSON.stringify({
-              rolesCreated: roles.length,
-              scenesCreated: scenes.length,
-              episodeNum: targetEpisode,
-              coinsUsed,
-              model: result.model,
-              usage: result.usage,
+              rolesCreated: totalRoles,
+              scenesCreated: totalScenes,
+              episodesGenerated: endEpisode - startEpisode + 1,
+              startEpisode,
+              endEpisode,
+              totalCoins,
+              model: lastModel,
             }),
           },
         }),
@@ -221,14 +249,14 @@ Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also 
       return NextResponse.json({
         jobId: job.id,
         status: "completed",
-        episodeNum: targetEpisode,
-        rolesCreated: roles.length,
-        scenesCreated: scenes.length,
-        coinsUsed,
-        model: result.model,
+        episodeNum: lastEpisode,
+        episodesGenerated: endEpisode - startEpisode + 1,
+        rolesCreated: totalRoles,
+        scenesCreated: totalScenes,
+        coinsUsed: totalCoins,
+        model: lastModel,
       })
     } catch (aiError) {
-      // AI 调用失败
       console.error("AI generation error:", aiError)
 
       await Promise.all([

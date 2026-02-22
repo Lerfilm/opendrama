@@ -7,28 +7,38 @@ import prisma from "@/lib/prisma"
 import { aiComplete, extractJSON } from "@/lib/ai"
 
 const PDF_IMPORT_SYSTEM_PROMPT = `You are a professional screenplay parser. You will receive raw text extracted from a screenplay PDF.
-Your job is to parse it into a structured JSON format for a script management system.
+Your ONLY job is to convert it into structured JSON — do NOT paraphrase, summarize, rewrite, or omit ANY content.
 
-Parse the screenplay into scenes. For each scene, extract:
-- sceneNum: sequential scene number (1, 2, 3...)
-- episodeNum: episode/act number (use 1 if not specified or it's a movie)
-- heading: the scene heading / slug line (e.g. "INT. COFFEE SHOP - DAY")
-- location: extracted location name from heading (e.g. "Coffee Shop")
+CRITICAL RULES:
+1. COPY all dialogue VERBATIM — every single word, exactly as written
+2. COPY all action/description text VERBATIM — every sentence, every detail
+3. COPY all stage directions VERBATIM
+4. Do NOT add, remove, or change any words in the actual script content
+5. Do NOT skip any scenes, characters, props, or story elements
+6. Preserve ALL props mentioned in action lines
+7. Preserve ALL character names exactly as written (including case)
+8. If content is in Chinese, keep it in Chinese exactly as written
+
+Parse the screenplay into scenes. For each scene extract:
+- sceneNum: sequential scene number (1, 2, 3...) — restart per episode
+- episodeNum: episode number (use 1 for movies/single episodes)
+- heading: the EXACT scene heading / slug line as written (e.g. "INT. COFFEE SHOP - DAY")
+- location: location name extracted from heading
 - timeOfDay: time of day from heading (e.g. "DAY", "NIGHT", "MORNING")
-- action: JSON array of blocks representing the scene content in order. Each block is one of:
-  * { "type": "action", "text": "..." } for action/description lines
-  * { "type": "dialogue", "character": "CHARACTER NAME", "parenthetical": "(quietly)", "line": "Dialogue text" } for dialogue
-  * { "type": "direction", "text": "..." } for stage directions / transitions
-- mood: inferred mood of the scene (e.g. "tense", "romantic", "comedic", "dramatic")
-- promptHint: a brief visual description for AI video generation (1-2 sentences)
+- action: JSON array of blocks in exact script order:
+  * { "type": "action", "text": "EXACT action/description text" }
+  * { "type": "dialogue", "character": "EXACT CHARACTER NAME", "parenthetical": "(exact parenthetical if any, else null)", "line": "EXACT dialogue text word for word" }
+  * { "type": "direction", "text": "EXACT stage direction or transition" }
+- mood: inferred mood (e.g. "tense", "romantic", "comedic", "dramatic", "suspenseful")
+- promptHint: brief visual description for AI video generation (1-2 sentences, your own words)
 - duration: estimated scene duration in seconds (30-180)
 
 Also extract:
 - title: the screenplay title
-- genre: detected genre
-- roles: array of characters with { name, role: "lead"|"supporting"|"minor", description }
+- genre: detected genre (drama/comedy/thriller/romance/scifi/fantasy/action)
+- roles: ALL characters that appear, each with { name: "EXACT NAME", role: "lead"|"supporting"|"minor", description: "brief physical/personality description" }
 
-Return ONLY valid JSON with this structure:
+Return ONLY valid JSON:
 {
   "title": "...",
   "genre": "...",
@@ -36,12 +46,7 @@ Return ONLY valid JSON with this structure:
   "scenes": [...]
 }
 
-Important:
-- Preserve the actual dialogue and action text faithfully
-- Group dialogue lines correctly with their character names
-- Handle parentheticals within dialogue
-- Scene numbers should restart per episode if multiple episodes are present
-- If the text is Chinese, keep it in Chinese`
+IMPORTANT: Include EVERY scene. Do not truncate or skip. The action array must contain the COMPLETE scene content.`
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -98,17 +103,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No text could be extracted from PDF" }, { status: 400 })
     }
 
-    // Limit text size to avoid excessive token usage
-    const truncatedText = text.slice(0, 30000)
+    // Limit text size — 60k chars covers ~15,000 tokens of input
+    // For longer scripts, we process as much as fits
+    const MAX_CHARS = 60000
+    const truncatedText = text.length > MAX_CHARS
+      ? text.slice(0, MAX_CHARS)
+      : text
 
     // Call AI to parse the screenplay
     const result = await aiComplete({
       messages: [
         { role: "system", content: PDF_IMPORT_SYSTEM_PROMPT },
-        { role: "user", content: `Parse this screenplay:\n\n${truncatedText}` },
+        { role: "user", content: `Parse this screenplay completely and faithfully. Every scene, every line of dialogue, every action — copy it verbatim:\n\n${truncatedText}` },
       ],
-      temperature: 0.2,
-      maxTokens: 12000,
+      temperature: 0.1,
+      maxTokens: 16000,
       responseFormat: "json",
     })
 

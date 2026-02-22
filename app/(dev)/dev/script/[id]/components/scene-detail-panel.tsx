@@ -55,7 +55,7 @@ interface SceneDetailPanelProps {
   onAcceptPolish: () => void; onDismissPolish: () => void
   isSuggesting: boolean; suggestions: Suggestion[] | null
   onSuggest: () => void; onDismissSuggestions: () => void
-  isGenerating: boolean; onGenerate: () => void
+  isGenerating: boolean; onGenerate: (generateAll?: boolean) => void
   onAddScene: (afterId?: string) => void; onDeleteScene: (id: string) => void
   selectedSceneId: string | null; onSelectScene: (id: string | null) => void
   activeTab: "script-text" | "breakdown"; onSetActiveTab: (tab: "script-text" | "breakdown") => void
@@ -232,11 +232,18 @@ export function SceneDetailPanel({
         <p className="text-sm mb-1" style={{ fontFamily: "sans-serif" }}>Select a scene</p>
         <p className="text-xs" style={{ color: "#CCC", fontFamily: "sans-serif" }}>or</p>
         {scenes.length === 0 ? (
-          <button onClick={onGenerate} disabled={isGenerating}
-            className="mt-3 px-4 py-1.5 text-xs rounded disabled:opacity-50"
-            style={{ background: "#E0E4F8", color: "#4F46E5", fontFamily: "sans-serif" }}>
-            {isGenerating ? "Generating..." : "AI Generate Episode"}
-          </button>
+          <div className="flex flex-col gap-2 mt-3">
+            <button onClick={() => onGenerate(false)} disabled={isGenerating}
+              className="px-4 py-1.5 text-xs rounded disabled:opacity-50"
+              style={{ background: "#E0E4F8", color: "#4F46E5", fontFamily: "sans-serif" }}>
+              {isGenerating ? "Generating..." : "AI Generate Episode 1"}
+            </button>
+            <button onClick={() => onGenerate(true)} disabled={isGenerating}
+              className="px-4 py-1.5 text-xs rounded disabled:opacity-50"
+              style={{ background: "#4F46E5", color: "#fff", fontFamily: "sans-serif" }}>
+              {isGenerating ? "Generating..." : "AI Generate All Episodes"}
+            </button>
+          </div>
         ) : (
           <button onClick={() => onAddScene()}
             className="mt-3 px-4 py-1.5 text-xs rounded"
@@ -404,8 +411,11 @@ export function SceneDetailPanel({
         <button onClick={onSuggest} disabled={isSuggesting} className="ml-2 text-[10px] px-2 py-1 rounded" style={{ background: "#E8E8E8", color: "#777" }}>
           {isSuggesting ? "..." : "AI Suggest"}
         </button>
-        <button onClick={onGenerate} disabled={isGenerating} className="ml-2 text-[10px] px-2 py-1 rounded" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
+        <button onClick={() => onGenerate(false)} disabled={isGenerating} className="ml-2 text-[10px] px-2 py-1 rounded" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
           {isGenerating ? "Generating..." : "AI Generate"}
+        </button>
+        <button onClick={() => onGenerate(true)} disabled={isGenerating} className="ml-2 text-[10px] px-2 py-1 rounded font-medium" style={{ background: "#4F46E5", color: "#fff" }}>
+          {isGenerating ? "..." : "All"}
         </button>
       </div>
 

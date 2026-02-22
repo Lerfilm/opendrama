@@ -83,6 +83,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const [resolution, setResolution] = useState("720p")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSplitting, setIsSplitting] = useState(false)
+  const [isStitching, setIsStitching] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
   const [balance, setBalance] = useState(initialBalance)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
@@ -222,6 +223,27 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
       alert("AI Split failed")
     } finally {
       setIsSplitting(false)
+    }
+  }
+
+  // AI Stitch: add bridging scenes between existing scenes for narrative flow
+  async function handleStitch() {
+    const epSceneCount = script.scenes.filter(s => s.episodeNum === selectedEp).length
+    if (epSceneCount < 2) { alert("Need at least 2 scenes in this episode to stitch."); return }
+    setIsStitching(true)
+    try {
+      const res = await fetch("/api/ai/stitch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptId: script.id, episodeNum: selectedEp }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || "Stitch failed"); return }
+      alert(data.message || `Stitch complete`)
+    } catch {
+      alert("Stitch failed")
+    } finally {
+      setIsStitching(false)
     }
   }
 
@@ -956,6 +978,23 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
             style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
           >
             {isSplitting ? "Splitting..." : epSegments.length > 0 ? "Re-split" : "✦ AI Split"}
+          </button>
+          <button
+            onClick={handleStitch}
+            disabled={isStitching}
+            className="flex items-center gap-1 text-[10px] px-3 py-1 rounded font-medium transition-colors disabled:opacity-50"
+            style={{ background: "#F0FDF4", color: "#16A34A", border: "1px solid #BBF7D0" }}
+            title="AI Stitch: add bridging scenes for narrative flow"
+          >
+            {isStitching ? (
+              <div className="w-2 h-2 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "#16A34A" }} />
+            ) : (
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            )}
+            {isStitching ? "Stitching..." : "Stitch"}
           </button>
           <button
             onClick={handleGenerate}

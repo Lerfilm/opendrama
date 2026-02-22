@@ -8,6 +8,8 @@ interface Scene {
   sceneNum: number
   heading?: string | null
   action?: string | null
+  dialogue?: string | null
+  stageDirection?: string | null
   mood?: string | null
   location?: string | null
   timeOfDay?: string | null
@@ -33,6 +35,30 @@ interface SceneListPanelProps {
   onAddEpisode: () => void
   onAddScene: () => void
   targetEpisodes: number
+}
+
+/** Count characters in a scene's text content (action + dialogue + stageDirection) */
+function countSceneChars(scene: Scene): number {
+  let count = 0
+  // action blocks (JSON array or plain text)
+  if (scene.action) {
+    const raw = scene.action.trim()
+    if (raw.startsWith("[")) {
+      try {
+        const blocks = JSON.parse(raw) as Array<{ text?: string; line?: string; character?: string }>
+        for (const b of blocks) {
+          count += (b.text || "").length + (b.line || "").length + (b.character || "").length
+        }
+      } catch {
+        count += raw.length
+      }
+    } else {
+      count += raw.length
+    }
+  }
+  if (scene.dialogue) count += scene.dialogue.length
+  if (scene.stageDirection) count += scene.stageDirection.length
+  return count
 }
 
 export function SceneListPanel({
@@ -65,6 +91,13 @@ export function SceneListPanel({
     })
   }, [scenes, filterLocation, filterMood])
 
+  // Episode total character count
+  const episodeTotalChars = useMemo(() => countSceneChars({ id: "", episodeNum: 0, sceneNum: 0,
+    action: scenes.map(s => s.action || "").join(""),
+    dialogue: scenes.map(s => s.dialogue || "").join(""),
+    stageDirection: scenes.map(s => s.stageDirection || "").join(""),
+  }), [scenes])
+
   const canAddEpisode = episodes.length < targetEpisodes
 
   return (
@@ -72,14 +105,23 @@ export function SceneListPanel({
       {/* Header */}
       <div className="flex-shrink-0 px-3 py-2" style={{ borderBottom: "1px solid #C8C8C8" }}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Scenes</span>
-          <button
-            onClick={onAddScene}
-            className="text-[10px] transition-colors"
-            style={{ color: "#4F46E5" }}
-          >
-            + Add
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Scenes</span>
+            {episodeTotalChars > 0 && (
+              <span className="text-[9px] px-1 py-0.5 rounded font-mono" style={{ background: "#E0E0E0", color: "#888" }}>
+                {episodeTotalChars.toLocaleString()} chars
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onAddScene}
+              className="text-[10px] transition-colors"
+              style={{ color: "#4F46E5" }}
+            >
+              + Add
+            </button>
+          </div>
         </div>
 
         {/* Episode Tabs */}
@@ -164,6 +206,7 @@ export function SceneListPanel({
               const isSelected = scene.id === selectedSceneId
               const isSaving = savingScenes.has(scene.id)
               const isEdited = scene.id in editingScenes
+              const charCount = countSceneChars(scene)
               return (
                 <button
                   key={scene.id}
@@ -185,16 +228,21 @@ export function SceneListPanel({
                       {scene.heading || "Untitled scene"}
                     </p>
 
-                    {/* Badges */}
-                    <div className="flex items-center gap-1 mt-1">
+                    {/* Badges + word count */}
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
                       {scene.mood && (
                         <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "#DDD", color: "#777" }}>
                           {scene.mood}
                         </span>
                       )}
                       {scene.location && (
-                        <span className="text-[9px] px-1 py-0.5 rounded truncate max-w-[80px]" style={{ background: "#DDD", color: "#777" }}>
+                        <span className="text-[9px] px-1 py-0.5 rounded truncate max-w-[70px]" style={{ background: "#DDD", color: "#777" }}>
                           {scene.location}
+                        </span>
+                      )}
+                      {charCount > 0 && (
+                        <span className="text-[9px] font-mono" style={{ color: "#BBB" }}>
+                          {charCount}c
                         </span>
                       )}
                     </div>
