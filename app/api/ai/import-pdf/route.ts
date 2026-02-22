@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { aiComplete, extractJSON } from "@/lib/ai"
 import { chargeAiFeature } from "@/lib/ai-pricing"
+import { uploadToStorage, isStorageConfigured } from "@/lib/storage"
 
 const PDF_IMPORT_SYSTEM_PROMPT = `You are a professional screenplay parser. You will receive raw text extracted from a screenplay PDF (one episode/section at a time).
 Your ONLY job is to convert it into structured JSON — do NOT paraphrase, summarize, rewrite, or omit ANY content.
@@ -217,12 +218,14 @@ export async function POST(req: NextRequest) {
         let language: string | undefined
         let targetEpisodes: number | undefined
         let resumeScriptId: string | undefined
+        let pdfFileRef: File | null = null
 
         if (contentType.includes("multipart/form-data")) {
           const formData = await req.formData()
           resumeScriptId = (formData.get("resumeScriptId") as string) || undefined
 
           const pdfFile = formData.get("pdf") as File | null
+          pdfFileRef = pdfFile
           if (!pdfFile) {
             return finish({ type: "error", error: "No PDF file provided" })
           }
@@ -322,6 +325,20 @@ export async function POST(req: NextRequest) {
             })
           }
 
+          // Upload PDF to Supabase Storage (best-effort)
+          let pdfStorageUrl: string | undefined
+          if (isStorageConfigured() && pdfFileRef) {
+            try {
+              const pdfBuffer = Buffer.from(await pdfFileRef.arrayBuffer())
+              const cleanName = (filename || "script.pdf").replace(/[^a-zA-Z0-9._-]/g, "_")
+              const storagePdfPath = `${session.user.id}/${Date.now()}-${cleanName}`
+              pdfStorageUrl = await uploadToStorage("scripts", storagePdfPath, pdfBuffer, "application/pdf")
+              emit({ type: "status", step: "PDF uploaded to storage ✓" })
+            } catch (err) {
+              console.warn("PDF storage upload failed (continuing):", err)
+            }
+          }
+
           // Create script immediately so user has a scriptId even if we fail
           const script = await prisma.script.create({
             data: {
@@ -332,6 +349,7 @@ export async function POST(req: NextRequest) {
               language: language || "en",
               targetEpisodes: targetEpisodes || episodeChunks.length,
               status: "importing",
+              metadata: pdfStorageUrl ? JSON.stringify({ pdfUrl: pdfStorageUrl, pdfName: filename }) : undefined,
             },
           })
           scriptId = script.id
@@ -474,6 +492,9 @@ export async function POST(req: NextRequest) {
         const finalTitle = globalTitle || filename?.replace(/\.pdf$/i, "") || "Imported Script"
         const finalGenre = globalGenre || genre || "drama"
 
+        // Preserve metadata (pdfUrl) while updating script
+        const existingScript = await prisma.script.findUnique({ where: { id: scriptId }, select: { metadata: true } })
+        const existingMeta = existingScript?.metadata ? (() => { try { return JSON.parse(existingScript.metadata) } catch { return {} } })() : {}
         await prisma.script.update({
           where: { id: scriptId },
           data: {
@@ -481,6 +502,7 @@ export async function POST(req: NextRequest) {
             genre: finalGenre,
             status: "draft",
             targetEpisodes: targetEpisodes || episodeChunks.length,
+            metadata: JSON.stringify(existingMeta),
           },
         })
 

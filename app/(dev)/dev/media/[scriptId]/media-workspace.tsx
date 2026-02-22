@@ -30,12 +30,13 @@ interface Script {
   coverImage?: string | null
   coverWide?: string | null
   coverTall?: string | null
+  metadata?: string | null
   roles: Role[]
   videoSegments: VideoSegment[]
 }
 
-type AssetType = "all" | "character" | "thumbnail" | "video" | "seed" | "cover"
-type BucketName = "role-images" | "scene-images" | "video-thumbs" | "seed-images" | "covers" | "props-images"
+type AssetType = "all" | "character" | "thumbnail" | "video" | "seed" | "cover" | "document"
+type BucketName = "role-images" | "scene-images" | "video-thumbs" | "seed-images" | "covers" | "props-images" | "scripts"
 
 interface Asset {
   id: string
@@ -58,6 +59,7 @@ const BUCKET_LABELS: Record<BucketName, { label: string; color: string; bg: stri
   "seed-images":   { label: "Seeds",      color: "#F59E0B", bg: "#FEF3C7" },
   "covers":        { label: "Covers",     color: "#EC4899", bg: "#FCE7F3" },
   "props-images":  { label: "Props",      color: "#8B5CF6", bg: "#F5F3FF" },
+  "scripts":       { label: "Scripts",    color: "#DC2626", bg: "#FEF2F2" },
 }
 
 const UPLOAD_BUCKETS: BucketName[] = ["role-images", "scene-images", "video-thumbs", "seed-images", "covers", "props-images"]
@@ -76,6 +78,16 @@ export function MediaWorkspace({ script }: { script: Script }) {
   // Build asset list from script data
   const allAssets = useMemo<Asset[]>(() => {
     const list: Asset[] = []
+
+    // Source PDF from metadata
+    if (script.metadata) {
+      try {
+        const meta = JSON.parse(script.metadata)
+        if (meta.pdfUrl) {
+          list.push({ id: "source-pdf", type: "document", url: meta.pdfUrl, label: meta.pdfName || "Source Screenplay PDF", bucket: "scripts" })
+        }
+      } catch { /* ignore */ }
+    }
 
     // Covers
     if (script.coverImage) list.push({ id: "cover-main", type: "cover", url: script.coverImage, label: "Cover", bucket: "covers", isBase64: script.coverImage.startsWith("data:") })
@@ -154,6 +166,7 @@ export function MediaWorkspace({ script }: { script: Script }) {
 
   const TYPE_FILTERS: { id: AssetType; label: string; icon: string }[] = [
     { id: "all",       label: "All",        icon: "⊞" },
+    { id: "document",  label: "Scripts",    icon: "📋" },
     { id: "character", label: "Characters", icon: "👤" },
     { id: "thumbnail", label: "Thumbnails", icon: "🖼" },
     { id: "video",     label: "Videos",     icon: "▶" },
@@ -341,6 +354,18 @@ export function MediaWorkspace({ script }: { script: Script }) {
                               <polygon points="5 3 19 12 5 21 5 3"/>
                             </svg>
                           </div>
+                        ) : asset.type === "document" ? (
+                          <a href={asset.url} target="_blank" rel="noopener noreferrer"
+                            className="w-full h-full flex flex-col items-center justify-center gap-1 hover:opacity-80 transition-opacity"
+                            style={{ background: "#FEF2F2" }}
+                            onClick={e => e.stopPropagation()}>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={1.5}>
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/>
+                              <polyline points="14 2 14 8 20 8"/>
+                              <path d="M9 15h6M9 11h3"/>
+                            </svg>
+                            <span className="text-[8px] font-bold" style={{ color: "#DC2626" }}>PDF</span>
+                          </a>
                         ) : (
                           <img
                             src={asset.url}
@@ -396,6 +421,20 @@ export function MediaWorkspace({ script }: { script: Script }) {
             <div className="relative" style={{ background: "#1A1A1A", aspectRatio: "1" }}>
               {selectedAsset.type === "video" ? (
                 <video src={selectedAsset.url} controls className="w-full h-full object-contain" style={{ display: "block" }} />
+              ) : selectedAsset.type === "document" ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2" style={{ background: "#1A1A1A" }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={1}>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <path d="M9 15h6M9 11h6M9 7h3"/>
+                  </svg>
+                  <span className="text-[10px] font-bold" style={{ color: "#DC2626" }}>PDF</span>
+                  <a href={selectedAsset.url} target="_blank" rel="noopener noreferrer"
+                    className="text-[10px] px-3 py-1.5 rounded font-medium"
+                    style={{ background: "#DC2626", color: "#fff" }}>
+                    ↗ Open PDF
+                  </a>
+                </div>
               ) : (
                 <img src={selectedAsset.url} alt={selectedAsset.label} className="w-full h-full object-contain" style={{ display: "block" }} />
               )}

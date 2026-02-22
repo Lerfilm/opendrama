@@ -1,0 +1,268 @@
+[    3525ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[    3525ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/auth/signin:0
+[    6574ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[    6576ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/:0
+[   11798ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[   11799ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/developer:0
+[   15406ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[   15406ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/developer:0
+[   24482ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[   24482ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  135789ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  135798ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlx71kst0004hymxbqanhnyf:0
+[  138877ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at u (https://opendrama.ai/v8/_next/static/chunks/76f648f3c85b0d56.js:1:17129)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  142900ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  142901ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  295674ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  295687ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlxw57sc0000hzu1jb66cw0m:0
+[  298369ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at u (https://opendrama.ai/v8/_next/static/chunks/76f648f3c85b0d56.js:1:17129)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  322526ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  322568ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlxw57sc0000hzu1jb66cw0m:0
+[  334700ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  334701ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlxw57sc0000hzu1jb66cw0m:0
+[  341546ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  341547ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlxw57sc0000hzu1jb66cw0m:0
+[  346412ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at u (https://opendrama.ai/v8/_next/static/chunks/76f648f3c85b0d56.js:1:17129)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  348535ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  348535ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  352165ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  352166ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  353175ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  353175ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlxuvqi50000hyu12phv03v5:0
+[  356344ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  356344ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  358915ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  358915ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  359938ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at u (https://opendrama.ai/v8/_next/static/chunks/76f648f3c85b0d56.js:1:17129)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  405993ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  405994ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  410500ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  410501ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  412420ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  412421ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/location/cmlw31reh0000hzmxuenlwizt:0
+[  413765ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  413769ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/casting/cmlw31reh0000hzmxuenlwizt:0
+[  418727ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  418728ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/props/cmlw31reh0000hzmxuenlwizt:0
+[  420103ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  420103ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/editing/cmlw31reh0000hzmxuenlwizt:0
+[  421496ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  421497ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/theater/cmlw31reh0000hzmxuenlwizt:0
+[  443287ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  443332ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/location/cmlw31reh0000hzmxuenlwizt:0
+[  444490ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  444491ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/casting/cmlw31reh0000hzmxuenlwizt:0
+[  446460ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  446461ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  448925ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  448925ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/props/cmlw31reh0000hzmxuenlwizt:0
+[  455047ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  455089ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/location/cmlw31reh0000hzmxuenlwizt:0
+[  458100ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  458100ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/props/cmlw31reh0000hzmxuenlwizt:0
+[  459134ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  459134ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/location/cmlw31reh0000hzmxuenlwizt:0
+[  460368ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  460368ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/props/cmlw31reh0000hzmxuenlwizt:0
+[  481635ms] [ERROR] Failed to load resource: the server responded with a status of 502 () @ https://opendrama.ai/api/ai/extract-props:0
+[  497245ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  497245ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/location/cmlw31reh0000hzmxuenlwizt:0
+[  498505ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  498506ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/location/cmlw31reh0000hzmxuenlwizt:0
+[  720567ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  720567ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  724570ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at m (https://opendrama.ai/v8/_next/static/chunks/0f9604278398ebcc.js:1:18338)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  726560ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  726560ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/location/cmlw31reh0000hzmxuenlwizt:0
+[  728306ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  728307ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  729611ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at m (https://opendrama.ai/v8/_next/static/chunks/0f9604278398ebcc.js:1:18338)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  731591ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  731591ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/location/cmlw31reh0000hzmxuenlwizt:0
+[  734379ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  734379ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  735286ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  735286ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/casting/cmlw31reh0000hzmxuenlwizt:0
+[  773678ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  773726ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  788734ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at m (https://opendrama.ai/v8/_next/static/chunks/0f9604278398ebcc.js:1:18338)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  790731ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  790731ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/casting/cmlw31reh0000hzmxuenlwizt:0
+[  792638ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  792640ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  797256ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at m (https://opendrama.ai/v8/_next/static/chunks/0f9604278398ebcc.js:1:18338)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  799173ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  799174ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/casting/cmlw31reh0000hzmxuenlwizt:0
+[  801043ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  801043ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/location/cmlw31reh0000hzmxuenlwizt:0
+[  802329ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  802330ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/props/cmlw31reh0000hzmxuenlwizt:0
+[  807015ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  807016ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/theater/cmlw31reh0000hzmxuenlwizt:0
+[  817939ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  817978ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/editing/cmlw31reh0000hzmxuenlwizt:0
+[  824104ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  824106ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/media/cmlw31reh0000hzmxuenlwizt:0
+[  883058ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  883100ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  884293ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  884293ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/casting/cmlw31reh0000hzmxuenlwizt:0
+[  887704ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  887708ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  892020ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  892021ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlw31reh0000hzmxuenlwizt:0
+[  894386ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  894386ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  897272ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  897274ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlx5yn600000hzmxyxvdbdti:0
+[  899026ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at m (https://opendrama.ai/v8/_next/static/chunks/0f9604278398ebcc.js:1:18338)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  901167ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  901167ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  902746ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  902746ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlx71kst0004hymxbqanhnyf:0
+[  904251ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at m (https://opendrama.ai/v8/_next/static/chunks/0f9604278398ebcc.js:1:18338)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[  905821ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  905821ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[  914796ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  914837ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlx71kst0004hymxbqanhnyf:0
+[  917024ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  917025ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/media/cmlx71kst0004hymxbqanhnyf:0
+[  941142ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  941143ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/casting/cmlx71kst0004hymxbqanhnyf:0
+[  944467ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  944467ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlx71kst0004hymxbqanhnyf:0
+[  947283ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  947284ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/media/cmlx71kst0004hymxbqanhnyf:0
+[  952177ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  952178ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/theater/cmlx71kst0004hymxbqanhnyf:0
+[  952996ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  952997ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/editing/cmlx71kst0004hymxbqanhnyf:0
+[  989055ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  989058ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/theater/cmlx71kst0004hymxbqanhnyf:0
+[  994599ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  994599ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/casting/cmlx71kst0004hymxbqanhnyf:0
+[  996723ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[  996724ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlx71kst0004hymxbqanhnyf:0
+[  997729ms] [ERROR] Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at a_ (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:64515)
+    at Object.on [as useCallback] (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:71853)
+    at r.useCallback (https://opendrama.ai/v8/_next/static/chunks/c71917475d078b84.js:1:26651)
+    at m (https://opendrama.ai/v8/_next/static/chunks/0f9604278398ebcc.js:1:18338)
+    at av (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:63230)
+    at oY (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:83503)
+    at io (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:94935)
+    at sc (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137956)
+    at https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137801
+    at ss (https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:1:137809) @ https://opendrama.ai/v8/_next/static/chunks/aee6c7720838f8a2.js:0
+[ 1027651ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[ 1027651ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/casting/cmlx71kst0004hymxbqanhnyf:0
+[ 1030353ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[ 1030353ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlx71kst0004hymxbqanhnyf:0
+[ 1034987ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[ 1034987ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev:0
+[ 1055925ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[ 1055925ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlxwtof40000hzu1zpwkco6k:0
+[ 1138182ms] [ERROR] Failed to load resource: the server responded with a status of 502 () @ https://opendrama.ai/api/ai/generate-script:0
+[ 1160199ms] [ERROR] Failed to load resource: the server responded with a status of 502 () @ https://opendrama.ai/api/ai/generate-script:0
+[ 1165467ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opendrama.ai/icon-192.png:0
+[ 1165467ms] [WARNING] Error while trying to use the following icon from the Manifest: https://opendrama.ai/icon-192.png (Download error or resource isn't a valid image) @ https://opendrama.ai/dev/script/cmlxwtof40000hzu1zpwkco6k:0

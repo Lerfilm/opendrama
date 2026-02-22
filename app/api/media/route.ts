@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   // Aggregate all assets from DB
   const assets: Array<{
     id: string
-    type: "video" | "thumbnail" | "seed" | "character" | "cover"
+    type: "video" | "thumbnail" | "seed" | "character" | "cover" | "document"
     url: string
     label: string
     bucket: string
@@ -51,6 +51,16 @@ export async function GET(req: NextRequest) {
     roleId?: string
     roleName?: string
   }> = []
+
+  // Source PDF from metadata
+  if (script.metadata) {
+    try {
+      const meta = JSON.parse(script.metadata)
+      if (meta.pdfUrl) {
+        assets.push({ id: "source-pdf", type: "document", url: meta.pdfUrl, label: meta.pdfName || "Source Screenplay PDF", bucket: "scripts" })
+      }
+    } catch { /* ignore parse errors */ }
+  }
 
   // Cover images
   if (script.coverImage) assets.push({ id: "cover-main", type: "cover", url: script.coverImage, label: "Cover", bucket: "covers" })
@@ -87,7 +97,7 @@ export async function GET(req: NextRequest) {
   // Also list from Supabase Storage if configured
   const storageAssets: Array<{ name: string; url: string; bucket: string; size: number }> = []
   if (isStorageConfigured()) {
-    const buckets: StorageBucket[] = ["role-images", "scene-images", "video-thumbs", "seed-images", "covers", "props-images"]
+    const buckets: StorageBucket[] = ["role-images", "scene-images", "video-thumbs", "seed-images", "covers", "props-images", "scripts"]
     await Promise.all(buckets.map(async (bucket) => {
       const files = await listStorage(bucket, session.user!.id as string, 200)
       for (const f of files) {

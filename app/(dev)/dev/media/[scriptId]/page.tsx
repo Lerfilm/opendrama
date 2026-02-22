@@ -17,6 +17,7 @@ export default async function MediaPage({ params }: { params: Promise<{ scriptId
       coverImage: true,
       coverWide: true,
       coverTall: true,
+      metadata: true,
       roles: {
         select: { id: true, name: true, role: true, referenceImages: true, avatarUrl: true },
       },

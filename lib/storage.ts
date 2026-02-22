@@ -17,6 +17,7 @@ export type StorageBucket =
   | "seed-images"
   | "covers"
   | "props-images"
+  | "scripts"
 
 export interface UploadedAsset {
   url: string
