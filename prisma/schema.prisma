@@ -516,6 +516,23 @@ model PublishedScript {
 }
 
 // ============================================
+// AI 功能定价配置
+// ============================================
+
+// AI功能的coin费用，由管理员在后台配置
+model AiFeaturePrice {
+  id          String   @id @default(cuid())
+  featureKey  String   @unique  // e.g. "extract_props", "extract_locations", "generate_script"
+  label       String            // 显示名称, e.g. "Props AI Extract"
+  costCoins   Int      @default(1)  // 每次调用扣除的 coins
+  description String?           // 说明文字
+  enabled     Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+
+  @@map("ai_feature_prices")
+}
+
+// ============================================
 // 成就卡系统
 // ============================================
 

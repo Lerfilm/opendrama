@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import { AIConfirmModal } from "@/components/dev/ai-confirm-modal"
 
 interface CostumePhoto {
   scene: string       // e.g. "INT. OFFICE - DAY"
@@ -131,6 +132,7 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false)
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const costumeFileInputRef = useRef<HTMLInputElement>(null)
@@ -568,7 +570,7 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                         Reference Images ({selectedRole.referenceImages?.length ?? 0})
                       </label>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => generateCharacterImage(selectedRole.id)} disabled={!!generatingFor}
+                        <button onClick={() => setShowGenerateConfirm(selectedRole.id)} disabled={!!generatingFor}
                           className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded disabled:opacity-50"
                           style={{ background: "#EDE9FE", color: "#6D28D9" }}>
                           {generatingFor === selectedRole.id ? (
@@ -900,6 +902,15 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
           </>
         )}
       </div>
+
+      {showGenerateConfirm && (
+        <AIConfirmModal
+          featureKey="generate_character"
+          featureLabel="AI Portrait"
+          onConfirm={() => { const id = showGenerateConfirm; setShowGenerateConfirm(null); generateCharacterImage(id) }}
+          onCancel={() => setShowGenerateConfirm(null)}
+        />
+      )}
 
       {/* Hidden file inputs */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden"

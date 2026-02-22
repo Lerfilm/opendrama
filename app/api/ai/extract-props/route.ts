@@ -3,11 +3,17 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { aiComplete, extractJSON } from "@/lib/ai"
+import { chargeAiFeature } from "@/lib/ai-pricing"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const charge = await chargeAiFeature(session.user.id, "extract_props")
+  if (!charge.ok) {
+    return NextResponse.json({ error: "insufficient_balance", balance: charge.balance, required: charge.required }, { status: 402 })
   }
 
   try {

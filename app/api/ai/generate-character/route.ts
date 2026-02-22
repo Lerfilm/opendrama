@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { chargeAiFeature } from "@/lib/ai-pricing"
 import { aiComplete } from "@/lib/ai"
 import { mirrorUrlToStorage, isStorageConfigured, storagePath } from "@/lib/storage"
 
@@ -16,6 +17,12 @@ const T2I_MODEL = "doubao-seedream-3-0-t2i-250415"
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const charge = await chargeAiFeature(session.user.id, "generate_character")
+  if (!charge.ok) {
+    return NextResponse.json({ error: "insufficient_balance", balance: charge.balance, required: charge.required }, { status: 402 })
+  }
+
 
   try {
     const { name, description, role, genre } = await req.json()

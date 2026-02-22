@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { chargeAiFeature } from "@/lib/ai-pricing"
 import { aiComplete, extractJSON } from "@/lib/ai"
 
 export async function POST(req: NextRequest) {
@@ -9,6 +10,12 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const charge = await chargeAiFeature(session.user.id, "ai_split")
+  if (!charge.ok) {
+    return NextResponse.json({ error: "insufficient_balance", balance: charge.balance, required: charge.required }, { status: 402 })
+  }
+
 
   try {
     const { scriptId, episodeNum, model, resolution } = await req.json()

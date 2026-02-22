@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react"
 import { t } from "@/lib/i18n"
+import { AIConfirmModal } from "@/components/dev/ai-confirm-modal"
 import { SceneListPanel } from "./components/scene-list-panel"
 import { SceneDetailPanel } from "./components/scene-detail-panel"
 import { InspectorPanel } from "./components/inspector-panel"
@@ -86,6 +87,7 @@ export function ScriptWorkspace({ script: initial }: { script: Script }) {
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState<{ featureKey: string; featureLabel: string; action: () => void } | null>(null)
   const saveTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({})
 
   // === Derived ===
@@ -340,7 +342,12 @@ export function ScriptWorkspace({ script: initial }: { script: Script }) {
   }
 
   // === Render ===
+  function confirmThen(featureKey: string, featureLabel: string, action: () => void) {
+    setPendingConfirm({ featureKey, featureLabel, action })
+  }
+
   return (
+    <>
     <div className="h-full grid grid-cols-[280px_1fr_300px]">
       {/* Left: Scene List */}
       <SceneListPanel
@@ -370,16 +377,16 @@ export function ScriptWorkspace({ script: initial }: { script: Script }) {
         onUpdateField={updateSceneField}
         onSaveAll={saveAllScenes}
         isPolishing={isPolishing}
-        onPolish={handlePolish}
+        onPolish={(sceneId) => confirmThen("ai_polish", "AI Polish", () => handlePolish(sceneId))}
         polishResult={polishResult}
         onAcceptPolish={acceptPolish}
         onDismissPolish={() => setPolishResult(null)}
         isSuggesting={isSuggesting}
         suggestions={suggestions}
-        onSuggest={handleSuggest}
+        onSuggest={() => confirmThen("ai_suggest", "AI Suggest", handleSuggest)}
         onDismissSuggestions={() => setSuggestions(null)}
         isGenerating={isGenerating}
-        onGenerate={handleAIGenerate}
+        onGenerate={(all) => confirmThen("generate_script", all ? "AI Generate All Episodes" : "AI Generate Episode", () => handleAIGenerate(all))}
         onAddScene={handleAddScene}
         onDeleteScene={handleDeleteScene}
         selectedSceneId={selectedSceneId}
@@ -406,5 +413,15 @@ export function ScriptWorkspace({ script: initial }: { script: Script }) {
         roles={script.roles}
       />
     </div>
+
+    {pendingConfirm && (
+      <AIConfirmModal
+        featureKey={pendingConfirm.featureKey}
+        featureLabel={pendingConfirm.featureLabel}
+        onConfirm={() => { const fn = pendingConfirm.action; setPendingConfirm(null); fn() }}
+        onCancel={() => setPendingConfirm(null)}
+      />
+    )}
+    </>
   )
 }

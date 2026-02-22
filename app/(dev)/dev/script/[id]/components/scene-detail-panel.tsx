@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { SceneHeader } from "./scene-header"
 import { SegmentTimeline } from "./segment-timeline"
+import { AIConfirmModal } from "@/components/dev/ai-confirm-modal"
 
 // ─── Block system ────────────────────────────────────────────────────────────
 export type Block =
@@ -120,6 +121,7 @@ function PromptHintField({ sceneId, value, onChange, scriptId }: {
   sceneId: string; value: string; onChange: (v: string) => void; scriptId: string
 }) {
   const [isAdapting, setIsAdapting] = useState(false)
+  const [showAdaptConfirm, setShowAdaptConfirm] = useState(false)
 
   async function handleAIAdapt() {
     setIsAdapting(true)
@@ -141,6 +143,7 @@ function PromptHintField({ sceneId, value, onChange, scriptId }: {
   }
 
   return (
+    <>
     <div className="mt-4 pt-3" style={{ borderTop: "1px dashed #E0D8D0", fontFamily: "sans-serif" }}>
       <div className="flex items-center justify-between gap-1.5 mb-1.5">
         <div className="flex items-center gap-1.5">
@@ -148,7 +151,7 @@ function PromptHintField({ sceneId, value, onChange, scriptId }: {
           <span className="text-[9px]" style={{ color: "#CCC" }}>for video generation</span>
         </div>
         <button
-          onClick={handleAIAdapt}
+          onClick={() => setShowAdaptConfirm(true)}
           disabled={isAdapting}
           className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded disabled:opacity-50 transition-colors"
           style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
@@ -169,6 +172,16 @@ function PromptHintField({ sceneId, value, onChange, scriptId }: {
         style={{ background: "#F0EDE8", color: "#777", border: "1px solid #E0D8D0" }}
       />
     </div>
+
+    {showAdaptConfirm && (
+      <AIConfirmModal
+        featureKey="adapt_prompt"
+        featureLabel="AI Adapt Prompt"
+        onConfirm={() => { setShowAdaptConfirm(false); handleAIAdapt() }}
+        onCancel={() => setShowAdaptConfirm(false)}
+      />
+    )}
+    </>
   )
 }
 

@@ -166,14 +166,25 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
 
     try {
       setPdfImportProgress(20)
-      setPdfImportStep("AI is analyzing screenplay structure...")
+      setPdfImportStep("Extracting text from PDF...")
 
+      // Cycle through status messages to indicate multi-episode processing
+      const steps = [
+        "Extracting text from PDF...",
+        "AI is parsing screenplay structure...",
+        "Processing episodes and scenes...",
+        "Extracting dialogue and action blocks...",
+        "Almost done — creating scenes...",
+      ]
+      let stepIdx = 0
       const progressInterval = setInterval(() => {
         setPdfImportProgress(prev => {
-          if (prev < 80) return prev + 2
+          if (prev < 80) return prev + 1.5
           return prev
         })
-      }, 800)
+        stepIdx = (stepIdx + 1) % steps.length
+        setPdfImportStep(steps[stepIdx])
+      }, 1200)
 
       // Send the raw PDF as FormData — server extracts text with pdf-parse
       const formData = new FormData()
@@ -201,7 +212,8 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
       const data = await res.json()
 
       setPdfImportProgress(100)
-      setPdfImportStep(`✓ Imported: ${data.scenesCreated} scenes, ${data.rolesCreated} roles`)
+      const epInfo = data.episodesProcessed > 1 ? `, ${data.episodesProcessed} episodes` : ""
+      setPdfImportStep(`✓ Imported: ${data.scenesCreated} scenes, ${data.rolesCreated} roles${epInfo}`)
 
       await new Promise(r => setTimeout(r, 800))
 
@@ -317,19 +329,6 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
           </div>
           {tab === "projects" && (
             <div className="flex items-center gap-2">
-              <Link
-                href="/studio/script/new"
-                className="flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded transition-colors"
-                style={{ background: "#E0E7FF", color: "#4F46E5", border: "1px solid #C7D2FE" }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="12" y1="18" x2="12" y2="12" />
-                  <line x1="9" y1="15" x2="15" y2="15" />
-                </svg>
-                New Script
-              </Link>
               <button
                 onClick={() => setShowModal(true)}
                 className="flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded transition-colors"
