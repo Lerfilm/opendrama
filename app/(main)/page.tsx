@@ -12,6 +12,17 @@ import ContinueWatching from "@/components/continue-watching"
 export default async function HomePage() {
   const session = await auth()
 
+  // Real-time balance from DB (available = balance - reserved)
+  const userBalance = session?.user?.id
+    ? await prisma.userBalance.findUnique({
+        where: { userId: session.user.id },
+        select: { balance: true, reserved: true },
+      })
+    : null
+  const availableCoins = userBalance
+    ? userBalance.balance - userBalance.reserved
+    : 0
+
   const seriesList = await prisma.series.findMany({
     where: { status: "active" },
     select: {
@@ -74,7 +85,7 @@ export default async function HomePage() {
               <Link href="/recharge">
                 <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur rounded-full px-3 py-1.5">
                   <Coins className="w-4 h-4 text-yellow-400" />
-                  <span className="text-white text-sm font-semibold">{(session.user as any)?.coins || 0}</span>
+                  <span className="text-white text-sm font-semibold">{availableCoins}</span>
                 </div>
               </Link>
             ) : (

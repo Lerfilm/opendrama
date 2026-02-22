@@ -18,7 +18,7 @@ export default async function ProfilePage() {
 
   // 获取用户统计
   const userId = session.user.id as string
-  const [watchCount, scriptCount, cardCount] = await Promise.all([
+  const [watchCount, scriptCount, cardCount, userBalance] = await Promise.all([
     prisma.watchEvent.count({
       where: { userId },
     }),
@@ -28,7 +28,12 @@ export default async function ProfilePage() {
     prisma.userCard.count({
       where: { userId },
     }),
+    prisma.userBalance.findUnique({
+      where: { userId },
+      select: { balance: true, reserved: true },
+    }),
   ])
+  const availableCoins = userBalance ? userBalance.balance - userBalance.reserved : 0
 
   const menuItems = [
     { icon: Play, label: t("history.title"), href: "/history", badge: watchCount > 0 ? `${watchCount}` : null },
@@ -68,7 +73,7 @@ export default async function ProfilePage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-amber-600">
-                  {(session.user as any)?.coins || 0}
+                  {availableCoins}
                 </span>
                 <span className="text-xs text-amber-500">{t("home.rechargeNow")} →</span>
               </div>
