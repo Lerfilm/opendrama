@@ -27,12 +27,21 @@ interface Role {
   costumes?: CostumePhoto[]
 }
 
+interface SceneRef {
+  id: string
+  episodeNum: number
+  sceneNum: number
+  heading?: string | null
+  location?: string | null
+  timeOfDay?: string | null
+}
+
 interface Script {
   id: string
   title: string
   genre: string
   roles: Role[]
-  scenes?: Array<{ heading?: string | null; location?: string | null }>
+  scenes?: SceneRef[]
 }
 
 interface CastingWorkspaceProps {
@@ -157,6 +166,7 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [showGenerateConfirm, setShowGenerateConfirm] = useState<string | null>(null)
   const [isFillingSpecs, setIsFillingSpecs] = useState(false)
+  const [generatingCostumeFor, setGeneratingCostumeFor] = useState<string | null>(null) // scene id
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const costumeFileInputRef = useRef<HTMLInputElement>(null)
@@ -364,6 +374,38 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
     }
   }
 
+  async function generateCostumeForScene(roleId: string, scene: SceneRef) {
+    const role = roles.find(r => r.id === roleId)
+    if (!role) return
+    const key = `E${scene.episodeNum}S${scene.sceneNum}`
+    setGeneratingCostumeFor(key)
+    try {
+      const res = await fetch("/api/ai/generate-costume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterName: role.name,
+          characterDescription: role.description,
+          gender: role.gender,
+          sceneHeading: scene.heading,
+          location: scene.location,
+          timeOfDay: scene.timeOfDay,
+          genre: script.genre,
+        }),
+      })
+      if (!res.ok) return
+      const { url } = await res.json()
+      if (url) {
+        const newCostume = { url, scene: key, note: scene.heading || "" }
+        const newCostumes = [...(role.costumes || []), newCostume]
+        updateLocal(roleId, { costumes: newCostumes })
+        await saveCostumes(roleId, newCostumes)
+      }
+    } finally {
+      setGeneratingCostumeFor(null)
+    }
+  }
+
   async function removeImage(roleId: string, imgUrl: string) {
     const role = roles.find(r => r.id === roleId)
     if (!role) return
@@ -439,10 +481,10 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium truncate" style={{ color: isSelected ? "#1A1A1A" : "#333" }}>{role.name}</p>
-                      <div className="flex items-center gap-1 mt-0.5">
+                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                         <span className="text-[9px] px-1 py-0.5 rounded" style={typeStyle}>{ROLE_TYPE_LABELS[role.role] || role.role}</span>
-                        {role.gender && <span className="text-[9px]" style={{ color: "#999" }}>{role.gender}</span>}
-                        {role.age && <span className="text-[9px]" style={{ color: "#999" }}>{role.age}</span>}
+                        {role.gender && <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "#E5E7EB", color: "#6B7280" }}>{role.gender}</span>}
+                        {role.age && <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "#E5E7EB", color: "#6B7280" }}>{role.age}</span>}
                       </div>
                     </div>
                     {(role.costumes?.length ?? 0) > 0 && (
@@ -885,47 +927,51 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                 <div className="max-w-2xl mx-auto p-6">
                   <div className="flex items-center justify-between mb-5">
                     <div>
-                      <h3 className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>定妆照 · Costume Record</h3>
+                      <h3 className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>定妆照 · Costume by Scene</h3>
                       <p className="text-[11px] mt-0.5" style={{ color: "#999" }}>
-                        Upload costume photos tagged by scene / setting. Each look is a separate entry.
+                        AI generates costume looks for each scene. Click ✦ AI Costume to generate.
                       </p>
-                    </div>
-                  </div>
-
-                  {/* Upload new costume */}
-                  <div className="p-4 rounded-lg mb-6" style={{ background: "#F5F5F5", border: "1px solid #E0E0E0" }}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: "#888" }}>Add Costume Look</p>
-                    <div className="flex gap-2 mb-2">
-                      <div className="flex-1">
-                        <label className="text-[10px] mb-1 block" style={{ color: "#AAA" }}>Scene / Location</label>
-                        <input type="text" value={costumeScene}
-                          onChange={e => setCostumeScene(e.target.value)}
-                          placeholder="e.g. INT. OFFICE - DAY"
-                          className="w-full h-7 px-2 text-[11px] rounded focus:outline-none"
-                          style={{ background: "#fff", border: "1px solid #D0D0D0", color: "#1A1A1A" }} />
-                      </div>
-                      <div className="flex-1">
-                        <label className="text-[10px] mb-1 block" style={{ color: "#AAA" }}>Note (optional)</label>
-                        <input type="text" value={costumeNote}
-                          onChange={e => setCostumeNote(e.target.value)}
-                          placeholder="Ep 1-3, formal attire"
-                          className="w-full h-7 px-2 text-[11px] rounded focus:outline-none"
-                          style={{ background: "#fff", border: "1px solid #D0D0D0", color: "#1A1A1A" }} />
-                      </div>
                     </div>
                     <button
                       onClick={() => costumeFileInputRef.current?.click()}
                       disabled={uploadingCostume}
-                      className="flex items-center gap-2 text-[11px] px-3 py-1.5 rounded disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded disabled:opacity-50"
                       style={{ background: "#4F46E5", color: "#fff" }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                        <polyline points="16 16 12 12 8 16" />
-                        <line x1="12" y1="12" x2="12" y2="21" />
-                        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-                      </svg>
-                      {uploadingCostume ? "Uploading..." : "Upload Photo"}
+                      ↑ Upload
                     </button>
                   </div>
+
+                  {/* Scene list with AI generate buttons */}
+                  {(script.scenes?.length ?? 0) > 0 && (
+                    <div className="mb-6 space-y-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#888" }}>Scenes in Script</p>
+                      {script.scenes!.map(scene => {
+                        const key = `E${scene.episodeNum}S${scene.sceneNum}`
+                        const existing = (selectedRole.costumes || []).filter(c => c.scene === key)
+                        const isGenerating = generatingCostumeFor === key
+                        return (
+                          <div key={scene.id} className="flex items-center gap-2 px-3 py-2 rounded" style={{ background: "#F5F5F5", border: "1px solid #E8E8E8" }}>
+                            <span className="text-[10px] font-mono font-bold flex-shrink-0" style={{ color: "#4F46E5" }}>{key}</span>
+                            <span className="text-[11px] truncate flex-1" style={{ color: "#555" }}>{scene.heading || scene.location || "Untitled"}</span>
+                            {existing.length > 0 && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "#D1FAE5", color: "#065F46" }}>
+                                {existing.length} look{existing.length !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => generateCostumeForScene(selectedRole.id, scene)}
+                              disabled={isGenerating || !!generatingCostumeFor}
+                              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded flex-shrink-0 disabled:opacity-40"
+                              style={{ background: "#EDE9FE", color: "#6D28D9" }}>
+                              {isGenerating ? (
+                                <><div className="w-2 h-2 rounded-full border border-purple-400 border-t-transparent animate-spin" /> Gen...</>
+                              ) : <>✦ AI</>}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
 
                   {/* Costume grid grouped by scene */}
                   {(selectedRole.costumes?.length ?? 0) === 0 ? (

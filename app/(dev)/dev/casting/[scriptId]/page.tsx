@@ -13,6 +13,10 @@ export default async function CastingPage({ params }: { params: Promise<{ script
     where: { id: scriptId, userId: session.user.id as string },
     include: {
       roles: { orderBy: { createdAt: "asc" } },
+      scenes: {
+        select: { id: true, episodeNum: true, sceneNum: true, heading: true, location: true, timeOfDay: true },
+        orderBy: [{ episodeNum: "asc" }, { sceneNum: "asc" }],
+      },
     },
   })
 
