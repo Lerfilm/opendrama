@@ -11,6 +11,7 @@ export interface VideoGenerationRequest {
   referenceVideo?: string
   aspectRatio?: string
   durationSec: number
+  seed?: number          // fixed seed for cross-segment consistency within an episode
 }
 
 export interface VideoGenerationResult {
@@ -46,10 +47,11 @@ export async function queryVideoTask(model: string, taskId: string): Promise<Vid
 /**
  * Enrich a video segment prompt with character reference images.
  * Automatically detects mentioned characters and injects their reference images.
+ * Returns the episode seed so all segments in the same episode share visual consistency.
  */
 export async function enrichSegmentWithCharacters(
   segmentId: string
-): Promise<{ prompt: string; imageUrls: string[] }> {
+): Promise<{ prompt: string; imageUrls: string[]; episodeSeed: number }> {
   const segment = await prisma.videoSegment.findUnique({
     where: { id: segmentId },
     include: {
@@ -62,28 +64,59 @@ export async function enrichSegmentWithCharacters(
 
   const roles = segment.script.roles
 
-  // Match characters mentioned in the prompt
+  // Match ALL characters that appear in any segment of this episode, not just prompt mentions.
+  // This ensures consistent character descriptions are always prepended.
   const mentionedRoles = roles.filter(
     (r) => segment.prompt.includes(r.name)
   )
+  // Also include all roles with reference images even if not name-mentioned
+  const rolesWithImages = roles.filter(
+    (r) => r.referenceImages.length > 0 && !mentionedRoles.find(m => m.id === r.id)
+  )
 
-  // Collect reference images (max 2 per character, max 6 total)
-  const charImageUrls = mentionedRoles
-    .flatMap((r) => r.referenceImages.slice(0, 2))
-    .slice(0, 6)
+  // Collect reference images: mentioned roles first (max 2 each), then others (max 1 each)
+  const charImageUrls = [
+    ...mentionedRoles.flatMap((r) => r.referenceImages.slice(0, 2)),
+    ...rolesWithImages.flatMap((r) => r.referenceImages.slice(0, 1)),
+  ].slice(0, 6)
 
-  // Enhance prompt with character descriptions
-  const charDescriptions = mentionedRoles
-    .map((r) => `[Character ${r.name}: ${r.description || ""}]`)
-    .join(" ")
-  const enhancedPrompt = charDescriptions
-    ? `${charDescriptions}\n${segment.prompt}`
+  // Build detailed character description block
+  // Use a format Seedance understands: "character: [name], appearance: [desc]"
+  const charBlock = mentionedRoles
+    .map((r) => {
+      const desc = r.description || ""
+      return `character "${r.name}": ${desc}`
+    })
+    .join("; ")
+
+  const enhancedPrompt = charBlock
+    ? `[Cast: ${charBlock}]\n${segment.prompt}`
     : segment.prompt
 
   // Merge user-uploaded reference images with character images
   const allImageUrls = [...(segment.referenceImages || []), ...charImageUrls]
 
-  return { prompt: enhancedPrompt, imageUrls: allImageUrls }
+  // Derive a deterministic episode seed from scriptId + episodeNum so all
+  // segments in the same episode share the same seed value → more consistent
+  // character appearance across clips.
+  const episodeSeed = deriveEpisodeSeed(segment.scriptId, segment.episodeNum)
+
+  return { prompt: enhancedPrompt, imageUrls: allImageUrls, episodeSeed }
+}
+
+/**
+ * Derive a stable positive integer seed from scriptId + episodeNum.
+ * The same script/episode always gets the same seed so all its segments
+ * share a consistent visual starting point.
+ */
+function deriveEpisodeSeed(scriptId: string, episodeNum: number): number {
+  let hash = 0
+  const str = `${scriptId}:${episodeNum}`
+  for (let i = 0; i < str.length; i++) {
+    hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0
+  }
+  // Keep in range 1 – 2^31-1 (positive, non-zero)
+  return Math.abs(hash) || 42
 }
 
 // ====== Model → req_key mapping (Jimeng Visual API) ======
@@ -106,13 +139,11 @@ const SEEDANCE_MODEL_IDS: Record<string, string> = {
   seedance_1_0_pro_fast: "doubao-seedance-1-0-pro-fast-251015",
 }
 
-// I2V model IDs (used in chain mode when images are provided)
-const SEEDANCE_I2V_MODEL_IDS: Record<string, string> = {
-  seedance_2_0:          "doubao-seedance-1-0-lite-i2v-250428",
-  seedance_1_5_pro:      "doubao-seedance-1-0-lite-i2v-250428",
-  seedance_1_0_pro:      "doubao-seedance-1-0-lite-i2v-250428",
-  seedance_1_0_pro_fast: "doubao-seedance-1-0-lite-i2v-250428",
-}
+// NOTE: We intentionally do NOT switch to a separate "I2V lite" model when images
+// are provided. The T2V models (1.5-pro, 1.0-pro, etc.) already accept image_url
+// content items alongside the text prompt. Switching to the lite I2V variant
+// would silently downgrade output quality. Instead, all submissions go to the
+// same T2V model the user selected, passing reference images in the content array.
 
 // Duration limits per Seedance model (seconds)
 const SEEDANCE_MAX_DURATION: Record<string, number> = {
@@ -123,10 +154,11 @@ const SEEDANCE_MAX_DURATION: Record<string, number> = {
 }
 
 // Resolution → aspect_ratio mapping
+// Short drama is vertical (9:16). Override with req.aspectRatio if provided.
 function getAspectRatio(resolution: string): string {
-  if (resolution === "1080p") return "16:9"
-  if (resolution === "720p") return "16:9"
-  return "16:9"
+  if (resolution === "1080p") return "9:16"
+  if (resolution === "720p") return "9:16"
+  return "9:16"
 }
 
 // ====== Seedance (Volcengine Ark API) ======
@@ -196,21 +228,22 @@ async function sanitizePromptForSeedance(prompt: string): Promise<string> {
 }
 
 async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId: string }> {
-  const hasImages = req.imageUrls && req.imageUrls.length > 0
-  // Use I2V model when images are provided (chain mode / reference images)
-  const modelId = hasImages
-    ? (SEEDANCE_I2V_MODEL_IDS[req.model] ?? SEEDANCE_MODEL_IDS[req.model])
-    : SEEDANCE_MODEL_IDS[req.model]
+  // Always use the T2V model the user selected — do NOT switch to an I2V "lite"
+  // variant, which would silently downgrade quality. Seedance T2V models accept
+  // image_url items in the content array alongside the text prompt.
+  const modelId = SEEDANCE_MODEL_IDS[req.model]
   if (!modelId) throw new Error(`Unknown Seedance model: ${req.model}`)
 
   const maxDuration = SEEDANCE_MAX_DURATION[req.model] ?? 12
   const duration = Math.min(Math.max(Math.round(req.durationSec), 4), maxDuration)
 
-  // Build content array: images first (i2v), then text prompt
+  const hasImages = req.imageUrls && req.imageUrls.length > 0
+
+  // Build content array: reference images first, then text prompt
   const buildContent = (promptText: string): Array<Record<string, unknown>> => {
     const items: Array<Record<string, unknown>> = []
     if (hasImages) {
-      items.push(...req.imageUrls!.slice(0, 9).map(url => ({
+      items.push(...req.imageUrls!.slice(0, 6).map(url => ({
         type: "image_url",
         image_url: { url },
       })))
@@ -219,17 +252,21 @@ async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId
     return items
   }
 
+  // Use the episode-scoped seed for cross-segment consistency.
+  // Fall back to -1 (random) only when no seed is provided.
+  const seed = req.seed && req.seed > 0 ? req.seed : -1
+
   const baseBody: Record<string, unknown> = {
     model: modelId,
     resolution: req.resolution === "1080p" ? "1080p" : "720p",
-    ratio: req.aspectRatio || "16:9",
+    ratio: req.aspectRatio || getAspectRatio(req.resolution),
     duration,
-    seed: -1,
+    seed,
     watermark: false,
     camera_fixed: false,
   }
 
-  console.log(`[Seedance] Submitting: model=${modelId}`)
+  console.log(`[Seedance] Submitting: model=${modelId}, ratio=${baseBody.ratio}, seed=${seed}, images=${req.imageUrls?.length ?? 0}`)
 
   const trySubmit = async (promptText: string) =>
     seedanceRequest<{ id: string; status: string }>(

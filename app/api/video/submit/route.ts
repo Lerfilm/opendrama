@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
     try {
       // Enrich prompt with character references
-      const { prompt, imageUrls } = await enrichSegmentWithCharacters(segmentId)
+      const { prompt, imageUrls, episodeSeed } = await enrichSegmentWithCharacters(segmentId)
 
       // Submit to video generation API
       const { taskId } = await submitVideoTask({
@@ -139,6 +139,7 @@ export async function POST(req: NextRequest) {
         imageUrls,
         referenceVideo: segment.referenceVideo || undefined,
         durationSec: segment.durationSec,
+        seed: episodeSeed,
       })
 
       // Update segment with task ID
@@ -172,7 +173,7 @@ async function submitSegmentToProvider(segmentId: string, userId: string) {
   if (!segment || !segment.model || !segment.resolution) return
 
   try {
-    const { prompt, imageUrls } = await enrichSegmentWithCharacters(segmentId)
+    const { prompt, imageUrls, episodeSeed } = await enrichSegmentWithCharacters(segmentId)
 
     const { taskId } = await submitVideoTask({
       model: segment.model,
@@ -181,6 +182,7 @@ async function submitSegmentToProvider(segmentId: string, userId: string) {
       imageUrls,
       referenceVideo: segment.referenceVideo || undefined,
       durationSec: segment.durationSec,
+      seed: episodeSeed,
     })
 
     await prisma.videoSegment.update({

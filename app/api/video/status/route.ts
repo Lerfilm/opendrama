@@ -130,7 +130,7 @@ async function kickNextReservedSegment(scriptId: string, episodeNum: number, use
   console.log(`[VideoStatus] Sequential: kicking next segment ${next.id} (index ${next.segmentIndex})`)
 
   try {
-    const { prompt, imageUrls } = await enrichSegmentWithCharacters(next.id)
+    const { prompt, imageUrls, episodeSeed } = await enrichSegmentWithCharacters(next.id)
 
     const { taskId } = await submitVideoTask({
       model: next.model,
@@ -139,6 +139,7 @@ async function kickNextReservedSegment(scriptId: string, episodeNum: number, use
       imageUrls,
       referenceVideo: next.referenceVideo || undefined,
       durationSec: next.durationSec,
+      seed: episodeSeed,
     })
 
     await prisma.videoSegment.update({
