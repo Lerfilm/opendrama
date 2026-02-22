@@ -50,17 +50,32 @@ Return ONLY valid JSON:
 
 IMPORTANT: Include EVERY scene from this section. Do not truncate or skip. The action array must contain the COMPLETE scene content.`
 
-/** Split text into episode chunks by detecting EP1/EP2/第一集 etc. markers */
-function splitIntoEpisodeChunks(text: string): Array<{ episodeNum: number; text: string }> {
-  // Normalize line endings so position arithmetic is consistent
+/** Split text into episode chunks by detecting EP1/EP2/第一集 etc. markers.
+ *  Falls back to even split by targetEpisodes if no markers found. */
+function splitIntoEpisodeChunks(
+  text: string,
+  targetEpisodes = 1,
+): Array<{ episodeNum: number; text: string }> {
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
 
-  // Patterns that can match anywhere on a (short) line — case-insensitive
-  const EP_PATTERNS: Array<[RegExp, "num" | "cn"]> = [
-    [/\bEP\.?\s*0*(\d+)\b/i, "num"],           // EP1, EP 1, EP.1, EP01
-    [/\bEpisode\.?\s*0*(\d+)\b/i, "num"],       // Episode 1, episode.1
-    [/第\s*0*(\d+)\s*集/, "num"],               // 第1集, 第01集
-    [/第\s*([一二三四五六七八九十百千万]+)\s*集/, "cn"],  // 第一集, 第二十集
+  // Patterns anchored to START of trimmed line — checked for lines of any length
+  const START_PATTERNS: Array<[RegExp, "num" | "cn"]> = [
+    [/^EP\.?\s*0*(\d+)\b/i, "num"],                              // EP1, EP.1, EP 1
+    [/^E0*(\d+)\b/i, "num"],                                     // E01, E1
+    [/^Episode\.?\s*0*(\d+)\b/i, "num"],                        // Episode 1
+    [/^第\s*0*(\d+)\s*集/, "num"],                               // 第1集, 第01集
+    [/^第\s*([一二三四五六七八九十百千万]+)\s*集/, "cn"],          // 第一集, 第二十集
+    [/^【第\s*0*(\d+)\s*集】/, "num"],                            // 【第1集】
+    [/^【第\s*([一二三四五六七八九十百千万]+)\s*集】/, "cn"],       // 【第一集】
+    [/^（第\s*0*(\d+)\s*集）/, "num"],                            // （第1集）
+    [/^（第\s*([一二三四五六七八九十百千万]+)\s*集）/, "cn"],      // （第一集）
+  ]
+
+  // Patterns checked anywhere in the line — only for short lines (≤40 chars)
+  const ANYWHERE_PATTERNS: Array<[RegExp, "num" | "cn"]> = [
+    [/\bEP\.?\s*0*(\d+)\b/i, "num"],
+    [/第\s*0*(\d+)\s*集/, "num"],
+    [/第\s*([一二三四五六七八九十百千万]+)\s*集/, "cn"],
   ]
 
   const markers: Array<{ pos: number; epNum: number }> = []
@@ -69,24 +84,35 @@ function splitIntoEpisodeChunks(text: string): Array<{ episodeNum: number; text:
 
   for (const line of lines) {
     const trimmed = line.trim()
-    // Only check lines that are plausibly episode headers (short or look like headers)
-    if (trimmed.length <= 60) {
-      for (const [pat, type] of EP_PATTERNS) {
+    if (trimmed) {
+      let matched = false
+      // Check start-of-line patterns (no length restriction)
+      for (const [pat, type] of START_PATTERNS) {
         const m = trimmed.match(pat)
         if (m) {
           const epNum = type === "cn" ? chineseToNum(m[1]) : parseInt(m[1], 10)
           if (epNum > 0 && epNum <= 200) {
             markers.push({ pos, epNum })
+            matched = true
             break
+          }
+        }
+      }
+      // Check anywhere patterns only for short lines
+      if (!matched && trimmed.length <= 40) {
+        for (const [pat, type] of ANYWHERE_PATTERNS) {
+          const m = trimmed.match(pat)
+          if (m) {
+            const epNum = type === "cn" ? chineseToNum(m[1]) : parseInt(m[1], 10)
+            if (epNum > 0 && epNum <= 200) {
+              markers.push({ pos, epNum })
+              break
+            }
           }
         }
       }
     }
     pos += line.length + 1
-  }
-
-  if (markers.length === 0) {
-    return [{ episodeNum: 1, text: normalized }]
   }
 
   // Deduplicate: keep first occurrence of each episode number
@@ -97,25 +123,60 @@ function splitIntoEpisodeChunks(text: string): Array<{ episodeNum: number; text:
     return true
   })
 
+  if (uniqueMarkers.length > 1) {
+    // Build chunks from detected markers
+    const chunks: Array<{ episodeNum: number; text: string }> = []
+    for (let i = 0; i < uniqueMarkers.length; i++) {
+      const start = uniqueMarkers[i].pos
+      const end = i + 1 < uniqueMarkers.length ? uniqueMarkers[i + 1].pos : normalized.length
+      const chunkText = normalized.slice(start, end).trim()
+      if (chunkText.length > 50) {
+        chunks.push({ episodeNum: uniqueMarkers[i].epNum, text: chunkText })
+      }
+    }
+    if (uniqueMarkers[0].pos > 500) {
+      chunks[0] = {
+        ...chunks[0],
+        text: normalized.slice(0, uniqueMarkers[0].pos) + "\n\n" + chunks[0].text,
+      }
+    }
+    if (chunks.length > 0) return chunks
+  }
+
+  // Fallback: no markers found — split evenly by targetEpisodes
+  if (targetEpisodes > 1) {
+    return splitEvenlyByEpisodes(normalized, targetEpisodes)
+  }
+
+  return [{ episodeNum: 1, text: normalized }]
+}
+
+/** Evenly split text into N episode chunks, breaking at paragraph boundaries */
+function splitEvenlyByEpisodes(text: string, count: number): Array<{ episodeNum: number; text: string }> {
+  const targetLen = Math.ceil(text.length / count)
   const chunks: Array<{ episodeNum: number; text: string }> = []
-  for (let i = 0; i < uniqueMarkers.length; i++) {
-    const start = uniqueMarkers[i].pos
-    const end = i + 1 < uniqueMarkers.length ? uniqueMarkers[i + 1].pos : normalized.length
-    const chunkText = normalized.slice(start, end).trim()
-    if (chunkText.length > 100) {
-      chunks.push({ episodeNum: uniqueMarkers[i].epNum, text: chunkText })
+  let remaining = text
+  let epNum = 1
+
+  while (remaining.length > 0 && epNum <= count) {
+    if (epNum === count) {
+      if (remaining.trim().length > 50) chunks.push({ episodeNum: epNum, text: remaining.trim() })
+      break
     }
+    let slice = remaining.slice(0, targetLen)
+    // Try to break at a blank line near the target length
+    const lastPara = slice.lastIndexOf("\n\n")
+    if (lastPara > targetLen * 0.55) {
+      slice = remaining.slice(0, lastPara)
+    }
+    if (slice.trim().length > 50) {
+      chunks.push({ episodeNum: epNum, text: slice.trim() })
+    }
+    remaining = remaining.slice(slice.length).trimStart()
+    epNum++
   }
 
-  // If there's significant preamble before the first marker, prepend it to the first chunk
-  if (uniqueMarkers[0].pos > 500) {
-    chunks[0] = {
-      ...chunks[0],
-      text: normalized.slice(0, uniqueMarkers[0].pos) + "\n\n" + chunks[0].text,
-    }
-  }
-
-  return chunks.length > 0 ? chunks : [{ episodeNum: 1, text: normalized }]
+  return chunks.length > 0 ? chunks : [{ episodeNum: 1, text }]
 }
 
 function chineseToNum(s: string): number {
@@ -294,7 +355,7 @@ export async function POST(req: NextRequest) {
           .join("\n")
         emit({ type: "debug_text", preview: text.slice(0, 800), lines: debugLines })
 
-        const episodeChunks = splitIntoEpisodeChunks(text)
+        const episodeChunks = splitIntoEpisodeChunks(text, targetEpisodes)
         const allParts = episodeChunks.flatMap(chunk => splitChunkIfNeeded(chunk))
 
         emit({ type: "total", total: allParts.length, episodes: episodeChunks.length })
