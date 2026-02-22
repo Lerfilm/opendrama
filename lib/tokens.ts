@@ -85,21 +85,36 @@ export async function confirmDeduction(
 
 /**
  * Refund reserved tokens after failed generation.
+ * Clamps to actual reserved amount to prevent negative values from double-refunds.
  */
 export async function refundReservation(userId: string, amount: number, description?: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
+    // Read current state first to prevent over-releasing
+    const current = await tx.userBalance.findUnique({
+      where: { userId },
+      select: { reserved: true, balance: true },
+    })
+    if (!current) return
+
+    // Only release what is actually still reserved (clamp to [0, reserved])
+    const actualRelease = Math.min(amount, Math.max(current.reserved, 0))
+    if (actualRelease <= 0) {
+      console.warn(`[Tokens] refundReservation skipped (reserved=${current.reserved}, requested=${amount})`)
+      return
+    }
+
     const balance = await tx.userBalance.update({
       where: { userId },
-      data: { reserved: { decrement: amount } },
+      data: { reserved: { decrement: actualRelease } },
     })
 
     await tx.tokenTransaction.create({
       data: {
         userId,
         type: "release",
-        amount,
+        amount: actualRelease,
         balanceAfter: balance.balance,
-        description: description || `Released ${amount} reserved coins`,
+        description: description || `Released ${actualRelease} reserved coins`,
       },
     })
   })
