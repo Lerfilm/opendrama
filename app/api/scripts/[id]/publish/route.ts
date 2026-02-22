@@ -16,7 +16,9 @@ async function uploadEpisodeToMux(
   if (videoUrls.length === 0) throw new Error("No video URLs to upload")
 
   const asset = await video.assets.create({
-    inputs: videoUrls.map(url => ({ url })),
+    // Each input must have explicit type:"video" — otherwise Mux treats
+    // inputs beyond the first as overlay/audio tracks and rejects them.
+    inputs: videoUrls.map(url => ({ url, type: "video" as const })),
     playback_policy: ["public"],
     encoding_tier: "baseline",
     passthrough: JSON.stringify({ episodeNum, seriesTitle, synopsis: synopsis.slice(0, 200) }),
