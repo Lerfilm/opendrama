@@ -52,25 +52,33 @@ IMPORTANT: Include EVERY scene from this section. Do not truncate or skip. The a
 
 /** Split text into episode chunks by detecting EP1/EP2/第一集 etc. markers */
 function splitIntoEpisodeChunks(text: string): Array<{ episodeNum: number; text: string }> {
-  const EP_MARKERS = [
-    /^(?:EP|Episode|EPISODE)\s*(\d+)\b/m,
-    /^第\s*([一二三四五六七八九十百\d]+)\s*集/m,
-    /^第\s*(\d+)\s*集/m,
+  // Normalize line endings so position arithmetic is consistent
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+
+  // Patterns that can match anywhere on a (short) line — case-insensitive
+  const EP_PATTERNS: Array<[RegExp, "num" | "cn"]> = [
+    [/\bEP\.?\s*0*(\d+)\b/i, "num"],           // EP1, EP 1, EP.1, EP01
+    [/\bEpisode\.?\s*0*(\d+)\b/i, "num"],       // Episode 1, episode.1
+    [/第\s*0*(\d+)\s*集/, "num"],               // 第1集, 第01集
+    [/第\s*([一二三四五六七八九十百千万]+)\s*集/, "cn"],  // 第一集, 第二十集
   ]
 
   const markers: Array<{ pos: number; epNum: number }> = []
-  const lines = text.split("\n")
+  const lines = normalized.split("\n")
   let pos = 0
+
   for (const line of lines) {
     const trimmed = line.trim()
-    for (const pattern of EP_MARKERS) {
-      const m = trimmed.match(pattern)
-      if (m) {
-        const numStr = m[1]
-        const epNum = parseInt(numStr) || chineseToNum(numStr)
-        if (epNum > 0 && epNum <= 100) {
-          markers.push({ pos, epNum })
-          break
+    // Only check lines that are plausibly episode headers (short or look like headers)
+    if (trimmed.length <= 60) {
+      for (const [pat, type] of EP_PATTERNS) {
+        const m = trimmed.match(pat)
+        if (m) {
+          const epNum = type === "cn" ? chineseToNum(m[1]) : parseInt(m[1], 10)
+          if (epNum > 0 && epNum <= 200) {
+            markers.push({ pos, epNum })
+            break
+          }
         }
       }
     }
@@ -78,9 +86,10 @@ function splitIntoEpisodeChunks(text: string): Array<{ episodeNum: number; text:
   }
 
   if (markers.length === 0) {
-    return [{ episodeNum: 1, text }]
+    return [{ episodeNum: 1, text: normalized }]
   }
 
+  // Deduplicate: keep first occurrence of each episode number
   const seen = new Set<number>()
   const uniqueMarkers = markers.filter(m => {
     if (seen.has(m.epNum)) return false
@@ -91,31 +100,40 @@ function splitIntoEpisodeChunks(text: string): Array<{ episodeNum: number; text:
   const chunks: Array<{ episodeNum: number; text: string }> = []
   for (let i = 0; i < uniqueMarkers.length; i++) {
     const start = uniqueMarkers[i].pos
-    const end = i + 1 < uniqueMarkers.length ? uniqueMarkers[i + 1].pos : text.length
-    const chunkText = text.slice(start, end).trim()
+    const end = i + 1 < uniqueMarkers.length ? uniqueMarkers[i + 1].pos : normalized.length
+    const chunkText = normalized.slice(start, end).trim()
     if (chunkText.length > 100) {
       chunks.push({ episodeNum: uniqueMarkers[i].epNum, text: chunkText })
     }
   }
 
+  // If there's significant preamble before the first marker, prepend it to the first chunk
   if (uniqueMarkers[0].pos > 500) {
     chunks[0] = {
       ...chunks[0],
-      text: text.slice(0, uniqueMarkers[0].pos) + "\n\n" + chunks[0].text,
+      text: normalized.slice(0, uniqueMarkers[0].pos) + "\n\n" + chunks[0].text,
     }
   }
 
-  return chunks.length > 0 ? chunks : [{ episodeNum: 1, text }]
+  return chunks.length > 0 ? chunks : [{ episodeNum: 1, text: normalized }]
 }
 
 function chineseToNum(s: string): number {
-  const map: Record<string, number> = {
-    "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
-    "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
-    "十一": 11, "十二": 12, "十三": 13, "十四": 14, "十五": 15,
-    "十六": 16, "十七": 17, "十八": 18, "十九": 19, "二十": 20,
+  const UNIT: Record<string, number> = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9 }
+  const TENS: Record<string, number> = { "十": 10, "百": 100, "千": 1000, "万": 10000 }
+  let result = 0
+  let current = 0
+  for (const ch of s) {
+    if (UNIT[ch] !== undefined) {
+      current = UNIT[ch]
+    } else if (TENS[ch] !== undefined) {
+      if (current === 0) current = 1  // handle 十一 = 11 (leading 十 without preceding 一)
+      result += current * TENS[ch]
+      current = 0
+    }
   }
-  return map[s] || 0
+  result += current
+  return result || 0
 }
 
 const MAX_CHUNK_CHARS = 40000
