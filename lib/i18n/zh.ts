@@ -552,6 +552,7 @@ const zh = {
   "generate.regenerate": "重新生成",
   "generate.retryAll": "重试全部失败",
   "generate.preview": "预览",
+  "generate.download": "下载",
   "generate.mergePublish": "合并发布",
   "generate.alreadyPublished": "该剧本已发布，请前往系列页面查看",
   "generate.resetAll": "全部重置",

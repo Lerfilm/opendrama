@@ -12,7 +12,7 @@ import {
   ArrowLeft, Loader2, Zap,
   CheckCircle, XIcon, Coins, PenTool,
   Play, RefreshCw, ChevronDown, ChevronUp,
-  Upload, Trash2, Link2,
+  Upload, Trash2, Link2, Download,
 } from "@/components/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -613,20 +613,31 @@ export function GenerateWorkbench({
                       <span className="ml-1">{t("generate.regenerate")}</span>
                     </Button>
 
-                    {/* Preview — done state only */}
+                    {/* Preview + Download — done state only */}
                     {isDone && seg.videoUrl && (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="text-xs h-7 px-2 bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => setPreviewVideo({
-                          url: seg.videoUrl!,
-                          title: `${t("studio.segment")} #${seg.segmentIndex + 1}`,
-                        })}
-                      >
-                        <Play className="w-3 h-3 mr-1" />
-                        {t("generate.preview")}
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="text-xs h-7 px-2 bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => setPreviewVideo({
+                            url: seg.videoUrl!,
+                            title: `${t("studio.segment")} #${seg.segmentIndex + 1}`,
+                          })}
+                        >
+                          <Play className="w-3 h-3 mr-1" />
+                          {t("generate.preview")}
+                        </Button>
+                        <a
+                          href={`/api/video/download?segmentId=${seg.id}`}
+                          download
+                          className="inline-flex items-center justify-center h-7 px-2 rounded-md text-xs font-medium
+                                     border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          <Download className="w-3 h-3 mr-1" />
+                          {t("generate.download")}
+                        </a>
+                      </>
                     )}
 
                     {/* Reset — always visible, pushes to right */}

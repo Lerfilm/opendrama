@@ -550,6 +550,7 @@ const en: Record<string, string> = {
   "generate.regenerate": "Regenerate",
   "generate.retryAll": "Retry failed",
   "generate.preview": "Preview",
+  "generate.download": "Download",
   "generate.mergePublish": "Publish Series",
   "generate.alreadyPublished": "This script is already published. Check the Series page.",
   "generate.resetAll": "Reset All",
