@@ -3,6 +3,8 @@
  * 通过 OpenRouter 路由调用 MiniMax 及其他模型
  */
 
+import { jsonrepair } from "jsonrepair"
+
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 export interface AIMessage {
@@ -143,10 +145,25 @@ export function extractJSON<T = Record<string, unknown>>(text: string): T {
     }
   }
 
-  // 4. Last resort: greedy regex
+  // 4. Try jsonrepair to fix malformed JSON (unescaped quotes, truncated responses, etc.)
+  try {
+    const startIdx2 = text.search(/[{[]/)
+    const candidate = startIdx2 >= 0 ? text.slice(startIdx2) : text
+    return JSON.parse(jsonrepair(candidate))
+  } catch {
+    // continue
+  }
+
+  // 5. Last resort: greedy regex then repair
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[0])
+    try {
+      return JSON.parse(jsonMatch[0])
+    } catch {
+      try {
+        return JSON.parse(jsonrepair(jsonMatch[0]))
+      } catch { /* fall through */ }
+    }
   }
 
   throw new Error(`Failed to extract JSON from AI response. Response starts with: ${text.slice(0, 200)}`)
