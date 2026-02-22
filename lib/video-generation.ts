@@ -264,7 +264,8 @@ async function querySeedanceTask(model: string, taskId: string): Promise<VideoGe
   const result = await seedanceRequest<{
     id: string
     status: string
-    content?: Array<{ type: string; video_url?: { url: string } }>
+    // content is an object { video_url: string }, NOT an array
+    content?: { video_url?: string } | Array<{ type: string; video_url?: { url: string } }>
     error?: { message?: string }
   }>(`/contents/generations/tasks/${taskId}`, undefined, "GET")
 
@@ -274,13 +275,20 @@ async function querySeedanceTask(model: string, taskId: string): Promise<VideoGe
   if (status === "succeeded") {
     let videoUrl: string | undefined
     if (result.content) {
-      for (const item of result.content) {
-        if (item.type === "video_url" && item.video_url?.url) {
-          videoUrl = item.video_url.url
-          break
+      if (Array.isArray(result.content)) {
+        // Legacy array format (not observed in practice)
+        for (const item of result.content) {
+          if (item.type === "video_url" && item.video_url?.url) {
+            videoUrl = item.video_url.url
+            break
+          }
         }
+      } else {
+        // Actual format: { video_url: "https://..." }
+        videoUrl = (result.content as { video_url?: string }).video_url
       }
     }
+    console.log(`[Seedance] Task ${taskId} succeeded, videoUrl: ${videoUrl ? "found" : "missing"}`)
     return { taskId, status: "done", videoUrl }
   }
 
