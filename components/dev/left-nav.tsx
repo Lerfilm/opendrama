@@ -128,7 +128,7 @@ export function LeftNav() {
   return (
     <nav
       className="flex flex-col items-center py-2"
-      style={{ background: "#C8C8C8", borderRight: "1px solid #B0B0B0" }}
+      style={{ background: "#252528", borderRight: "1px solid #1A1A1C" }}
     >
       {navItems.map((item) => (
         <div key={item.id} className="relative group">
@@ -136,10 +136,13 @@ export function LeftNav() {
             <Link
               href={item.href}
               className="relative flex flex-col items-center justify-center w-14 h-12 transition-colors"
-              style={{ color: item.active ? "#1A1A1A" : "#555" }}
+              style={{ color: item.active ? "#FFFFFF" : "#999" }}
             >
               {item.active && (
-                <div className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r" style={{ background: "#4F46E5" }} />
+                <div className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r" style={{ background: "#6366F1" }} />
+              )}
+              {item.active && (
+                <div className="absolute inset-0 rounded-r" style={{ background: "rgba(99,102,241,0.08)" }} />
               )}
               {item.icon}
               <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
@@ -147,7 +150,7 @@ export function LeftNav() {
           ) : (
             <div
               className="relative flex flex-col items-center justify-center w-14 h-12 cursor-not-allowed"
-              style={{ color: "#AAAAAA" }}
+              style={{ color: "#4A4A50" }}
             >
               {item.icon}
               <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
@@ -167,7 +170,7 @@ export function LeftNav() {
       <div className="mt-auto">
         <div
           className="flex flex-col items-center justify-center w-14 h-12 cursor-not-allowed"
-          style={{ color: "#AAAAAA" }}
+          style={{ color: "#4A4A50" }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
