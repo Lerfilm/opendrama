@@ -239,6 +239,10 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
   const scenesComplete = currentScenes.length > 0
   const segmentsComplete = episodeSegmentCount > 0
 
+  // Compute next episode to generate
+  const nextEpisodeToGenerate = episodes.length > 0 ? Math.max(...episodes) + 1 : 1
+  const allEpisodesGenerated = nextEpisodeToGenerate > script.targetEpisodes
+
   // AI Generate script
   async function handleAIGenerate() {
     if (isGenerating) return
@@ -251,7 +255,22 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
         body: JSON.stringify({ scriptId: script.id }),
       })
 
+      if (res.status === 402) {
+        alert(t("studio.insufficientBalance"))
+        return
+      }
+      if (res.status === 400) {
+        const data = await res.json()
+        alert(data.error || t("studio.saveFailed"))
+        return
+      }
       if (!res.ok) throw new Error("Failed")
+
+      const result = await res.json()
+      // Auto-switch to the newly generated episode
+      if (result.episodeNum) {
+        setSelectedEpisode(result.episodeNum)
+      }
 
       const scriptRes = await fetch(`/api/scripts/${script.id}`)
       if (scriptRes.ok) {
@@ -472,7 +491,7 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
         <Button
           size="sm"
           onClick={handleAIGenerate}
-          disabled={isGenerating}
+          disabled={isGenerating || allEpisodesGenerated}
           className="bg-gradient-to-r from-purple-500 to-pink-500 text-white"
         >
           {isGenerating ? (
@@ -480,7 +499,11 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
           ) : (
             <Sparkles className="w-4 h-4 mr-1" />
           )}
-          {isGenerating ? t("studio.generating") : t("studio.generateScript")}
+          {isGenerating
+            ? t("studio.generating")
+            : allEpisodesGenerated
+              ? t("studio.allEpisodesGenerated")
+              : t("studio.generateEpisode", { num: nextEpisodeToGenerate })}
         </Button>
       </div>
 
@@ -937,9 +960,9 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
                 <p className="font-semibold mb-1">{t("studio.emptySceneTitle")}</p>
                 <p className="text-xs text-muted-foreground mb-4">{t("studio.emptySceneDesc")}</p>
                 <div className="flex flex-col gap-2 items-center">
-                  <Button size="sm" onClick={handleAIGenerate} disabled={isGenerating} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                  <Button size="sm" onClick={handleAIGenerate} disabled={isGenerating || allEpisodesGenerated} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
                     <Sparkles className="w-4 h-4 mr-1" />
-                    {t("studio.generateScript")}
+                    {allEpisodesGenerated ? t("studio.allEpisodesGenerated") : t("studio.generateEpisode", { num: nextEpisodeToGenerate })}
                   </Button>
                   <span className="text-[10px] text-muted-foreground">{t("studio.orAddManually")}</span>
                   <Button size="sm" variant="outline" onClick={() => handleAddScene()}>
