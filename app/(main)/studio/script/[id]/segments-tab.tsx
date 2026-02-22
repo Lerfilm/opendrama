@@ -77,11 +77,12 @@ interface SegmentsTabProps {
 // ─── Constants ────────────────────────────────────
 
 const MODELS = [
-  { id: "seedance_2_0", name: "Seedance 2.0", resolutions: ["1080p", "720p"] },
-  { id: "seedance_1_5_pro", name: "Seedance 1.5 Pro", resolutions: ["1080p", "720p"] },
-  { id: "jimeng_3_0_pro", name: "Jimeng 3.0 Pro", resolutions: ["1080p"] },
-  { id: "jimeng_3_0", name: "Jimeng 3.0", resolutions: ["1080p", "720p"] },
-  { id: "jimeng_s2_pro", name: "Jimeng S2 Pro", resolutions: ["720p"] },
+  { id: "seedance_1_5_pro",      name: "Seedance 1.5 Pro",       resolutions: ["1080p", "720p"] },
+  { id: "seedance_1_0_pro",      name: "Seedance 1.0 Pro",       resolutions: ["1080p", "720p"] },
+  { id: "seedance_1_0_pro_fast", name: "Seedance 1.0 Pro Fast",  resolutions: ["1080p", "720p"] },
+  { id: "jimeng_3_0_pro",        name: "Jimeng 3.0 Pro",         resolutions: ["1080p"] },
+  { id: "jimeng_3_0",            name: "Jimeng 3.0",             resolutions: ["1080p", "720p"] },
+  { id: "jimeng_s2_pro",         name: "Jimeng S2 Pro",          resolutions: ["720p"] },
 ]
 
 const SHOT_TYPES = ["wide", "medium", "close-up", "extreme-close-up"]
@@ -91,7 +92,7 @@ const CAMERA_MOVES = ["static", "pan", "tilt", "dolly", "tracking", "orbit"]
 
 export function SegmentsTab({ script, selectedEpisode, onDataChanged }: SegmentsTabProps) {
   // Model & resolution
-  const [selectedModel, setSelectedModel] = useState("seedance_2_0")
+  const [selectedModel, setSelectedModel] = useState("seedance_1_5_pro")
   const [selectedResolution, setSelectedResolution] = useState("720p")
 
   // AI Split state

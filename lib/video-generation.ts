@@ -96,20 +96,30 @@ const MODEL_REQ_KEYS: Record<string, string> = {
 }
 
 // ====== Seedance → Ark model ID mapping ======
+// Note: doubao-seedance-2-0-260128 exists but requires separate account activation.
+// seedance_2_0 maps to 1.5-pro as the best currently available model.
 
 const SEEDANCE_MODEL_IDS: Record<string, string> = {
-  seedance_2_0:     "doubao-seedance-2-0-t2v-250610",
-  seedance_1_5_pro: "doubao-seedance-1-5-pro-251215",
-  seedance_1_0_pro: "doubao-seedance-1-0-pro-250528",
+  seedance_2_0:          "doubao-seedance-1-5-pro-251215", // 2.0 not activated → fallback to 1.5-pro
+  seedance_1_5_pro:      "doubao-seedance-1-5-pro-251215",
+  seedance_1_0_pro:      "doubao-seedance-1-0-pro-250528",
+  seedance_1_0_pro_fast: "doubao-seedance-1-0-pro-fast-251015",
+}
+
+// I2V model IDs (used in chain mode when images are provided)
+const SEEDANCE_I2V_MODEL_IDS: Record<string, string> = {
+  seedance_2_0:          "doubao-seedance-1-0-lite-i2v-250428",
+  seedance_1_5_pro:      "doubao-seedance-1-0-lite-i2v-250428",
+  seedance_1_0_pro:      "doubao-seedance-1-0-lite-i2v-250428",
+  seedance_1_0_pro_fast: "doubao-seedance-1-0-lite-i2v-250428",
 }
 
 // Duration limits per Seedance model (seconds)
-// seedance_1_5_pro / seedance_1_0_pro: 4–12s
-// seedance_2_0: 4–15s
 const SEEDANCE_MAX_DURATION: Record<string, number> = {
-  seedance_2_0:     15,
-  seedance_1_5_pro: 12,
-  seedance_1_0_pro: 12,
+  seedance_2_0:          12,
+  seedance_1_5_pro:      12,
+  seedance_1_0_pro:      12,
+  seedance_1_0_pro_fast: 12,
 }
 
 // Resolution → aspect_ratio mapping
@@ -186,7 +196,11 @@ async function sanitizePromptForSeedance(prompt: string): Promise<string> {
 }
 
 async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId: string }> {
-  const modelId = SEEDANCE_MODEL_IDS[req.model]
+  const hasImages = req.imageUrls && req.imageUrls.length > 0
+  // Use I2V model when images are provided (chain mode / reference images)
+  const modelId = hasImages
+    ? (SEEDANCE_I2V_MODEL_IDS[req.model] ?? SEEDANCE_MODEL_IDS[req.model])
+    : SEEDANCE_MODEL_IDS[req.model]
   if (!modelId) throw new Error(`Unknown Seedance model: ${req.model}`)
 
   const maxDuration = SEEDANCE_MAX_DURATION[req.model] ?? 12
@@ -195,8 +209,8 @@ async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId
   // Build content array: images first (i2v), then text prompt
   const buildContent = (promptText: string): Array<Record<string, unknown>> => {
     const items: Array<Record<string, unknown>> = []
-    if (req.imageUrls && req.imageUrls.length > 0) {
-      items.push(...req.imageUrls.slice(0, 9).map(url => ({
+    if (hasImages) {
+      items.push(...req.imageUrls!.slice(0, 9).map(url => ({
         type: "image_url",
         image_url: { url },
       })))
