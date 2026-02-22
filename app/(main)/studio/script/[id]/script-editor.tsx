@@ -8,6 +8,7 @@ import {
   ArrowLeft, Plus, Sparkles, Trash2, Loader2,
   ChevronDown, ChevronUp, Wand2, Lightbulb,
   Play, Save, Zap, CheckCircle, PenTool, Users,
+  XIcon, ImageIcon,
 } from "@/components/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -75,6 +76,178 @@ interface Suggestion {
 interface PolishResult {
   original: Partial<Scene>
   polished: Partial<Scene>
+}
+
+// ─── Role Card with reference image upload ────────────────────────────────────
+
+const roleColors: Record<string, string> = {
+  protagonist: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  antagonist: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  supporting: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  minor: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+}
+
+function RoleCard({
+  role,
+  onImagesChange,
+}: {
+  role: Role
+  onImagesChange: (images: string[]) => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const images = role.referenceImages ?? []
+
+  async function compressAndUpload(file: File): Promise<string> {
+    // Client-side compress to ≤ 512 KB before upload
+    return new Promise((resolve, reject) => {
+      const img = new window.Image()
+      const objectUrl = URL.createObjectURL(file)
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl)
+        const maxDim = 512
+        let { width, height } = img
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round((height / width) * maxDim); width = maxDim }
+          else { width = Math.round((width / height) * maxDim); height = maxDim }
+        }
+        const canvas = document.createElement("canvas")
+        canvas.width = width; canvas.height = height
+        canvas.getContext("2d")?.drawImage(img, 0, 0, width, height)
+        canvas.toBlob(async (blob) => {
+          if (!blob) { reject(new Error("Compression failed")); return }
+          const compressed = new File([blob], file.name, { type: "image/jpeg" })
+          const fd = new FormData()
+          fd.append("file", compressed)
+          const res = await fetch("/api/upload/role-image", { method: "POST", body: fd })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            reject(new Error((data as { error?: string }).error || "Upload failed"))
+            return
+          }
+          const data = await res.json() as { url: string }
+          resolve(data.url)
+        }, "image/jpeg", 0.82)
+      }
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Invalid image")) }
+      img.src = objectUrl
+    })
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setError(null)
+    setUploading(true)
+    try {
+      const newUrls: string[] = []
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith("image/")) continue
+        const url = await compressAndUpload(file)
+        newUrls.push(url)
+      }
+      const merged = [...images, ...newUrls].slice(0, 4) // max 4 images per role
+      // Save to DB
+      await fetch("/api/roles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: role.id, referenceImages: merged }),
+      })
+      onImagesChange(merged)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed")
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  async function removeImage(idx: number) {
+    const next = images.filter((_, i) => i !== idx)
+    await fetch("/api/roles", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: role.id, referenceImages: next }),
+    })
+    onImagesChange(next)
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="font-semibold text-sm">{role.name}</span>
+          <Badge variant="secondary" className={roleColors[role.role] || ""}>
+            {t(`studio.${role.role}` as "studio.protagonist")}
+          </Badge>
+        </div>
+        {role.description && (
+          <p className="text-xs text-muted-foreground mb-2">{role.description}</p>
+        )}
+
+        {/* Reference images */}
+        <div className="flex items-center gap-1.5 flex-wrap mt-2">
+          {images.map((img, i) => (
+            <div key={i} className="relative group w-14 h-14 shrink-0">
+              <img
+                src={img}
+                alt={`${role.name} ref ${i + 1}`}
+                className="w-full h-full rounded object-cover border"
+              />
+              <button
+                onClick={() => removeImage(i)}
+                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white
+                           flex items-center justify-center opacity-0 group-hover:opacity-100
+                           transition-opacity shadow"
+                title={t("studio.removeImage")}
+              >
+                <XIcon className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          ))}
+
+          {images.length < 4 && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-14 h-14 rounded border-2 border-dashed border-muted-foreground/30
+                         flex flex-col items-center justify-center gap-0.5
+                         text-muted-foreground hover:border-primary/50 hover:text-primary
+                         transition-colors disabled:opacity-50 shrink-0"
+              title={t("studio.uploadRefImage")}
+            >
+              {uploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <ImageIcon className="w-4 h-4" />
+                  <span className="text-[9px] leading-none">{t("studio.addPhoto")}</span>
+                </>
+              )}
+            </button>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+        </div>
+
+        {error && (
+          <p className="text-[10px] text-red-500 mt-1">{error}</p>
+        )}
+        {images.length === 0 && !uploading && (
+          <p className="text-[10px] text-muted-foreground mt-1">
+            {t("studio.refImageHint")}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
 
 export function ScriptEditor({ script: initial }: { script: Script }) {
@@ -437,13 +610,6 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
     } catch {
       // silent fail
     }
-  }
-
-  const roleColors: Record<string, string> = {
-    protagonist: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-    antagonist: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-    supporting: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-    minor: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
   }
 
   const suggestionIcons: Record<string, string> = {
@@ -1010,34 +1176,16 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
       {activeTab === "roles" && (
         <div className="space-y-3">
           {script.roles.map((role) => (
-            <Card key={role.id}>
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-sm">{role.name}</span>
-                  <Badge
-                    variant="secondary"
-                    className={roleColors[role.role] || ""}
-                  >
-                    {t(`studio.${role.role}` as "studio.protagonist")}
-                  </Badge>
-                </div>
-                {role.description && (
-                  <p className="text-xs text-muted-foreground mb-2">{role.description}</p>
-                )}
-                {role.referenceImages && role.referenceImages.length > 0 && (
-                  <div className="flex gap-1 mt-2">
-                    {role.referenceImages.map((img, i) => (
-                      <img
-                        key={i}
-                        src={img}
-                        alt={`${role.name} ref ${i + 1}`}
-                        className="w-12 h-12 rounded object-cover border"
-                      />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <RoleCard
+              key={role.id}
+              role={role}
+              onImagesChange={(images) => {
+                setScript(prev => ({
+                  ...prev,
+                  roles: prev.roles.map(r => r.id === role.id ? { ...r, referenceImages: images } : r),
+                }))
+              }}
+            />
           ))}
 
           {script.roles.length === 0 && (

@@ -327,7 +327,7 @@ export function GenerateWorkbench({
     }
   }
 
-  // Publish script → Series
+  // Publish script → upload segments to Mux → Series page
   async function handlePublish() {
     setIsPublishing(true)
     try {
@@ -336,16 +336,16 @@ export function GenerateWorkbench({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       })
+      const data = await res.json()
       if (res.ok) {
-        const data = await res.json()
+        const uploaded = data.episodesUploaded ?? 0
+        const failed = data.episodesFailed ?? 0
+        if (failed > 0) {
+          alert(t("generate.publishPartialFail", { failed, uploaded }))
+        }
         router.push(`/series/${data.seriesId}`)
       } else {
-        const data = await res.json()
-        if (res.status === 409 && data.publishedId) {
-          alert(t("generate.alreadyPublished"))
-        } else {
-          alert(data.error || "Publish failed")
-        }
+        alert(data.error || "Publish failed")
       }
     } catch {
       alert("Publish failed")
@@ -746,7 +746,7 @@ export function GenerateWorkbench({
                       ? <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                       : <Upload className="w-3 h-3 mr-1" />
                     }
-                    {isPublishing ? t("common.processing") : t("generate.mergePublish")}
+                    {isPublishing ? t("generate.uploadingToMux") : t("generate.mergePublish")}
                   </Button>
                 </div>
               </CardContent>
