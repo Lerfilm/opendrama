@@ -347,14 +347,6 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Split into chunks ────────────────────────────────────────────────
-        // Debug: emit first 800 chars + short lines so we can diagnose split issues
-        const debugLines = text.split(/\r?\n/).slice(0, 120)
-          .map((l, i) => `${i + 1}: ${l.slice(0, 120)}`)
-          .filter(l => l.trim().length > 2)
-          .slice(0, 60)
-          .join("\n")
-        emit({ type: "debug_text", preview: text.slice(0, 800), lines: debugLines })
-
         const episodeChunks = splitIntoEpisodeChunks(text, targetEpisodes)
         const allParts = episodeChunks.flatMap(chunk => splitChunkIfNeeded(chunk))
 

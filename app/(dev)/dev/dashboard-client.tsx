@@ -215,10 +215,6 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
           try { msg = JSON.parse(trimmed) } catch { continue }
 
           switch (msg.type) {
-            case "debug_text":
-              console.log("[PDF Import] Text preview:\n", msg.preview)
-              console.log("[PDF Import] First lines:\n", msg.lines)
-              break
             case "status":
               setPdfImportStep(msg.step as string)
               break
