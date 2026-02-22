@@ -303,6 +303,8 @@ const en: Record<string, string> = {
   "theater.composing": "Composing episode video...",
   "theater.uploading": "Uploading to streaming...",
   "theater.published": "Published successfully!",
+  "theater.episodeProgress": "{published}/{total} episodes on air",
+  "theater.readyToPush": "{count} ready to publish",
 
   // Settings
   "settings.language": "Language / 语言",
@@ -557,6 +559,8 @@ const en: Record<string, string> = {
   "generate.preview": "Preview",
   "generate.download": "Download",
   "generate.mergePublish": "Publish Series",
+  "generate.uploadingToMux": "Uploading to Mux...",
+  "generate.publishPartialFail": "{failed} episode(s) failed to upload, {uploaded} succeeded",
   "generate.alreadyPublished": "This script is already published. Check the Series page.",
   "generate.resetAll": "Reset All",
   "generate.resetAllTitle": "Reset All Segments",

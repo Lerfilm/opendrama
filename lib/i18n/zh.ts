@@ -303,6 +303,8 @@ const zh = {
   "theater.composing": "正在合成集视频...",
   "theater.uploading": "正在上传到流媒体...",
   "theater.published": "发布成功！",
+  "theater.episodeProgress": "已上线 {published}/{total} 集",
+  "theater.readyToPush": "{count} 集待发布",
 
   // 设置
   "settings.language": "语言 / Language",
@@ -559,6 +561,8 @@ const zh = {
   "generate.preview": "预览",
   "generate.download": "下载",
   "generate.mergePublish": "合并发布",
+  "generate.uploadingToMux": "上传中...",
+  "generate.publishPartialFail": "{failed} 集上传失败，{uploaded} 集成功",
   "generate.alreadyPublished": "该剧本已发布，请前往系列页面查看",
   "generate.resetAll": "全部重置",
   "generate.resetAllTitle": "重置全部片段",

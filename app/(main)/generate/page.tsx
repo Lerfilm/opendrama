@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Film, CheckCircle, Loader2, Zap, PenTool, XIcon } from "@/components/icons"
+import { Film, CheckCircle, Loader2, Zap, PenTool, XIcon, Radio } from "@/components/icons"
 import Link from "next/link"
 import { t } from "@/lib/i18n"
 
@@ -20,31 +20,66 @@ export default async function TheaterPage() {
         select: { episodeNum: true, status: true },
       },
       _count: { select: { scenes: true } },
+      // Get the linked series + its episodes to know Mux publish state
+      seriesLink: {
+        select: {
+          id: true,
+          episodes: {
+            select: { episodeNum: true, muxPlaybackId: true },
+          },
+        },
+      },
     },
   })
 
-  // Process each script's video segment stats
+  // Process each script's stats
   const scriptsWithStats = scripts.map((script) => {
-    const total = script.videoSegments.length
-    const done = script.videoSegments.filter((s) => s.status === "done").length
-    const generating = script.videoSegments.filter(
+    const segs = script.videoSegments
+
+    // Segment-level counts (for generating/failed badge)
+    const generating = segs.filter(
       (s) => s.status === "generating" || s.status === "submitted" || s.status === "reserved"
     ).length
-    const pending = script.videoSegments.filter((s) => s.status === "pending").length
-    const failed = script.videoSegments.filter((s) => s.status === "failed").length
+    const failed = segs.filter((s) => s.status === "failed").length
+    const pending = segs.filter((s) => s.status === "pending").length
 
-    // Unique episodes with segments
-    const episodesWithSegments = new Set(script.videoSegments.map((s) => s.episodeNum)).size
+    // Episode-level counts
+    const episodeNumsWithSegments = [...new Set(segs.map((s) => s.episodeNum))].sort((a, b) => a - b)
+    const totalEpisodes = episodeNumsWithSegments.length
+
+    // Episodes where ALL segments are done (locally generated)
+    const doneSegsByEp = new Map<number, number>()
+    const totalSegsByEp = new Map<number, number>()
+    for (const s of segs) {
+      totalSegsByEp.set(s.episodeNum, (totalSegsByEp.get(s.episodeNum) ?? 0) + 1)
+      if (s.status === "done") {
+        doneSegsByEp.set(s.episodeNum, (doneSegsByEp.get(s.episodeNum) ?? 0) + 1)
+      }
+    }
+    const episodesLocallyDone = episodeNumsWithSegments.filter(
+      (ep) => (doneSegsByEp.get(ep) ?? 0) > 0 && doneSegsByEp.get(ep) === totalSegsByEp.get(ep)
+    ).length
+
+    // Episodes pushed to Mux (have muxPlaybackId)
+    const muxEpisodes = script.seriesLink?.episodes ?? []
+    const episodesOnMux = muxEpisodes.filter((e) => !!e.muxPlaybackId).length
 
     return {
       ...script,
-      segmentStats: { total, done, generating, pending, failed, episodesWithSegments },
+      segmentStats: {
+        totalEpisodes,
+        episodesLocallyDone,
+        episodesOnMux,
+        generating,
+        failed,
+        pending,
+      },
     }
   })
 
   // Separate: scripts with segments vs without
-  const scriptsReady = scriptsWithStats.filter((s) => s.segmentStats.total > 0)
-  const scriptsEmpty = scriptsWithStats.filter((s) => s.segmentStats.total === 0)
+  const scriptsReady = scriptsWithStats.filter((s) => s.segmentStats.totalEpisodes > 0)
+  const scriptsEmpty = scriptsWithStats.filter((s) => s.segmentStats.totalEpisodes === 0)
 
   return (
     <div className="space-y-6 p-4 pb-24">
@@ -61,24 +96,43 @@ export default async function TheaterPage() {
           <h2 className="text-sm font-semibold mb-3">{t("theater.selectScript")}</h2>
           <div className="space-y-3">
             {scriptsReady.map((script) => {
-              const { total, done, generating, pending, failed } = script.segmentStats
-              const allDone = done > 0 && done === total
+              const { totalEpisodes, episodesLocallyDone, episodesOnMux, generating, failed, pending } =
+                script.segmentStats
+
+              // Status logic (mutually exclusive, priority order)
               const isGenerating = generating > 0
+              const isOnAir = episodesOnMux > 0 && episodesOnMux < totalEpisodes
+              const isCompleted = episodesOnMux > 0 && episodesOnMux >= totalEpisodes
               const hasPending = pending > 0
               const hasFailed = failed > 0
 
               return (
                 <Link key={script.id} href={`/generate/${script.id}`}>
-                  <Card className={`hover:shadow-md transition-shadow ${allDone ? "border-green-200 dark:border-green-800" : ""}`}>
+                  <Card
+                    className={`hover:shadow-md transition-shadow ${
+                      isCompleted
+                        ? "border-green-200 dark:border-green-800"
+                        : isOnAir
+                        ? "border-blue-200 dark:border-blue-800"
+                        : ""
+                    }`}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <h3 className="font-semibold truncate">{script.title}</h3>
-                            {allDone && (
+
+                            {isCompleted && (
                               <Badge className="text-[10px] bg-green-100 text-green-700 shrink-0">
                                 <CheckCircle className="w-3 h-3 mr-0.5" />
                                 {t("common.completed")}
+                              </Badge>
+                            )}
+                            {isOnAir && (
+                              <Badge className="text-[10px] bg-blue-100 text-blue-700 shrink-0">
+                                <Radio className="w-3 h-3 mr-0.5" />
+                                {t("common.ongoing")}
                               </Badge>
                             )}
                             {isGenerating && (
@@ -87,7 +141,7 @@ export default async function TheaterPage() {
                                 {t("common.processing")}
                               </Badge>
                             )}
-                            {hasPending && !isGenerating && !allDone && (
+                            {hasPending && !isGenerating && !isOnAir && !isCompleted && (
                               <Badge className="text-[10px] bg-blue-100 text-blue-700 shrink-0">
                                 <Zap className="w-3 h-3 mr-0.5" />
                                 {t("generate.readyBadge")}
@@ -108,22 +162,36 @@ export default async function TheaterPage() {
                         </div>
                       </div>
 
-                      {/* Progress bar */}
-                      {total > 0 && (
+                      {/* Progress bar — by episodes pushed to Mux */}
+                      {totalEpisodes > 0 && (
                         <div className="space-y-1">
                           <div className="w-full bg-muted rounded-full h-1.5">
-                            <div
-                              className="bg-gradient-to-r from-green-400 to-green-500 h-1.5 rounded-full transition-all"
-                              style={{ width: `${(done / total) * 100}%` }}
-                            />
+                            {/* Base bar: locally-done episodes (green) */}
+                            <div className="relative w-full h-1.5 rounded-full overflow-hidden bg-muted">
+                              {/* Locally done (lighter green) */}
+                              <div
+                                className="absolute inset-y-0 left-0 bg-green-300 dark:bg-green-700 transition-all"
+                                style={{ width: `${(episodesLocallyDone / totalEpisodes) * 100}%` }}
+                              />
+                              {/* On Mux (solid green) */}
+                              <div
+                                className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 to-green-600 transition-all"
+                                style={{ width: `${(episodesOnMux / totalEpisodes) * 100}%` }}
+                              />
+                            </div>
                           </div>
                           <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                             <span>
-                              {done}/{total} {t("studio.segments").toLowerCase()}
+                              {t("theater.episodeProgress", {
+                                published: episodesOnMux,
+                                total: totalEpisodes,
+                              })}
                             </span>
-                            <span>
-                              {script.segmentStats.episodesWithSegments} {t("common.episodes").toLowerCase()}
-                            </span>
+                            {episodesLocallyDone > episodesOnMux && (
+                              <span className="text-green-600 dark:text-green-400">
+                                {t("theater.readyToPush", { count: episodesLocallyDone - episodesOnMux })}
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}
