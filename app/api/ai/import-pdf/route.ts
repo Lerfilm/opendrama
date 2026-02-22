@@ -5,8 +5,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { aiComplete, extractJSON } from "@/lib/ai"
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse")
 
 const PDF_IMPORT_SYSTEM_PROMPT = `You are a professional screenplay parser. You will receive raw text extracted from a screenplay PDF.
 Your job is to parse it into a structured JSON format for a script management system.
@@ -80,11 +78,14 @@ export async function POST(req: NextRequest) {
       const te = formData.get("targetEpisodes")
       targetEpisodes = te ? parseInt(te as string, 10) : undefined
 
-      // Parse PDF server-side using pdf-parse
+      // Parse PDF server-side using pdf-parse (dynamic import avoids Next.js build issues)
+      const pdfModule = await import("pdf-parse")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pdfParse = (pdfModule as any).default ?? pdfModule
       const arrayBuffer = await pdfFile.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
-      const parsed = await pdfParse(buffer)
-      text = parsed.text || ""
+      const parsedPdf = await pdfParse(buffer)
+      text = parsedPdf.text || ""
     } else {
       // Legacy JSON path (keep for backwards compatibility)
       const body = await req.json()
