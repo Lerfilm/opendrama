@@ -7,6 +7,7 @@ import { createFreshPrismaClient } from "@/lib/prisma"
 import { aiComplete, extractJSON } from "@/lib/ai"
 import { chargeAiFeature } from "@/lib/ai-pricing"
 import { uploadToStorage, isStorageConfigured } from "@/lib/storage"
+import { generateAndSaveSceneImages } from "@/lib/scene-image-gen"
 
 const PDF_IMPORT_SYSTEM_PROMPT = `You are a professional screenplay parser. You will receive raw text extracted from a screenplay PDF (one episode/section at a time).
 Your ONLY job is to convert it into structured JSON — do NOT paraphrase, summarize, rewrite, or omit ANY content.
@@ -543,6 +544,17 @@ export async function POST(req: NextRequest) {
             await db.scriptScene.createMany({ data: scenesToSave })
             epSceneCounters[part.episodeNum] = startSceneNum + chunkResult.scenes.length
             totalScenesCreated += chunkResult.scenes.length
+
+            // Fire background panoramic reference image generation (non-blocking)
+            const savedSceneNums = scenesToSave.map(s => s.sceneNum)
+            db.scriptScene.findMany({
+              where: { scriptId, episodeNum: part.episodeNum, sceneNum: { in: savedSceneNums } },
+              select: { id: true, heading: true, location: true, timeOfDay: true, mood: true, action: true },
+            }).then(createdScenes => {
+              generateAndSaveSceneImages(createdScenes, session.user.id).catch(err =>
+                console.error("[SceneImageGen] background generation failed for ep", part.episodeNum, err)
+              )
+            }).catch(console.error)
 
             emit({
               type: "chunk_done",

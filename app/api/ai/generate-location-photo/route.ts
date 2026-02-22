@@ -19,12 +19,17 @@ export async function POST(req: NextRequest) {
 
   const b64DataUrl = await aiGenerateImage(prompt, "16:9")
 
+  // Always start with base64 fallback, only replace with storage URL if upload succeeds
   let url: string = b64DataUrl
-  if (isStorageConfigured()) {
-    const b64 = b64DataUrl.split(",")[1]
-    const buffer = Buffer.from(b64, "base64")
-    const path = storagePath(session.user.id, "scene-images", `loc-${Date.now()}.png`)
-    url = await uploadToStorage("scene-images", path, buffer, "image/png")
+  if (isStorageConfigured() && b64DataUrl.startsWith("data:")) {
+    try {
+      const b64 = b64DataUrl.split(",")[1]
+      const buffer = Buffer.from(b64, "base64")
+      const path = storagePath(session.user.id, "scene-images", `loc-${Date.now()}.png`)
+      url = await uploadToStorage("scene-images", path, buffer, "image/png")
+    } catch {
+      // Storage upload failed (e.g. bucket not public) — base64 URL is already set
+    }
   }
 
   return Response.json({ url })

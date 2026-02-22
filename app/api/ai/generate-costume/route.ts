@@ -53,11 +53,13 @@ Generate a costume reference photo prompt:`,
   const b64DataUrl = await aiGenerateImage(prompt, "9:16")
 
   let url: string = b64DataUrl
-  if (isStorageConfigured()) {
-    const b64 = b64DataUrl.split(",")[1]
-    const buffer = Buffer.from(b64, "base64")
-    const path = storagePath(session.user.id, "role-images", `costume-${Date.now()}.png`)
-    url = await uploadToStorage("role-images", path, buffer, "image/png")
+  if (isStorageConfigured() && b64DataUrl.startsWith("data:")) {
+    try {
+      const b64 = b64DataUrl.split(",")[1]
+      const buffer = Buffer.from(b64, "base64")
+      const path = storagePath(session.user.id, "role-images", `costume-${Date.now()}.png`)
+      url = await uploadToStorage("role-images", path, buffer, "image/png")
+    } catch { /* keep base64 fallback */ }
   }
 
   return Response.json({ url })

@@ -340,6 +340,7 @@ model ScriptScene {
   location       String?  // 拍摄地点
   timeOfDay      String?  // 时间段
   promptHint     String?  @db.Text // 给视频生成的镜头提示
+  referenceImage String?  // Auto-generated panoramic reference photo (16:9)
   duration       Int?
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())

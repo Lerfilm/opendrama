@@ -128,7 +128,7 @@ export function SceneListPanel({
         </div>
 
         {/* Episode Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-1">
+        <div className="flex flex-col gap-0.5 max-h-[160px] overflow-y-auto dev-scrollbar py-1">
           {episodes.map(ep => {
             const epScenes = allScenes.filter(s => s.episodeNum === ep)
             const epSegments = segments.filter(s => s.episodeNum === ep)
@@ -139,11 +139,11 @@ export function SceneListPanel({
               <button
                 key={ep}
                 onClick={() => onSelectEpisode(ep)}
-                className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-colors"
+                className="w-full flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-colors"
                 style={{ background: isActive ? "#4F46E5" : "transparent", color: isActive ? "#fff" : "#666" }}
               >
                 <span>E{ep}</span>
-                <div className="flex gap-0.5">
+                <div className="flex gap-0.5 ml-1">
                   <div className="w-1 h-1 rounded-full" style={{ background: hasScenes ? "#10B981" : isActive ? "rgba(255,255,255,0.3)" : "#CCC" }} />
                   <div className="w-1 h-1 rounded-full" style={{ background: hasSegments ? "#3B82F6" : isActive ? "rgba(255,255,255,0.3)" : "#CCC" }} />
                 </div>
@@ -153,7 +153,7 @@ export function SceneListPanel({
           {canAddEpisode && (
             <button
               onClick={onAddEpisode}
-              className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors"
+              className="w-full h-7 flex items-center justify-center rounded transition-colors"
               style={{ color: "#AAA" }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

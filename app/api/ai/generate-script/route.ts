@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { aiComplete, buildScriptSystemPrompt, extractJSON } from "@/lib/ai"
 import { getAvailableBalance, confirmDeduction } from "@/lib/tokens"
+import { generateAndSaveSceneImages } from "@/lib/scene-image-gen"
 
 /**
  * AI script generation pricing:
@@ -26,7 +27,7 @@ async function generateEpisode(
   userId: string,
   script: { title: string; genre: string; format: string; logline: string | null; synopsis: string | null; targetEpisodes: number; language: string },
   targetEpisode: number,
-): Promise<{ rolesCreated: number; scenesCreated: number; coinsUsed: number; model: string }> {
+): Promise<{ rolesCreated: number; scenesCreated: number; coinsUsed: number; model: string; createdScenes: Array<{ id: string; heading: string | null; location: string | null; timeOfDay: string | null; mood: string | null; action: string | null }> }> {
   const systemPrompt = buildScriptSystemPrompt(script.language)
   const genreMap: Record<string, string> = {
     drama: "都市情感", comedy: "喜剧", romance: "甜宠",
@@ -73,28 +74,35 @@ Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also 
   const roles = parsed.roles || []
   const scenes = parsed.scenes || []
 
-  await Promise.all([
-    ...(targetEpisode === 1
-      ? roles.map((role) =>
-          prisma.scriptRole.create({
-            data: {
-              scriptId,
-              name: role.name || "未命名",
-              role: role.role || "supporting",
-              description: role.description || "",
-              voiceType: role.voiceType || null,
-            },
-          })
-        )
-      : []
-    ),
-    ...scenes.map((scene, i) =>
+  // Save roles (episode 1 only)
+  if (targetEpisode === 1 && roles.length > 0) {
+    await Promise.all(
+      roles.map((role) =>
+        prisma.scriptRole.create({
+          data: {
+            scriptId,
+            name: role.name || "未命名",
+            role: role.role || "supporting",
+            description: role.description || "",
+            voiceType: role.voiceType || null,
+          },
+        })
+      )
+    )
+  }
+
+  // Save scenes and capture created records for background image generation
+  const createdScenes = await Promise.all(
+    scenes.map((scene, i) =>
       prisma.scriptScene.create({
         data: {
           scriptId,
           episodeNum: targetEpisode,
           sceneNum: (scene.sceneNum as number) || i + 1,
           heading: (scene.heading as string) || "",
+          location: (scene.location as string) || "",
+          timeOfDay: (scene.timeOfDay as string) || "",
+          mood: (scene.mood as string) || "",
           action: (scene.action as string) || "",
           dialogue: typeof scene.dialogue === "string"
             ? scene.dialogue
@@ -103,9 +111,10 @@ Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also 
           duration: (scene.duration as number) || 60,
           sortOrder: i,
         },
+        select: { id: true, heading: true, location: true, timeOfDay: true, mood: true, action: true },
       })
-    ),
-  ])
+    )
+  )
 
   const coinsUsed = calcScriptCostCoins(result.usage.totalTokens)
   await confirmDeduction(userId, coinsUsed, {
@@ -117,7 +126,7 @@ Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also 
     console.error("[GenerateScript] coin deduction failed:", err)
   })
 
-  return { rolesCreated: roles.length, scenesCreated: scenes.length, coinsUsed, model: result.model }
+  return { rolesCreated: roles.length, scenesCreated: scenes.length, coinsUsed, model: result.model, createdScenes }
 }
 
 export async function POST(req: NextRequest) {
@@ -211,6 +220,11 @@ export async function POST(req: NextRequest) {
         totalCoins += res.coinsUsed
         lastModel = res.model
         lastEpisode = ep
+
+        // Fire background panoramic reference image generation (non-blocking)
+        generateAndSaveSceneImages(res.createdScenes, session.user.id).catch(err =>
+          console.error("[SceneImageGen] background generation failed for ep", ep, err)
+        )
 
         // Update job progress
         const progress = Math.round(((ep - startEpisode + 1) / (endEpisode - startEpisode + 1)) * 100)
