@@ -27,15 +27,16 @@ interface DevDashboardClientProps {
 }
 
 const GENRE_OPTIONS = [
-  { value: "drama", label: "都市情感 Drama" },
-  { value: "romance", label: "爱情 Romance" },
-  { value: "thriller", label: "悬疑惊悚 Thriller" },
-  { value: "comedy", label: "喜剧 Comedy" },
-  { value: "fantasy", label: "奇幻 Fantasy" },
-  { value: "scifi", label: "科幻 Sci-Fi" },
-  { value: "action", label: "动作 Action" },
-  { value: "horror", label: "恐怖 Horror" },
-  { value: "historical", label: "古装历史 Historical" },
+  { value: "romance", label: "Romance 言情" },
+  { value: "ceo", label: "CEO / Billionaire 霸总" },
+  { value: "revenge", label: "Revenge 复仇" },
+  { value: "urban", label: "Urban 都市" },
+  { value: "fantasy", label: "Fantasy / Werewolf 奇幻/狼人" },
+  { value: "family", label: "Family 家庭伦理" },
+  { value: "comedy", label: "Comedy 喜剧" },
+  { value: "suspense", label: "Suspense / Thriller 悬疑" },
+  { value: "historical", label: "Historical 古装" },
+  { value: "action", label: "Action 动作" },
 ]
 
 const FORMAT_OPTIONS = [
@@ -43,7 +44,6 @@ const FORMAT_OPTIONS = [
   { value: "movie", label: "电影 Movie" },
   { value: "animation", label: "动画 Animation" },
   { value: "documentary", label: "纪录片 Documentary" },
-  { value: "stageplay", label: "舞台剧 Stage Play" },
 ]
 
 const LANGUAGE_OPTIONS = [

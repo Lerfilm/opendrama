@@ -69,7 +69,7 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
   const totalDone = script.videoSegments.length
   const readyEpisodes = episodes.filter(ep => (epMap.get(ep)?.length ?? 0) > 0)
 
-  const [tags, setTags] = useState<string[]>(["drama", script.genre].filter(Boolean))
+  const [tags, setTags] = useState<string[]>([script.genre].filter(Boolean))
   const [tagInput, setTagInput] = useState("")
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishResult, setPublishResult] = useState<{ ok: boolean; message: string } | null>(null)
@@ -225,7 +225,9 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
           {/* Tags */}
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#AAA" }}>Tags</p>
-            <div className="flex flex-wrap gap-1 mb-2">
+
+            {/* Selected tags */}
+            <div className="flex flex-wrap gap-1 mb-3">
               {tags.map(tag => (
                 <span key={tag} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
                   {tag}
@@ -237,14 +239,47 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
                   </button>
                 </span>
               ))}
+              {tags.length === 0 && <span className="text-[10px]" style={{ color: "#CCC" }}>No tags selected</span>}
             </div>
-            <div className="flex gap-1">
+
+            {/* Preset tag palette */}
+            {([
+              { group: "受众 Audience", tags: ["Female 女频", "Male 男频"] },
+              { group: "情感 Romance", tags: ["Enemies to Lovers", "Love at First Sight", "Fated Lovers", "Forbidden", "Toxic Love", "Love-Hate", "Sweet Romance", "Second Chance", "Reunion", "Love After Divorce", "Campus Romance"] },
+              { group: "人设 Character", tags: ["Strong Heroine 大女主", "Hidden Identity 隐藏身份", "Playing Dumb 扮猪吃虎"] },
+              { group: "剧情 Plot", tags: ["Pregnancy 怀孕", "All-Too-Late 追悔莫及", "Tear-Jerker 催泪", "Feel-Good 轻松愉快"] },
+              { group: "年龄 Age", tags: ["Young Adult 青春向"] },
+            ] as const).map(({ group, tags: presets }) => (
+              <div key={group} className="mb-2">
+                <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#BBB" }}>{group}</p>
+                <div className="flex flex-wrap gap-1">
+                  {presets.map(preset => {
+                    const active = tags.includes(preset)
+                    return (
+                      <button
+                        key={preset}
+                        onClick={() => setTags(prev => active ? prev.filter(t => t !== preset) : [...prev, preset])}
+                        className="text-[10px] px-2 py-0.5 rounded-full transition-colors"
+                        style={active
+                          ? { background: "#4F46E5", color: "#fff" }
+                          : { background: "#EBEBEB", color: "#666" }}
+                      >
+                        {preset}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {/* Free-form custom tag */}
+            <div className="flex gap-1 mt-2">
               <input
                 type="text"
                 value={tagInput}
                 onChange={e => setTagInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && addTag()}
-                placeholder="Add tag..."
+                placeholder="Custom tag..."
                 className="flex-1 h-7 px-2 text-[11px] rounded focus:outline-none"
                 style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }}
               />
