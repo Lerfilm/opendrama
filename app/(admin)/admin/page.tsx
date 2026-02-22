@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Film, Users, Coins, Sparkles } from "@/components/icons"
 import { t } from "@/lib/i18n"
+import Link from "next/link"
 
 export default async function AdminDashboardPage() {
   const stats = await Promise.all([
@@ -10,6 +11,7 @@ export default async function AdminDashboardPage() {
     prisma.episode.count(),
     prisma.user.count(),
     prisma.purchase.aggregate({
+      where: { status: "completed" },
       _sum: { amount: true },
     }),
     prisma.card.count(),
@@ -45,6 +47,13 @@ export default async function AdminDashboardPage() {
     },
   ]
 
+  const quickActions = [
+    { href: "/admin/series/new", label: "Create New Series", desc: "Add a new drama series with episodes", icon: "🎬" },
+    { href: "/admin/cards/new", label: "Create New Card", desc: "Add a collectible card to the pool", icon: "🃏" },
+    { href: "/admin/analytics", label: "View Analytics", desc: "User growth, revenue trends, funnel", icon: "📊" },
+    { href: "/admin/series", label: "Manage Series", desc: "Publish, unpublish, or delete series", icon: "📺" },
+  ]
+
   return (
     <div className="space-y-6">
       <div>
@@ -56,16 +65,12 @@ export default async function AdminDashboardPage() {
         {statCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
               <stat.icon className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">
-                {stat.description}
-              </p>
+              <p className="text-xs text-muted-foreground">{stat.description}</p>
             </CardContent>
           </Card>
         ))}
@@ -75,16 +80,18 @@ export default async function AdminDashboardPage() {
         <CardHeader>
           <CardTitle>{t("admin.quickActions")}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            • {t("admin.quickAction1")}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            • {t("admin.quickAction2")}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            • {t("admin.quickAction3")}
-          </p>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {quickActions.map((action) => (
+              <Link key={action.href} href={action.href}>
+                <div className="p-4 rounded-lg border hover:bg-accent hover:border-primary transition-colors cursor-pointer h-full">
+                  <div className="text-2xl mb-2">{action.icon}</div>
+                  <p className="text-sm font-medium mb-1">{action.label}</p>
+                  <p className="text-xs text-muted-foreground">{action.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>

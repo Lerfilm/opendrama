@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import Link from "next/link"
+import { MODEL_PRICING } from "@/lib/model-pricing"
 
 interface VideoSegment {
   id: string
@@ -96,6 +97,13 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const failed = epSegments.filter(s => s.status === "failed").length
   const active = epSegments.filter(s => ["submitted", "generating", "reserved"].includes(s.status)).length
   const totalDuration = epSegments.reduce((sum, s) => sum + s.durationSec, 0)
+
+  // Cost estimate: sum duration of ungenerated segments × price per second for selected model/resolution
+  const ungeneratedSegments = epSegments.filter(s => !["done", "submitted", "generating", "reserved"].includes(s.status))
+  const estimatedCost = ungeneratedSegments.reduce((sum, s) => {
+    const pricePerSec = MODEL_PRICING[model]?.[resolution] ?? 0
+    return sum + Math.ceil(s.durationSec * pricePerSec / 100)
+  }, 0)
 
   // Poll for status updates
   const pollStatus = useCallback(async () => {
@@ -996,6 +1004,11 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
             )}
             {isStitching ? "Stitching..." : "Stitch"}
           </button>
+          {estimatedCost > 0 && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#FEF3C7", color: "#92400E" }}>
+              ~{estimatedCost} coins
+            </span>
+          )}
           <button
             onClick={handleGenerate}
             disabled={isSubmitting || epSegments.length === 0}

@@ -74,6 +74,22 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishResult, setPublishResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [publishedSeries, setPublishedSeries] = useState<Series | null>(series)
+  const [editTitle, setEditTitle] = useState(script.title)
+  const [editLogline, setEditLogline] = useState(script.logline || "")
+  const [isSavingMeta, setIsSavingMeta] = useState(false)
+
+  async function saveScriptMeta() {
+    setIsSavingMeta(true)
+    try {
+      await fetch(`/api/scripts/${script.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle, logline: editLogline }),
+      })
+    } finally {
+      setIsSavingMeta(false)
+    }
+  }
 
   function addTag() {
     const t = tagInput.trim().toLowerCase()
@@ -86,14 +102,14 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
       setPublishResult({ ok: false, message: "No completed video segments found. Generate videos first." })
       return
     }
-    if (!confirm(`Publish "${script.title}" with ${readyEpisodes.length} episode(s)? This will create/update the Series on the platform.`)) return
+    if (!confirm(`Publish "${editTitle}" with ${readyEpisodes.length} episode(s)? This will create/update the Series on the platform.`)) return
     setIsPublishing(true)
     setPublishResult(null)
     try {
       const res = await fetch(`/api/scripts/${script.id}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tags }),
+        body: JSON.stringify({ tags, title: editTitle, logline: editLogline }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -172,6 +188,37 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Editable Metadata */}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#AAA" }}>Metadata</p>
+            <div className="space-y-2">
+              <div>
+                <label className="text-[9px] uppercase tracking-wider mb-0.5 block" style={{ color: "#BBB" }}>Title</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  onBlur={saveScriptMeta}
+                  className="w-full h-7 px-2 text-[11px] rounded focus:outline-none"
+                  style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }}
+                />
+              </div>
+              <div>
+                <label className="text-[9px] uppercase tracking-wider mb-0.5 block" style={{ color: "#BBB" }}>Logline</label>
+                <textarea
+                  value={editLogline}
+                  onChange={e => setEditLogline(e.target.value)}
+                  onBlur={saveScriptMeta}
+                  rows={2}
+                  placeholder="One-line description..."
+                  className="w-full px-2 py-1 text-[11px] rounded focus:outline-none resize-none"
+                  style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }}
+                />
+              </div>
+              {isSavingMeta && <p className="text-[9px]" style={{ color: "#AAA" }}>Saving...</p>}
             </div>
           </div>
 

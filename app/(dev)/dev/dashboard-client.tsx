@@ -316,17 +316,32 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
             </p>
           </div>
           {tab === "projects" && (
-            <button
-              onClick={() => setShowModal(true)}
-              className="flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded transition-colors"
-              style={{ background: "#4F46E5", color: "#fff" }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              New Project
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/studio/script/new"
+                className="flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded transition-colors"
+                style={{ background: "#E0E7FF", color: "#4F46E5", border: "1px solid #C7D2FE" }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="12" y1="18" x2="12" y2="12" />
+                  <line x1="9" y1="15" x2="15" y2="15" />
+                </svg>
+                New Script
+              </Link>
+              <button
+                onClick={() => setShowModal(true)}
+                className="flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded transition-colors"
+                style={{ background: "#4F46E5", color: "#fff" }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                New Project
+              </button>
+            </div>
           )}
         </div>
 

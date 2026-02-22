@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma"
 import { t } from "@/lib/i18n"
+import { AnalyticsDaySelector } from "./day-selector"
 
 async function getOverview() {
   const today = new Date()
@@ -27,15 +28,15 @@ async function getOverview() {
   }
 }
 
-async function getUserTrend() {
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  thirtyDaysAgo.setHours(0, 0, 0, 0)
+async function getUserTrend(days: number) {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+  cutoff.setHours(0, 0, 0, 0)
 
   const rows = (await prisma.$queryRaw`
     SELECT DATE("createdAt") as date, COUNT(*)::bigint as count
     FROM users
-    WHERE "createdAt" >= ${thirtyDaysAgo}
+    WHERE "createdAt" >= ${cutoff}
     GROUP BY DATE("createdAt")
     ORDER BY date ASC
   `) as { date: string; count: bigint }[]
@@ -59,15 +60,15 @@ async function getTopSeries() {
   }))
 }
 
-async function getRevenueTrend() {
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  thirtyDaysAgo.setHours(0, 0, 0, 0)
+async function getRevenueTrend(days: number) {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+  cutoff.setHours(0, 0, 0, 0)
 
   const rows = (await prisma.$queryRaw`
     SELECT DATE("createdAt") as date, SUM(amount)::bigint as total
     FROM purchases
-    WHERE status = 'completed' AND "createdAt" >= ${thirtyDaysAgo}
+    WHERE status = 'completed' AND "createdAt" >= ${cutoff}
     GROUP BY DATE("createdAt")
     ORDER BY date ASC
   `) as { date: string; total: bigint }[]
@@ -110,13 +111,19 @@ function formatCents(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
 }
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: { days?: string }
+}) {
+  const days = Math.max(1, parseInt(searchParams.days || "30", 10) || 30)
+
   const [overview, userTrend, topSeries, revenueTrend, funnel] =
     await Promise.all([
       getOverview(),
-      getUserTrend(),
+      getUserTrend(days),
       getTopSeries(),
-      getRevenueTrend(),
+      getRevenueTrend(days),
       getFunnel(),
     ])
 
@@ -126,7 +133,11 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">{t("analytics.title")}</h1>
+      {/* Page header with day selector */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">{t("analytics.title")}</h1>
+        <AnalyticsDaySelector days={days} />
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -146,7 +157,7 @@ export default async function AnalyticsPage() {
 
       {/* User Growth Chart */}
       <div className="bg-background rounded-lg border p-6">
-        <h2 className="text-lg font-semibold mb-4">{t("analytics.userGrowth")}</h2>
+        <h2 className="text-lg font-semibold mb-4">{t("analytics.userGrowth")} <span className="text-sm font-normal text-muted-foreground">({days}d)</span></h2>
         {userTrend.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("common.noData")}</p>
         ) : (
@@ -207,7 +218,7 @@ export default async function AnalyticsPage() {
 
         {/* Revenue Trend */}
         <div className="bg-background rounded-lg border p-6">
-          <h2 className="text-lg font-semibold mb-4">{t("analytics.revenueTrend")}</h2>
+          <h2 className="text-lg font-semibold mb-4">{t("analytics.revenueTrend")} <span className="text-sm font-normal text-muted-foreground">({days}d)</span></h2>
           {revenueTrend.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t("common.noData")}</p>
           ) : (

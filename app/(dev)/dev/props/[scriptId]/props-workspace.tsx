@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useMemo } from "react"
+import { useState, useRef, useMemo, useEffect } from "react"
 
 interface SceneRef {
   id: string
@@ -70,6 +70,39 @@ export function PropsWorkspace({ script }: { script: Script }) {
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pendingPropIdRef = useRef<string | null>(null)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isLoadedRef = useRef(false)
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+
+  // Load props from API on mount
+  useEffect(() => {
+    fetch(`/api/scripts/${script.id}/props`)
+      .then(r => r.json())
+      .then(d => {
+        setProps(d.props || [])
+        isLoadedRef.current = true
+      })
+      .catch(() => { isLoadedRef.current = true })
+  }, [script.id])
+
+  // Auto-save props when they change
+  useEffect(() => {
+    if (!isLoadedRef.current) return
+    if (props.length === 0) return
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    setSaveStatus("saving")
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await fetch(`/api/scripts/${script.id}/props`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ props }),
+        })
+        setSaveStatus("saved")
+        setTimeout(() => setSaveStatus("idle"), 2000)
+      } catch { setSaveStatus("idle") }
+    }, 800)
+  }, [props])
 
   const selectedProp = props.find(p => p.id === selectedPropId) ?? null
 
@@ -181,8 +214,10 @@ export function PropsWorkspace({ script }: { script: Script }) {
       <div className="w-64 flex flex-col flex-shrink-0" style={{ background: "#EBEBEB", borderRight: "1px solid #C0C0C0" }}>
         {/* Header */}
         <div className="px-3 py-2.5 flex items-center justify-between" style={{ borderBottom: "1px solid #C8C8C8" }}>
-          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>
+          <span className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "#888" }}>
             Props · {props.length}
+            {saveStatus === "saving" && <span style={{color:"#AAA",fontSize:9}}>Saving...</span>}
+            {saveStatus === "saved" && <span style={{color:"#10B981",fontSize:9}}>Saved</span>}
           </span>
           <div className="flex items-center gap-1.5">
             <button

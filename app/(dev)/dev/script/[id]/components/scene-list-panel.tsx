@@ -68,6 +68,7 @@ export function SceneListPanel({
 }: SceneListPanelProps) {
   const [filterLocation, setFilterLocation] = useState("")
   const [filterMood, setFilterMood] = useState("")
+  const [searchText, setSearchText] = useState("")
 
   // Get unique locations and moods for filters
   const locations = useMemo(() => {
@@ -84,12 +85,14 @@ export function SceneListPanel({
 
   // Filter scenes
   const filteredScenes = useMemo(() => {
+    const query = searchText.trim().toLowerCase()
     return scenes.filter(s => {
       if (filterLocation && s.location !== filterLocation) return false
       if (filterMood && s.mood !== filterMood) return false
+      if (query && !(s.heading || "").toLowerCase().includes(query)) return false
       return true
     })
-  }, [scenes, filterLocation, filterMood])
+  }, [scenes, filterLocation, filterMood, searchText])
 
   // Episode total character count
   const episodeTotalChars = useMemo(() => countSceneChars({ id: "", episodeNum: 0, sceneNum: 0,
@@ -163,6 +166,16 @@ export function SceneListPanel({
       </div>
 
       {/* Filters */}
+      <div className="flex-shrink-0 px-3 pt-1.5 pb-0">
+        <input
+          type="text"
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          placeholder="Search scenes..."
+          className="w-full text-[10px] rounded px-2 py-1 focus:outline-none focus:ring-1"
+          style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#555" }}
+        />
+      </div>
       {(locations.length > 0 || moods.length > 0) && (
         <div className="flex-shrink-0 px-3 py-1.5 flex gap-1.5" style={{ borderBottom: "1px solid #D0D0D0" }}>
           {locations.length > 0 && (
