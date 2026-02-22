@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
-import { queryVideoTask } from "@/lib/video-generation"
+import { queryVideoTask, enrichSegmentWithCharacters, submitVideoTask } from "@/lib/video-generation"
 import { confirmDeduction, refundReservation } from "@/lib/tokens"
 
 // Segments stuck in generating/submitted for longer than this are auto-failed
@@ -19,6 +19,7 @@ async function syncActiveSegments(
     providerTaskId: string | null
     tokenCost: number | null
     scriptId: string
+    episodeNum: number
     createdAt: Date
   }>
 ) {
@@ -60,6 +61,8 @@ async function syncActiveSegments(
         ).catch(() => {})
       }
       Object.assign(seg, { status: "failed", errorMessage: "Generation timed out (>30min)" })
+      // Also kick next reserved segment after timeout-fail
+      if (count > 0) kickNextReservedSegment(seg.scriptId, seg.episodeNum, userId).catch(() => {})
       continue
     }
 
@@ -99,10 +102,59 @@ async function syncActiveSegments(
 
         // Update in-memory object for response
         Object.assign(seg, updateData)
+
+        // Sequential mode: when a segment finishes (done or failed),
+        // kick off the next reserved segment in the same script episode.
+        if (count > 0 && (result.status === "done" || result.status === "failed")) {
+          kickNextReservedSegment(seg.scriptId, seg.episodeNum, userId).catch(() => {})
+        }
       }
     } catch (err) {
       console.error(`[VideoStatus] Failed to query provider for ${seg.id}:`, err)
     }
+  }
+}
+
+/**
+ * Find the next reserved (not yet submitted) segment in the same episode
+ * and submit it to the video generation provider.
+ */
+async function kickNextReservedSegment(scriptId: string, episodeNum: number, userId: string | null) {
+  // Find the first reserved segment (ordered by segmentIndex)
+  const next = await prisma.videoSegment.findFirst({
+    where: { scriptId, episodeNum, status: "reserved" },
+    orderBy: { segmentIndex: "asc" },
+  })
+  if (!next || !next.model || !next.resolution) return
+
+  console.log(`[VideoStatus] Sequential: kicking next segment ${next.id} (index ${next.segmentIndex})`)
+
+  try {
+    const { prompt, imageUrls } = await enrichSegmentWithCharacters(next.id)
+
+    const { taskId } = await submitVideoTask({
+      model: next.model,
+      resolution: next.resolution,
+      prompt,
+      imageUrls,
+      referenceVideo: next.referenceVideo || undefined,
+      durationSec: next.durationSec,
+    })
+
+    await prisma.videoSegment.update({
+      where: { id: next.id },
+      data: { status: "submitted", providerTaskId: taskId },
+    })
+    console.log(`[VideoStatus] Sequential: segment ${next.id} submitted as task ${taskId}`)
+  } catch (err) {
+    console.error(`[VideoStatus] Sequential: segment ${next.id} failed to submit:`, err)
+    if (next.tokenCost && userId) {
+      await refundReservation(userId, next.tokenCost, `Refund: sequential segment ${next.id} failed`).catch(() => {})
+    }
+    await prisma.videoSegment.update({
+      where: { id: next.id },
+      data: { status: "failed", errorMessage: String(err) },
+    }).catch(() => {})
   }
 }
 

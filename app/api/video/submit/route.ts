@@ -85,11 +85,11 @@ export async function POST(req: NextRequest) {
       data: { status: "producing" },
     })
 
-    // Submit each segment to video generation (fire-and-forget)
-    // Errors per segment are caught individually
-    for (const segment of createdSegments) {
-      submitSegmentToProvider(segment.id, session.user.id).catch(err => {
-        console.error(`Segment ${segment.id} submission failed:`, err)
+    // Sequential mode: submit only the first segment now.
+    // status/route.ts will submit the next reserved segment after each one completes.
+    if (createdSegments.length > 0) {
+      submitSegmentToProvider(createdSegments[0].id, session.user.id).catch(err => {
+        console.error(`Segment ${createdSegments[0].id} submission failed:`, err)
       })
     }
 
