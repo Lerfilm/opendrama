@@ -81,6 +81,7 @@ export function GenerateWorkbench({
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set())
   const [previewVideo, setPreviewVideo] = useState<{ url: string; title: string } | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [publishProgress, setPublishProgress] = useState<string>("")
   const [resettingSegment, setResettingSegment] = useState<string | null>(null)
   const [isResettingAll, setIsResettingAll] = useState(false)
   const [showResetAllConfirm, setShowResetAllConfirm] = useState(false)
@@ -327,30 +328,86 @@ export function GenerateWorkbench({
     }
   }
 
-  // Publish script → upload segments to Mux → Series page
+  // Publish script → client downloads TOS segments → uploads to Mux → Series page
   async function handlePublish() {
     setIsPublishing(true)
+    setPublishProgress(t("generate.publishPreparing"))
     try {
+      // Phase 1: server creates Mux upload URLs + Series/Episode records
       const res = await fetch(`/api/scripts/${script.id}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       })
-      const data = await res.json()
-      if (res.ok) {
-        const uploaded = data.episodesUploaded ?? 0
-        const failed = data.episodesFailed ?? 0
-        if (failed > 0) {
-          alert(t("generate.publishPartialFail", { failed, uploaded }))
-        }
-        router.push(`/series/${data.seriesId}`)
-      } else {
-        alert(data.error || "Publish failed")
+      const data = await res.json() as {
+        seriesId: string
+        episodes: Array<{
+          episodeNum: number
+          uploadUrl?: string
+          muxUploadId?: string
+          segmentUrls?: string[]
+          muxPlaybackId?: string
+          skipped?: boolean
+        }>
+        error?: string
       }
-    } catch {
+      if (!res.ok) { alert(data.error || "Publish failed"); return }
+
+      const { seriesId, episodes } = data
+      const toUpload = episodes.filter(e => !e.skipped && e.uploadUrl && e.segmentUrls)
+      let uploaded = 0, failed = 0
+
+      // Phase 2: for each episode, browser downloads segments + PUTs to Mux
+      for (const ep of toUpload) {
+        setPublishProgress(t("generate.publishUploading", { ep: ep.episodeNum, total: toUpload.length }))
+        try {
+          // Download all segment videos as ArrayBuffers
+          const buffers: ArrayBuffer[] = []
+          for (let i = 0; i < ep.segmentUrls!.length; i++) {
+            setPublishProgress(t("generate.publishDownloading", {
+              ep: ep.episodeNum, seg: i + 1, total: ep.segmentUrls!.length
+            }))
+            const segRes = await fetch(ep.segmentUrls![i])
+            if (!segRes.ok) throw new Error(`Segment ${i + 1} download failed: ${segRes.status}`)
+            buffers.push(await segRes.arrayBuffer())
+          }
+
+          // Concatenate all buffers into one Blob (works for same-codec MP4s)
+          const blob = new Blob(buffers, { type: "video/mp4" })
+
+          // PUT to Mux direct upload URL
+          setPublishProgress(t("generate.publishUploading", { ep: ep.episodeNum, total: toUpload.length }))
+          const putRes = await fetch(ep.uploadUrl!, {
+            method: "PUT",
+            body: blob,
+            headers: { "Content-Type": "video/mp4" },
+          })
+          if (!putRes.ok) throw new Error(`Mux PUT failed: ${putRes.status}`)
+
+          // Phase 3: tell server the upload is done, poll for assetId
+          setPublishProgress(t("generate.publishFinalizing", { ep: ep.episodeNum }))
+          await fetch(`/api/scripts/${script.id}/publish/complete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ episodeNum: ep.episodeNum, muxUploadId: ep.muxUploadId, seriesId }),
+          })
+          uploaded++
+        } catch (err) {
+          console.error(`Publish ep${ep.episodeNum} failed:`, err)
+          failed++
+        }
+      }
+
+      if (failed > 0) {
+        alert(t("generate.publishPartialFail", { failed, uploaded }))
+      }
+      router.push(`/series/${seriesId}`)
+    } catch (err) {
+      console.error("Publish error:", err)
       alert("Publish failed")
     } finally {
       setIsPublishing(false)
+      setPublishProgress("")
     }
   }
 
@@ -746,7 +803,7 @@ export function GenerateWorkbench({
                       ? <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                       : <Upload className="w-3 h-3 mr-1" />
                     }
-                    {isPublishing ? t("generate.uploadingToMux") : t("generate.mergePublish")}
+                    {isPublishing ? (publishProgress || t("generate.uploadingToMux")) : t("generate.mergePublish")}
                   </Button>
                 </div>
               </CardContent>

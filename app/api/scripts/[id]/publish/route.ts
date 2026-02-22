@@ -5,35 +5,15 @@ import prisma from "@/lib/prisma"
 import { video } from "@/lib/mux"
 
 /**
- * Upload one episode to Mux. Multiple input URLs are auto-concatenated.
- */
-async function uploadEpisodeToMux(
-  episodeNum: number,
-  seriesTitle: string,
-  synopsis: string,
-  videoUrls: string[]
-): Promise<{ muxAssetId: string; muxPlaybackId: string }> {
-  if (videoUrls.length === 0) throw new Error("No video URLs to upload")
-
-  const asset = await video.assets.create({
-    // Each input must have explicit type:"video" — otherwise Mux treats
-    // inputs beyond the first as overlay/audio tracks and rejects them.
-    inputs: videoUrls.map(url => ({ url, type: "video" as const })),
-    playback_policy: ["public"],
-    encoding_tier: "baseline",
-    passthrough: JSON.stringify({ episodeNum, seriesTitle, synopsis: synopsis.slice(0, 200) }),
-  })
-
-  const playbackId = asset.playback_ids?.[0]?.id
-  if (!playbackId) throw new Error("Mux asset created but no playback_id returned")
-
-  return { muxAssetId: asset.id, muxPlaybackId: playbackId }
-}
-
-/**
- * Publish a script → Series + Episodes with Mux video.
- * For each episode: fetch done VideoSegments → upload to Mux (auto-concat) → store muxPlaybackId.
- * Re-publish is supported: episodes with muxPlaybackId are skipped; new ones are added.
+ * POST /api/scripts/[id]/publish
+ * Phase 1: Create Mux direct-upload URLs for each episode.
+ * Returns { seriesId, episodes: [{ episodeNum, uploadUrl, segmentUrls }] }
+ * The CLIENT then downloads segment videos (TOS URLs — only accessible from CN IPs)
+ * and PUTs the merged video to the Mux uploadUrl.
+ *
+ * Phase 2 (completion): POST /api/scripts/[id]/publish/complete
+ * Client calls this after each upload finishes, passing muxUploadId.
+ * Server polls Mux for the asset/playbackId and stores it.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -51,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = await req.json().catch(() => ({}))
     const { tags } = body as { tags?: string[] }
 
-    // All done segments for this script
+    // All done segments
     const allSegments = await prisma.videoSegment.findMany({
       where: { scriptId: id, status: "done", videoUrl: { not: null } },
       orderBy: [{ episodeNum: "asc" }, { segmentIndex: "asc" }],
@@ -60,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "No completed video segments found. Generate videos first." }, { status: 400 })
     }
 
-    // Group segments and scenes by episode
+    // Group by episode
     const segmentsByEpisode = new Map<number, typeof allSegments>()
     for (const seg of allSegments) {
       if (!segmentsByEpisode.has(seg.episodeNum)) segmentsByEpisode.set(seg.episodeNum, [])
@@ -75,15 +55,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Create or reuse Series
     let seriesId = ""
-    let isNewPublish = !script.published
+    const isNewPublish = !script.published
 
     if (!isNewPublish) {
       const existingSeries = await prisma.series.findFirst({ where: { scriptId: id } })
-      if (existingSeries) {
-        seriesId = existingSeries.id
-      } else {
-        isNewPublish = true
-      }
+      if (existingSeries) seriesId = existingSeries.id
     }
 
     if (!seriesId) {
@@ -105,61 +81,71 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       seriesId = series.id
     }
 
-    // Upload each episode to Mux
+    // For each episode: if already has muxPlaybackId → skip; otherwise create Mux direct upload URL
     const synopsis = script.logline || script.synopsis || ""
-    const uploadResults: { episodeNum: number; muxPlaybackId?: string; skipped?: boolean; error?: string }[] = []
+    const episodeResults: {
+      episodeNum: number
+      uploadUrl?: string
+      muxUploadId?: string
+      segmentUrls?: string[]
+      muxPlaybackId?: string
+      skipped?: boolean
+      totalDuration?: number
+      title?: string
+    }[] = []
 
     for (const episodeNum of episodeNums) {
-      const scenes = episodeMap.get(episodeNum) || []
       const segments = segmentsByEpisode.get(episodeNum)!
+      const scenes = episodeMap.get(episodeNum) || []
       const firstScene = scenes[0]
       const totalDuration = segments.reduce((acc, s) => acc + s.durationSec, 0)
       const title = firstScene?.heading || "Episode " + episodeNum
-      const description = scenes.length > 0
-        ? scenes.map(s => s.action).filter(Boolean).join(" ").slice(0, 300)
-        : "Episode " + episodeNum
 
       const existingEp = await prisma.episode.findUnique({
         where: { seriesId_episodeNum: { seriesId, episodeNum } },
       })
+
       if (existingEp?.muxPlaybackId) {
-        uploadResults.push({ episodeNum, muxPlaybackId: existingEp.muxPlaybackId, skipped: true })
+        episodeResults.push({ episodeNum, muxPlaybackId: existingEp.muxPlaybackId, skipped: true })
         continue
       }
 
-      let muxAssetId: string | null = null
-      let muxPlaybackId: string | null = null
-      let uploadError: string | undefined
+      // Create Mux direct upload URL — client will PUT the video here
+      const upload = await video.uploads.create({
+        cors_origin: "*",
+        new_asset_settings: {
+          playback_policy: ["public"],
+          encoding_tier: "baseline",
+          passthrough: JSON.stringify({ episodeNum, seriesTitle: script.title, synopsis: synopsis.slice(0, 200) }),
+        },
+      })
 
-      try {
-        const result = await uploadEpisodeToMux(episodeNum, script.title, synopsis, segments.map(s => s.videoUrl!))
-        muxAssetId = result.muxAssetId
-        muxPlaybackId = result.muxPlaybackId
-        console.log("[Publish] Ep" + episodeNum + ": asset=" + muxAssetId + " playback=" + muxPlaybackId)
-      } catch (err) {
-        uploadError = err instanceof Error ? err.message : String(err)
-        console.error("[Publish] Ep" + episodeNum + " Mux upload failed:", err)
-      }
+      const description = scenes.map(s => s.action).filter(Boolean).join(" ").slice(0, 300) || "Episode " + episodeNum
 
-      const epData = {
-        title, description, duration: totalDuration,
-        ...(muxAssetId ? { muxAssetId } : {}),
-        ...(muxPlaybackId ? { muxPlaybackId } : {}),
-      }
-
+      // Create/update Episode record (without muxPlaybackId yet — will be set after upload)
       if (existingEp) {
-        await prisma.episode.update({ where: { id: existingEp.id }, data: epData })
+        await prisma.episode.update({
+          where: { id: existingEp.id },
+          data: { title, description, duration: totalDuration, muxAssetId: null, muxPlaybackId: null },
+        })
       } else {
         await prisma.episode.create({
           data: {
             seriesId, episodeNum, status: "active",
             unlockCost: episodeNum <= 3 ? 0 : 10,
-            ...epData,
+            title, description, duration: totalDuration,
           },
         })
       }
 
-      uploadResults.push({ episodeNum, muxPlaybackId: muxPlaybackId ?? undefined, error: uploadError })
+      episodeResults.push({
+        episodeNum,
+        uploadUrl: upload.url,
+        muxUploadId: upload.id,
+        segmentUrls: segments.map(s => s.videoUrl!),
+        totalDuration,
+        title,
+      })
     }
 
     // Create PublishedScript + achievement card (first publish only)
@@ -199,11 +185,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     return NextResponse.json({
-      publishedId, seriesId,
-      episodesUploaded: uploadResults.filter(r => r.muxPlaybackId && !r.skipped).length,
-      episodesSkipped: uploadResults.filter(r => r.skipped).length,
-      episodesFailed: uploadResults.filter(r => !r.muxPlaybackId && !r.skipped).length,
-      episodes: uploadResults,
+      publishedId,
+      seriesId,
+      episodesSkipped: episodeResults.filter(r => r.skipped).length,
+      episodesToUpload: episodeResults.filter(r => !r.skipped).length,
+      episodes: episodeResults,
     })
   } catch (error) {
     console.error("Publish script error:", error)
