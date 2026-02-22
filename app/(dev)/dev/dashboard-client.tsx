@@ -978,6 +978,10 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
           </div>
         </div>
       )}
+      {/* Build version — bottom-right fixed */}
+      <div style={{ position: "fixed", bottom: 8, right: 12, fontSize: 9, color: "#C0C0C0", pointerEvents: "none", zIndex: 9, fontFamily: "monospace", letterSpacing: "0.02em" }}>
+        {process.env.NEXT_PUBLIC_BUILD_VERSION || ""}
+      </div>
     </div>
   )
 }

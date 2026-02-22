@@ -126,15 +126,6 @@ export function TopBar({ user, balance, className }: TopBarProps) {
             </>
           )}
 
-          {/* Build version */}
-          <span
-            className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-            style={{ background: "rgba(99,102,241,0.18)", color: "#818CF8", letterSpacing: "0.02em" }}
-            title={`Build: ${buildVersion}`}
-          >
-            {buildVersion}
-          </span>
-
           <div className="w-px h-4" style={{ background: "#333" }} />
 
           {/* Status */}
