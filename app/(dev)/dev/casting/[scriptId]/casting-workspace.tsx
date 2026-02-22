@@ -20,6 +20,7 @@ interface Role {
   // Extended fields stored in metadata JSON
   age?: string
   gender?: string
+  height?: string
   ethnicity?: string
   nationality?: string
   physique?: string
@@ -114,10 +115,11 @@ const PHYSIQUE_OPTIONS = ["Slim", "Athletic", "Average", "Curvy", "Muscular", "H
 type RightTab = "profile" | "costumes" | "audition"
 
 // Parse metadata JSON from description (we piggyback extra fields as JSON at the end)
-function parseRoleMeta(role: Role): { age: string; gender: string; ethnicity: string; nationality: string; physique: string; costumes: CostumePhoto[] } {
+function parseRoleMeta(role: Role): { age: string; gender: string; height: string; ethnicity: string; nationality: string; physique: string; costumes: CostumePhoto[] } {
   return {
     age: role.age || "",
     gender: role.gender || "",
+    height: role.height || "",
     ethnicity: role.ethnicity || "",
     nationality: role.nationality || "",
     physique: role.physique || "",
@@ -154,6 +156,7 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [showGenerateConfirm, setShowGenerateConfirm] = useState<string | null>(null)
+  const [isFillingSpecs, setIsFillingSpecs] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const costumeFileInputRef = useRef<HTMLInputElement>(null)
@@ -174,6 +177,7 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
       const metaJson = JSON.stringify({
         age: role.age || "",
         gender: role.gender || "",
+        height: role.height || "",
         ethnicity: role.ethnicity || "",
         nationality: role.nationality || "",
         physique: role.physique || "",
@@ -314,6 +318,7 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
           genre: script.genre,
           age: role.age,
           gender: role.gender,
+          height: role.height,
           ethnicity: role.ethnicity,
           physique: role.physique,
         }),
@@ -330,6 +335,32 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
       updateLocal(roleId, { referenceImages: newImages })
     } finally {
       setGeneratingFor(null)
+    }
+  }
+
+  async function fillSpecsFromDescription(roleId: string) {
+    const role = roles.find(r => r.id === roleId)
+    if (!role || !role.description) return
+    setIsFillingSpecs(true)
+    try {
+      const res = await fetch("/api/ai/fill-character-specs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: role.name, description: role.description, role: role.role }),
+      })
+      if (!res.ok) return
+      const specs = await res.json()
+      const patch: Partial<Role> = {}
+      if (specs.age) patch.age = specs.age
+      if (specs.gender) patch.gender = specs.gender
+      if (specs.height) patch.height = specs.height
+      if (specs.ethnicity) patch.ethnicity = specs.ethnicity
+      if (specs.nationality) patch.nationality = specs.nationality
+      if (specs.physique) patch.physique = specs.physique
+      updateLocal(roleId, patch)
+      setTimeout(() => saveRole(roleId), 100)
+    } finally {
+      setIsFillingSpecs(false)
     }
   }
 
@@ -511,7 +542,20 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
 
                     {/* ── CASTING DIRECTOR FIELDS ── */}
                     <div className="p-3 rounded-lg" style={{ background: "#F5F5F5", border: "1px solid #E0E0E0" }}>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: "#888" }}>Casting Specs</p>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Casting Specs</p>
+                        <button
+                          onClick={() => fillSpecsFromDescription(selectedRole.id)}
+                          disabled={isFillingSpecs || !selectedRole.description}
+                          className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded disabled:opacity-40 transition-colors"
+                          style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+                          title="Auto-fill from Character Description"
+                        >
+                          {isFillingSpecs ? (
+                            <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Filling...</>
+                          ) : <>✦ AI Fill</>}
+                        </button>
+                      </div>
                       <div className="grid grid-cols-3 gap-3">
                         {/* Age */}
                         <div>
@@ -534,6 +578,17 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                             <option value="">—</option>
                             {GENDER_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
                           </select>
+                        </div>
+                        {/* Height */}
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>Height 身高</label>
+                          <input type="text"
+                            value={selectedRole.height || ""}
+                            onChange={e => updateLocal(selectedRole.id, { height: e.target.value })}
+                            onBlur={() => saveRole(selectedRole.id)}
+                            placeholder="170cm"
+                            className="w-full h-7 px-2 text-[12px] rounded focus:outline-none"
+                            style={{ background: "#fff", border: "1px solid #D0D0D0", color: "#1A1A1A" }} />
                         </div>
                         {/* Physique */}
                         <div>

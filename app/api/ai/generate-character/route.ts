@@ -22,34 +22,45 @@ export async function POST(req: NextRequest) {
 
 
   try {
-    const { name, description, role, genre } = await req.json()
+    const { name, description, role, genre, age, gender, height, ethnicity, physique } = await req.json()
     if (!name) return NextResponse.json({ error: "name required" }, { status: 400 })
+
+    // Build physical specs line for richer prompting
+    const specLines = [
+      age ? `Age: ${age}` : "",
+      gender ? `Gender: ${gender}` : "",
+      height ? `Height: ${height}` : "",
+      ethnicity ? `Ethnicity: ${ethnicity}` : "",
+      physique ? `Physique: ${physique}` : "",
+    ].filter(Boolean).join(", ")
 
     // Step 1: Use LLM to generate a good character portrait prompt
     const llmResult = await aiComplete({
       messages: [
         {
           role: "system",
-          content: `You are a casting director and visual artist for Chinese short dramas (短剧).
-Generate a photorealistic character portrait prompt in English for AI image generation.
+          content: `You are a casting director for Chinese short dramas (短剧).
+Generate a HIGHLY photorealistic character portrait prompt in English for AI image generation.
 
 Requirements:
-- 1:1 square portrait format, head and shoulders shot
-- Photorealistic, cinematic quality
+- 1:1 square portrait, head and shoulders or bust shot
+- Ultra-realistic, 8K, RAW photo quality — NOT illustration, NOT anime, NOT painting
+- Real human actor/actress appearance, pores and skin texture visible
 - Asian actor/actress appearance (unless specified otherwise)
-- Clear face, good lighting, neutral to dramatic expression
-- Professional headshot or film still style
+- Natural face, professional film lighting, shallow depth of field
+- Cinematic film still or professional headshot style
 - DO NOT include text, watermarks, or logos
-- Output ONLY the image prompt, nothing else`,
+- Output ONLY the image prompt, no explanation`,
         },
         {
           role: "user",
           content: `Character: ${name}
 Role type: ${role || "supporting"}
 Genre: ${genre || "drama"}
+Physical specs: ${specLines || "not specified"}
 Description: ${description || "no description"}
 
-Generate a character portrait prompt:`,
+Generate a photorealistic portrait prompt:`,
         },
       ],
       maxTokens: 200,

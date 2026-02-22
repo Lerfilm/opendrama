@@ -1,5 +1,7 @@
 "use client"
 
+import { useState } from "react"
+
 interface Scene {
   id: string
   episodeNum: number
@@ -85,10 +87,33 @@ const roleColorStyles: Record<string, { background: string; color: string }> = {
   minor: { background: "#F3F4F6", color: "#6B7280" },
 }
 
+const GENRE_OPTIONS = ["drama", "comedy", "thriller", "romance", "scifi", "fantasy", "action", "horror", "mystery"]
+const FORMAT_OPTIONS = ["shortdrama", "series", "movie", "animation", "stageplay"]
+
 export function InspectorPanel({
   script, selectedScene, selectedSegment,
   editingScenes, getSceneValue, onUpdateField, roles,
 }: InspectorPanelProps) {
+  const [editTitle, setEditTitle] = useState(script.title)
+  const [editGenre, setEditGenre] = useState(script.genre)
+  const [editFormat, setEditFormat] = useState(script.format)
+  const [isSavingMeta, setIsSavingMeta] = useState(false)
+  const [metaSaved, setMetaSaved] = useState(false)
+
+  async function saveScriptMeta() {
+    setIsSavingMeta(true)
+    try {
+      await fetch(`/api/scripts/${script.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle, genre: editGenre, format: editFormat }),
+      })
+      setMetaSaved(true)
+      setTimeout(() => setMetaSaved(false), 2000)
+    } finally {
+      setIsSavingMeta(false)
+    }
+  }
   // === Segment Selected ===
   if (selectedSegment) {
     const segStatusStyle =
@@ -186,10 +211,51 @@ export function InspectorPanel({
 
   return (
     <div className="h-full overflow-y-auto dev-scrollbar px-3 py-3" style={{ background: "#F0F0F0", borderLeft: "1px solid #C8C8C8" }}>
-      <SectionHeader>Script</SectionHeader>
-      <PropRow label="Title">{script.title}</PropRow>
-      <PropRow label="Genre">{script.genre}</PropRow>
-      <PropRow label="Format">{script.format}</PropRow>
+      <div className="flex items-center justify-between pt-0 pb-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#AAA" }}>Script</span>
+        <button
+          onClick={saveScriptMeta}
+          disabled={isSavingMeta}
+          className="text-[9px] px-2 py-0.5 rounded disabled:opacity-50 transition-colors"
+          style={{ background: metaSaved ? "#D1FAE5" : "#E0E4F8", color: metaSaved ? "#065F46" : "#4F46E5" }}
+        >
+          {isSavingMeta ? "Saving..." : metaSaved ? "✓ Saved" : "Save"}
+        </button>
+      </div>
+      <div className="space-y-2 mb-2">
+        <div>
+          <label className="text-[9px] uppercase tracking-wider" style={{ color: "#AAA" }}>Title 剧名</label>
+          <input
+            type="text"
+            value={editTitle}
+            onChange={e => setEditTitle(e.target.value)}
+            className="w-full h-7 px-2 text-xs rounded mt-0.5 focus:outline-none"
+            style={{ background: "#fff", border: "1px solid #D0D0D0", color: "#1A1A1A" }}
+          />
+        </div>
+        <div>
+          <label className="text-[9px] uppercase tracking-wider" style={{ color: "#AAA" }}>Genre</label>
+          <select
+            value={editGenre}
+            onChange={e => setEditGenre(e.target.value)}
+            className="w-full h-7 px-2 text-xs rounded mt-0.5 focus:outline-none"
+            style={{ background: "#fff", border: "1px solid #D0D0D0", color: "#1A1A1A" }}
+          >
+            {GENRE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[9px] uppercase tracking-wider" style={{ color: "#AAA" }}>Format</label>
+          <select
+            value={editFormat}
+            onChange={e => setEditFormat(e.target.value)}
+            className="w-full h-7 px-2 text-xs rounded mt-0.5 focus:outline-none"
+            style={{ background: "#fff", border: "1px solid #D0D0D0", color: "#1A1A1A" }}
+          >
+            {FORMAT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </div>
+      </div>
       <PropRow label="Language">{script.language}</PropRow>
       <PropRow label="Episodes">{script.targetEpisodes}</PropRow>
       <PropRow label="Status">
