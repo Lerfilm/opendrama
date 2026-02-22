@@ -3,11 +3,98 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { video } from "@/lib/mux"
+import { exec } from "child_process"
+import { promisify } from "util"
+import { writeFile, readFile, unlink, mkdtemp } from "fs/promises"
+import { tmpdir } from "os"
+import { join } from "path"
+
+const execAsync = promisify(exec)
 
 /**
- * Upload one episode to Mux by passing TOS video URLs directly.
- * Mux downloads the videos server-side and concatenates them.
- * Requires type:"video" on each input (otherwise Mux treats extras as overlays).
+ * Download a URL to a local temp file. Returns the local path.
+ */
+async function downloadToTemp(url: string, destPath: string): Promise<void> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Failed to download ${url}: ${res.status}`)
+  const buf = Buffer.from(await res.arrayBuffer())
+  await writeFile(destPath, buf)
+}
+
+/**
+ * Concatenate video files using ffmpeg concat demuxer.
+ * Returns the path to the concatenated file.
+ */
+async function ffmpegConcat(inputPaths: string[], outputPath: string): Promise<void> {
+  // Write concat list file
+  const listPath = outputPath + ".txt"
+  const listContent = inputPaths.map(p => `file '${p}'`).join("\n")
+  await writeFile(listPath, listContent)
+
+  try {
+    const { stderr } = await execAsync(
+      `ffmpeg -y -f concat -safe 0 -i "${listPath}" -c copy "${outputPath}"`,
+      { maxBuffer: 200 * 1024 * 1024 } // 200MB buffer for stderr
+    )
+    console.log("[Publish] ffmpeg concat done:", stderr.slice(-200))
+  } finally {
+    await unlink(listPath).catch(() => {})
+  }
+}
+
+/**
+ * Upload a local file to Mux via direct upload.
+ * Returns { muxAssetId, muxPlaybackId }.
+ */
+async function uploadFileToMux(
+  filePath: string,
+  episodeNum: number,
+  seriesTitle: string,
+  synopsis: string
+): Promise<{ muxAssetId: string; muxPlaybackId: string }> {
+  // Create a direct upload URL
+  const upload = await video.uploads.create({
+    new_asset_settings: {
+      playback_policy: ["public"],
+      encoding_tier: "baseline",
+      passthrough: JSON.stringify({ episodeNum, seriesTitle, synopsis: synopsis.slice(0, 200) }),
+    },
+    cors_origin: "https://opendrama.ai",
+  })
+
+  // Read the file and PUT to Mux
+  const fileBuffer = await readFile(filePath)
+  const putRes = await fetch(upload.url, {
+    method: "PUT",
+    body: fileBuffer,
+    headers: { "Content-Type": "video/mp4" },
+  })
+  if (!putRes.ok) {
+    const text = await putRes.text().catch(() => "")
+    throw new Error(`Mux PUT failed: ${putRes.status} ${text}`)
+  }
+
+  // Poll for asset creation (up to 5 min)
+  let muxAssetId: string | undefined
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 5000))
+    const up = await video.uploads.retrieve(upload.id)
+    if (up.asset_id) { muxAssetId = up.asset_id; break }
+  }
+  if (!muxAssetId) throw new Error("Mux upload timed out — asset not created after 5 minutes")
+
+  // Get playback ID
+  const asset = await video.assets.retrieve(muxAssetId)
+  const muxPlaybackId = asset.playback_ids?.[0]?.id
+  if (!muxPlaybackId) throw new Error("Mux asset created but no playback_id returned")
+
+  return { muxAssetId, muxPlaybackId }
+}
+
+/**
+ * Upload one episode to Mux.
+ * - Single segment: pass URL directly via assets.create (no ffmpeg needed)
+ * - Multiple segments: download all, ffmpeg concat, direct upload
  */
 async function uploadEpisodeToMux(
   episodeNum: number,
@@ -17,22 +104,54 @@ async function uploadEpisodeToMux(
 ): Promise<{ muxAssetId: string; muxPlaybackId: string }> {
   if (videoUrls.length === 0) throw new Error("No video URLs to upload")
 
-  const asset = await video.assets.create({
-    inputs: videoUrls.map(url => ({ url, type: "video" as const })),
-    playback_policy: ["public"],
-    encoding_tier: "baseline",
-    passthrough: JSON.stringify({ episodeNum, seriesTitle, synopsis: synopsis.slice(0, 200) }),
-  })
+  // === Single segment: use assets.create directly (no ffmpeg) ===
+  if (videoUrls.length === 1) {
+    console.log(`[Publish] Ep${episodeNum}: single segment, passing URL directly to Mux`)
+    const asset = await video.assets.create({
+      inputs: [{ url: videoUrls[0] }],
+      playback_policy: ["public"],
+      encoding_tier: "baseline",
+      passthrough: JSON.stringify({ episodeNum, seriesTitle, synopsis: synopsis.slice(0, 200) }),
+    })
+    const playbackId = asset.playback_ids?.[0]?.id
+    if (!playbackId) throw new Error("Mux asset created but no playback_id returned")
+    return { muxAssetId: asset.id, muxPlaybackId: playbackId }
+  }
 
-  const playbackId = asset.playback_ids?.[0]?.id
-  if (!playbackId) throw new Error("Mux asset created but no playback_id returned")
+  // === Multiple segments: ffmpeg concat then direct upload ===
+  console.log(`[Publish] Ep${episodeNum}: ${videoUrls.length} segments — downloading for ffmpeg concat`)
+  const tmpDir = await mkdtemp(join(tmpdir(), `ep${episodeNum}-`))
+  const segPaths: string[] = []
 
-  return { muxAssetId: asset.id, muxPlaybackId: playbackId }
+  try {
+    // Download all segments in parallel (preserve order via index)
+    await Promise.all(
+      videoUrls.map(async (url, i) => {
+        const segPath = join(tmpDir, `seg${String(i).padStart(4, "0")}.mp4`)
+        segPaths[i] = segPath
+        await downloadToTemp(url, segPath)
+        console.log(`[Publish] Ep${episodeNum}: downloaded seg${i}`)
+      })
+    )
+
+    const concatPath = join(tmpDir, "concat.mp4")
+    await ffmpegConcat(segPaths, concatPath)
+    console.log(`[Publish] Ep${episodeNum}: ffmpeg concat done, uploading to Mux`)
+
+    const result = await uploadFileToMux(concatPath, episodeNum, seriesTitle, synopsis)
+    console.log(`[Publish] Ep${episodeNum}: Mux upload complete — asset=${result.muxAssetId} playback=${result.muxPlaybackId}`)
+    return result
+  } finally {
+    // Cleanup temp files
+    for (const p of segPaths) await unlink(p).catch(() => {})
+    const concatPath = join(tmpDir, "concat.mp4")
+    await unlink(concatPath).catch(() => {})
+    await import("fs/promises").then(fs => fs.rmdir(tmpDir)).catch(() => {})
+  }
 }
 
 /**
  * POST /api/scripts/[id]/publish
- * Server-side: Mux downloads TOS video URLs directly (both are accessible from US).
  * Re-publish supported: episodes with muxPlaybackId are skipped.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -131,7 +250,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         console.log("[Publish] Ep" + episodeNum + ": asset=" + muxAssetId + " playback=" + muxPlaybackId)
       } catch (err) {
         uploadError = err instanceof Error ? err.message : String(err)
-        console.error("[Publish] Ep" + episodeNum + " Mux upload failed:", err)
+        console.error("[Publish] Ep" + episodeNum + " upload failed:", err)
       }
 
       const epData = {

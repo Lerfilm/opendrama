@@ -299,3 +299,10 @@ html {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Dev mode thin scrollbar */
+.dev-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+.dev-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.dev-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+.dev-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+.dev-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.15) transparent; }

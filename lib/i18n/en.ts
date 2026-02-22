@@ -83,6 +83,7 @@ const en: Record<string, string> = {
   "profile.purchaseHistory": "Purchase History",
   "profile.cardCollection": "Card Collection",
   "profile.settings": "Settings",
+  "profile.developerMode": "Developer Mode",
   "profile.logout": "Log Out",
 
   // Purchases
@@ -616,6 +617,16 @@ const en: Record<string, string> = {
   "studio.stepStory": "Story Outline",
   "studio.stepSettings": "Settings",
   "studio.stepCreate": "Create",
+
+  // Developer Mode
+  "developer.title": "Developer Mode",
+  "developer.subtitle": "Developer tools and debugging options",
+  "developer.modeToggle": "Developer Mode",
+  "developer.modeOn": "On",
+  "developer.modeOff": "Off",
+  "developer.modeDesc": "Enable to access developer tools and debugging features",
+  "developer.tools": "Developer Tools",
+  "developer.comingSoon": "More developer tools coming soon",
 }
 
 export default en

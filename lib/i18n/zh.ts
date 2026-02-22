@@ -83,6 +83,7 @@ const zh = {
   "profile.purchaseHistory": "充值记录",
   "profile.cardCollection": "卡牌收藏",
   "profile.settings": "设置",
+  "profile.developerMode": "开发者模式",
   "profile.logout": "退出登录",
 
   // Purchases
@@ -618,6 +619,16 @@ const zh = {
   "studio.stepStory": "故事大纲",
   "studio.stepSettings": "设置",
   "studio.stepCreate": "创建",
+
+  // Developer Mode
+  "developer.title": "开发者模式",
+  "developer.subtitle": "开发者工具与调试选项",
+  "developer.modeToggle": "开发者模式开关",
+  "developer.modeOn": "已开启",
+  "developer.modeOff": "已关闭",
+  "developer.modeDesc": "开启后可使用开发者工具和调试功能",
+  "developer.tools": "开发者工具",
+  "developer.comingSoon": "更多开发者工具即将推出",
 } as const
 
 export type TranslationKey = keyof typeof zh

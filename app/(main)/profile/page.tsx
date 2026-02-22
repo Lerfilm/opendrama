@@ -5,8 +5,9 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Coins, CreditCard, History, Star, Settings, Play, PenTool, Video } from "@/components/icons"
+import { Coins, CreditCard, History, Star, Settings, Play, PenTool, Video, Code } from "@/components/icons"
 import { t } from "@/lib/i18n"
+import { isDeveloper } from "@/lib/developer"
 import prisma from "@/lib/prisma"
 
 export default async function ProfilePage() {
@@ -43,6 +44,16 @@ export default async function ProfilePage() {
     { icon: PenTool, label: t("studio.myScripts"), href: "/studio", badge: scriptCount > 0 ? `${scriptCount}` : null },
     { icon: Settings, label: t("profile.settings"), href: "/settings" },
   ]
+
+  // 开发者模式入口（仅白名单邮箱可见）
+  if (isDeveloper(session.user?.email)) {
+    menuItems.push({
+      icon: Code,
+      label: t("profile.developerMode"),
+      href: "/developer",
+      badge: null,
+    })
+  }
 
   return (
     <div className="p-4 space-y-6">

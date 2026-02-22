@@ -1,0 +1,220 @@
+"use client"
+
+import { useState, useMemo } from "react"
+
+interface Scene {
+  id: string
+  episodeNum: number
+  sceneNum: number
+  heading?: string | null
+  action?: string | null
+  mood?: string | null
+  location?: string | null
+  timeOfDay?: string | null
+}
+
+interface VideoSegment {
+  id: string
+  episodeNum: number
+  status: string
+}
+
+interface SceneListPanelProps {
+  scenes: Scene[]
+  episodes: number[]
+  allScenes: Scene[]
+  segments: VideoSegment[]
+  selectedEpisode: number
+  onSelectEpisode: (ep: number) => void
+  selectedSceneId: string | null
+  onSelectScene: (id: string) => void
+  savingScenes: Set<string>
+  editingScenes: Record<string, unknown>
+  onAddEpisode: () => void
+  onAddScene: () => void
+  targetEpisodes: number
+}
+
+export function SceneListPanel({
+  scenes, episodes, allScenes, segments, selectedEpisode, onSelectEpisode,
+  selectedSceneId, onSelectScene, savingScenes, editingScenes,
+  onAddEpisode, onAddScene, targetEpisodes,
+}: SceneListPanelProps) {
+  const [filterLocation, setFilterLocation] = useState("")
+  const [filterMood, setFilterMood] = useState("")
+
+  // Get unique locations and moods for filters
+  const locations = useMemo(() => {
+    const set = new Set<string>()
+    scenes.forEach(s => { if (s.location) set.add(s.location) })
+    return [...set].sort()
+  }, [scenes])
+
+  const moods = useMemo(() => {
+    const set = new Set<string>()
+    scenes.forEach(s => { if (s.mood) set.add(s.mood) })
+    return [...set].sort()
+  }, [scenes])
+
+  // Filter scenes
+  const filteredScenes = useMemo(() => {
+    return scenes.filter(s => {
+      if (filterLocation && s.location !== filterLocation) return false
+      if (filterMood && s.mood !== filterMood) return false
+      return true
+    })
+  }, [scenes, filterLocation, filterMood])
+
+  const canAddEpisode = episodes.length < targetEpisodes
+
+  return (
+    <div className="h-full flex flex-col" style={{ background: "#EBEBEB", borderRight: "1px solid #C0C0C0" }}>
+      {/* Header */}
+      <div className="flex-shrink-0 px-3 py-2" style={{ borderBottom: "1px solid #C8C8C8" }}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Scenes</span>
+          <button
+            onClick={onAddScene}
+            className="text-[10px] transition-colors"
+            style={{ color: "#4F46E5" }}
+          >
+            + Add
+          </button>
+        </div>
+
+        {/* Episode Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-1">
+          {episodes.map(ep => {
+            const epScenes = allScenes.filter(s => s.episodeNum === ep)
+            const epSegments = segments.filter(s => s.episodeNum === ep)
+            const hasScenes = epScenes.length > 0
+            const hasSegments = epSegments.length > 0
+            const isActive = selectedEpisode === ep
+            return (
+              <button
+                key={ep}
+                onClick={() => onSelectEpisode(ep)}
+                className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-colors"
+                style={{ background: isActive ? "#4F46E5" : "transparent", color: isActive ? "#fff" : "#666" }}
+              >
+                <span>E{ep}</span>
+                <div className="flex gap-0.5">
+                  <div className="w-1 h-1 rounded-full" style={{ background: hasScenes ? "#10B981" : isActive ? "rgba(255,255,255,0.3)" : "#CCC" }} />
+                  <div className="w-1 h-1 rounded-full" style={{ background: hasSegments ? "#3B82F6" : isActive ? "rgba(255,255,255,0.3)" : "#CCC" }} />
+                </div>
+              </button>
+            )
+          })}
+          {canAddEpisode && (
+            <button
+              onClick={onAddEpisode}
+              className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors"
+              style={{ color: "#AAA" }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <line x1="12" x2="12" y1="5" y2="19" />
+                <line x1="5" x2="19" y1="12" y2="12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filters */}
+      {(locations.length > 0 || moods.length > 0) && (
+        <div className="flex-shrink-0 px-3 py-1.5 flex gap-1.5" style={{ borderBottom: "1px solid #D0D0D0" }}>
+          {locations.length > 0 && (
+            <select
+              value={filterLocation}
+              onChange={e => setFilterLocation(e.target.value)}
+              className="text-[10px] rounded px-1.5 py-0.5 appearance-none cursor-pointer focus:outline-none"
+              style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#555" }}
+            >
+              <option value="">All locations</option>
+              {locations.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          )}
+          {moods.length > 0 && (
+            <select
+              value={filterMood}
+              onChange={e => setFilterMood(e.target.value)}
+              className="text-[10px] rounded px-1.5 py-0.5 appearance-none cursor-pointer focus:outline-none"
+              style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#555" }}
+            >
+              <option value="">All moods</option>
+              {moods.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          )}
+        </div>
+      )}
+
+      {/* Scene List */}
+      <div className="flex-1 overflow-y-auto dev-scrollbar">
+        {filteredScenes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12" style={{ color: "#BBB" }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-2 opacity-50">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <span className="text-[11px]">No scenes</span>
+          </div>
+        ) : (
+          <div className="py-1">
+            {filteredScenes.map(scene => {
+              const isSelected = scene.id === selectedSceneId
+              const isSaving = savingScenes.has(scene.id)
+              const isEdited = scene.id in editingScenes
+              return (
+                <button
+                  key={scene.id}
+                  onClick={() => onSelectScene(scene.id)}
+                  className="w-full text-left px-3 py-2 flex items-start gap-2 transition-colors"
+                  style={{
+                    background: isSelected ? "#DCE0F5" : "transparent",
+                    borderLeft: isSelected ? "2px solid #4F46E5" : "2px solid transparent",
+                  }}
+                >
+                  {/* Scene number */}
+                  <span className="text-[10px] font-mono mt-0.5 flex-shrink-0 w-6" style={{ color: "#AAA" }}>
+                    S{scene.sceneNum}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    {/* Heading */}
+                    <p className="text-xs truncate" style={{ color: isSelected ? "#1A1A1A" : "#444" }}>
+                      {scene.heading || "Untitled scene"}
+                    </p>
+
+                    {/* Badges */}
+                    <div className="flex items-center gap-1 mt-1">
+                      {scene.mood && (
+                        <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "#DDD", color: "#777" }}>
+                          {scene.mood}
+                        </span>
+                      )}
+                      {scene.location && (
+                        <span className="text-[9px] px-1 py-0.5 rounded truncate max-w-[80px]" style={{ background: "#DDD", color: "#777" }}>
+                          {scene.location}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status indicators */}
+                  <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                    {isSaving && (
+                      <div className="w-2 h-2 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "#AAA" }} />
+                    )}
+                    {isEdited && !isSaving && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Unsaved" />
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

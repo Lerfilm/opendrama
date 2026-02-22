@@ -1,0 +1,1128 @@
+"use client"
+
+import { useState, useCallback, useEffect, useRef, useMemo } from "react"
+import Link from "next/link"
+
+interface VideoSegment {
+  id: string
+  episodeNum: number
+  segmentIndex: number
+  sceneNum: number
+  durationSec: number
+  prompt: string
+  shotType?: string | null
+  cameraMove?: string | null
+  model?: string | null
+  resolution?: string | null
+  status: string
+  videoUrl?: string | null
+  thumbnailUrl?: string | null
+  tokenCost?: number | null
+  errorMessage?: string | null
+}
+
+interface Scene {
+  id: string
+  episodeNum: number
+  sceneNum: number
+  heading?: string | null
+  location?: string | null
+  timeOfDay?: string | null
+  mood?: string | null
+  action?: string | null
+}
+
+interface CostumePhoto { url: string; scene?: string; note?: string; isApproved?: boolean }
+
+interface Role {
+  id: string
+  name: string
+  role: string
+  description?: string | null
+  referenceImages: string[]
+  voiceType?: string | null  // stores JSON with costumes
+}
+
+interface Script {
+  id: string
+  title: string
+  targetEpisodes: number
+  scenes: Scene[]
+  roles: Role[]
+  videoSegments: VideoSegment[]
+}
+
+const MODELS = [
+  { id: "seedance_1_5_pro", name: "Seedance 1.5 Pro", res: ["1080p", "720p"] },
+  { id: "seedance_1_0_pro", name: "Seedance 1.0 Pro", res: ["1080p", "720p"] },
+  { id: "seedance_1_0_pro_fast", name: "Seedance Fast", res: ["1080p", "720p"] },
+  { id: "jimeng_3_0_pro", name: "Jimeng 3.0 Pro", res: ["1080p"] },
+  { id: "jimeng_3_0", name: "Jimeng 3.0", res: ["1080p", "720p"] },
+]
+
+const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
+  pending: { bg: "#F3F4F6", color: "#6B7280", label: "Pending" },
+  reserved: { bg: "#FEF3C7", color: "#92400E", label: "Reserved" },
+  submitted: { bg: "#DBEAFE", color: "#1D4ED8", label: "Submitted" },
+  generating: { bg: "#EDE9FE", color: "#6D28D9", label: "Generating" },
+  done: { bg: "#D1FAE5", color: "#065F46", label: "Done" },
+  failed: { bg: "#FEE2E2", color: "#991B1B", label: "Failed" },
+}
+
+export function TheaterWorkspace({ script, initialBalance }: { script: Script; initialBalance: number }) {
+  const episodes = [...new Set(script.scenes.map(s => s.episodeNum))].sort((a, b) => a - b)
+  if (episodes.length === 0 && script.targetEpisodes > 0) {
+    for (let i = 1; i <= script.targetEpisodes; i++) episodes.push(i)
+  }
+
+  const [selectedEp, setSelectedEp] = useState(episodes[0] ?? 1)
+  const [segments, setSegments] = useState<VideoSegment[]>(script.videoSegments)
+  const [selectedSegId, setSelectedSegId] = useState<string | null>(null)
+  const [model, setModel] = useState("seedance_1_5_pro")
+  const [resolution, setResolution] = useState("720p")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSplitting, setIsSplitting] = useState(false)
+  const [isPolling, setIsPolling] = useState(false)
+  const [balance, setBalance] = useState(initialBalance)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+
+  const epSegments = segments.filter(s => s.episodeNum === selectedEp).sort((a, b) => a.segmentIndex - b.segmentIndex)
+  const selectedSeg = segments.find(s => s.id === selectedSegId) ?? null
+
+  // Stat summary
+  const done = epSegments.filter(s => s.status === "done").length
+  const failed = epSegments.filter(s => s.status === "failed").length
+  const active = epSegments.filter(s => ["submitted", "generating", "reserved"].includes(s.status)).length
+  const totalDuration = epSegments.reduce((sum, s) => sum + s.durationSec, 0)
+
+  // Poll for status updates
+  const pollStatus = useCallback(async () => {
+    if (isPolling) return
+    setIsPolling(true)
+    try {
+      const res = await fetch(`/api/video/status?scriptId=${script.id}&episodeNum=${selectedEp}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSegments(prev => {
+          const map = new Map(prev.map(s => [s.id, s]))
+          for (const s of (data.segments ?? [])) map.set(s.id, s)
+          return [...map.values()]
+        })
+      }
+    } finally {
+      setIsPolling(false)
+    }
+  }, [script.id, selectedEp, isPolling])
+
+  // Auto-poll every 5s when there are active segments
+  useEffect(() => {
+    if (active > 0) {
+      pollingRef.current = setInterval(pollStatus, 5000)
+    }
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
+  }, [active, pollStatus])
+
+  // Submit batch generation
+  async function handleGenerate() {
+    if (epSegments.length === 0) { alert("No segments to generate. Run AI Split in Script module first."); return }
+    if (!confirm(`Generate ${epSegments.length} video segments? This will cost tokens from your balance.`)) return
+    setIsSubmitting(true)
+    try {
+      const res = await fetch("/api/video/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "batch",
+          scriptId: script.id,
+          episodeNum: selectedEp,
+          model,
+          resolution,
+          segments: epSegments.map(s => ({
+            id: s.id,
+            prompt: s.prompt,
+            durationSec: s.durationSec,
+            shotType: s.shotType,
+            cameraMove: s.cameraMove,
+          })),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.error || "Failed to submit")
+        return
+      }
+      await pollStatus()
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Reset single segment
+  async function handleReset(segId: string) {
+    await fetch("/api/video/reset", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ segmentId: segId }),
+    })
+    setSegments(prev => prev.filter(s => s.id !== segId))
+    if (selectedSegId === segId) setSelectedSegId(null)
+  }
+
+  // Reset all segments for episode
+  async function handleResetAll() {
+    if (!confirm("Reset all segments for this episode? This will refund reserved tokens.")) return
+    await fetch("/api/video/reset", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scriptId: script.id, episodeNum: selectedEp }),
+    })
+    setSegments(prev => prev.filter(s => s.episodeNum !== selectedEp))
+    setSelectedSegId(null)
+  }
+
+  // AI Split for episode
+  async function handleAISplit() {
+    if (!confirm(`AI Split Episode ${selectedEp} into video segments? This will replace any existing segments for this episode.`)) return
+    setIsSplitting(true)
+    try {
+      const res = await fetch("/api/ai/split", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scriptId: script.id,
+          episodeNum: selectedEp,
+          model,
+          resolution,
+        }),
+      })
+      if (!res.ok) throw new Error("Split failed")
+      const data = await res.json()
+
+      // Save segments
+      const saveRes = await fetch("/api/segments/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scriptId: script.id,
+          episodeNum: selectedEp,
+          model,
+          resolution,
+          segments: data.segments,
+        }),
+      })
+      if (saveRes.ok) {
+        const saved = await saveRes.json()
+        setSegments(prev => {
+          const filtered = prev.filter(s => s.episodeNum !== selectedEp)
+          return [...filtered, ...(saved.segments || [])].sort((a, b) => a.episodeNum - b.episodeNum || a.segmentIndex - b.segmentIndex)
+        })
+      }
+    } catch {
+      alert("AI Split failed")
+    } finally {
+      setIsSplitting(false)
+    }
+  }
+
+  const currentModel = MODELS.find(m => m.id === model)
+
+  // ── Main tab: call sheet or segments ──
+  const [mainTab, setMainTab] = useState<"callsheet" | "segments">("callsheet")
+
+  // ── Assets: collect all visual references ──
+  const [assetsOpen, setAssetsOpen] = useState(false)
+  const [assetTab, setAssetTab] = useState<"characters" | "costumes" | "locations">("characters")
+
+  const characterAssets = useMemo(() =>
+    script.roles.filter(r => (r.referenceImages?.length ?? 0) > 0),
+    [script.roles]
+  )
+
+  const costumeAssets = useMemo(() => {
+    const items: { role: Role; costume: CostumePhoto }[] = []
+    for (const role of script.roles) {
+      let meta: { costumes?: CostumePhoto[] } = {}
+      try { if (role.voiceType?.startsWith("{")) meta = JSON.parse(role.voiceType) } catch { /* ok */ }
+      for (const c of (meta.costumes || [])) {
+        items.push({ role, costume: c })
+      }
+    }
+    return items
+  }, [script.roles])
+
+  // Unique locations from scenes
+  const locationAssets = useMemo(() => {
+    const map = new Map<string, { heading: string; timeOfDay?: string | null; sceneCount: number }>()
+    for (const s of script.scenes) {
+      if (!s.location) continue
+      const existing = map.get(s.location)
+      if (existing) {
+        existing.sceneCount++
+      } else {
+        map.set(s.location, { heading: s.heading || s.location, timeOfDay: s.timeOfDay, sceneCount: 1 })
+      }
+    }
+    return [...map.entries()].map(([loc, data]) => ({ loc, ...data }))
+  }, [script.scenes])
+
+  const totalAssets = characterAssets.reduce((n, r) => n + r.referenceImages.length, 0)
+    + costumeAssets.length
+
+  // ── Call Sheet helpers ──
+  const epScenes = useMemo(() =>
+    script.scenes.filter(s => s.episodeNum === selectedEp).sort((a, b) => a.sceneNum - b.sceneNum),
+    [script.scenes, selectedEp]
+  )
+
+  // Extract character names from scene action/dialogue text
+  const mentionedInEp = useMemo(() => {
+    const names = new Set<string>()
+    for (const scene of epScenes) {
+      const text = scene.action || ""
+      // Parse block JSON if possible
+      try {
+        const blocks = JSON.parse(text) as Array<{ type: string; character?: string; text?: string }>
+        if (Array.isArray(blocks)) {
+          for (const b of blocks) {
+            if (b.type === "dialogue" && b.character) names.add(b.character.trim())
+          }
+        }
+      } catch { /* ok */ }
+      // Also check raw text for CAPS character names
+      const matches = text.matchAll(/^([A-Z\u4e00-\u9fff]{2,}(?:\s[A-Z]+)?)\s*\n/gm)
+      for (const m of matches) if (m[1].length < 30) names.add(m[1].trim())
+    }
+    return names
+  }, [epScenes])
+
+  // Characters to show: all roles where name is mentioned, or just show all roles
+  const epCast = useMemo(() =>
+    script.roles.filter(r =>
+      mentionedInEp.has(r.name.toUpperCase()) ||
+      mentionedInEp.has(r.name) ||
+      epScenes.some(s => (s.action || "").includes(r.name))
+    ).concat(script.roles.filter(r =>
+      !mentionedInEp.has(r.name.toUpperCase()) &&
+      !mentionedInEp.has(r.name) &&
+      !epScenes.some(s => (s.action || "").includes(r.name))
+    ).filter(r => r.role === "protagonist" || r.role === "antagonist")),
+    [script.roles, mentionedInEp, epScenes]
+  )
+
+  // Unique locations in this episode
+  const epLocations = useMemo(() => {
+    const map = new Map<string, { scenes: number[]; timeOfDay: string; mood: string }>()
+    for (const s of epScenes) {
+      if (!s.location) continue
+      const e = map.get(s.location)
+      if (e) { e.scenes.push(s.sceneNum) }
+      else map.set(s.location, { scenes: [s.sceneNum], timeOfDay: s.timeOfDay || "", mood: s.mood || "" })
+    }
+    return [...map.entries()].map(([loc, d]) => ({ loc, ...d }))
+  }, [epScenes])
+
+  // Costume lookup per role
+  const costumesPerRole = useMemo(() => {
+    const map = new Map<string, CostumePhoto[]>()
+    for (const role of script.roles) {
+      let meta: { costumes?: CostumePhoto[] } = {}
+      try { if (role.voiceType?.startsWith("{")) meta = JSON.parse(role.voiceType) } catch { /* ok */ }
+      if (meta.costumes?.length) map.set(role.id, meta.costumes)
+    }
+    return map
+  }, [script.roles])
+
+  return (
+    <div className="h-full flex flex-col" style={{ background: "#E8E8E8" }}>
+    {/* ── Assets strip (collapsible) ── */}
+    <div style={{ borderBottom: assetsOpen ? "1px solid #C0C0C0" : "none" }}>
+      {/* Toggle bar */}
+      <button
+        onClick={() => setAssetsOpen(v => !v)}
+        className="w-full flex items-center gap-2 px-4 py-1.5 text-[10px] transition-colors"
+        style={{ background: "#E2E2E2", borderBottom: "1px solid #C8C8C8" }}
+      >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+          style={{ transform: assetsOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s", color: "#888" }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+        <span className="font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Visual Assets</span>
+        {totalAssets > 0 && (
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-medium" style={{ background: "#D8DBF0", color: "#4F46E5" }}>
+            {totalAssets} images
+          </span>
+        )}
+        <span className="ml-auto text-[9px]" style={{ color: "#BBB" }}>
+          {characterAssets.length} characters · {costumeAssets.length} costumes · {locationAssets.length} locations
+        </span>
+      </button>
+
+      {/* Assets panel */}
+      {assetsOpen && (
+        <div style={{ background: "#EBEBEB" }}>
+          {/* Sub-tabs */}
+          <div className="flex px-4 gap-0" style={{ borderBottom: "1px solid #D0D0D0" }}>
+            {(["characters", "costumes", "locations"] as const).map(tab => (
+              <button key={tab} onClick={() => setAssetTab(tab)}
+                className="px-3 py-1.5 text-[10px] font-medium capitalize transition-colors relative"
+                style={{ color: assetTab === tab ? "#1A1A1A" : "#999" }}>
+                {tab}
+                {assetTab === tab && <div className="absolute bottom-0 left-2 right-2 h-[2px] rounded-t" style={{ background: "#4F46E5" }} />}
+              </button>
+            ))}
+            <div className="ml-auto flex items-center gap-2">
+              <Link href={`/dev/casting/${script.id}`}
+                className="text-[9px] px-2 py-0.5 rounded transition-colors"
+                style={{ color: "#4F46E5", background: "#E0E4F8" }}>
+                Edit in Casting →
+              </Link>
+            </div>
+          </div>
+
+          {/* Asset grid */}
+          <div className="overflow-x-auto">
+            <div className="flex gap-2 p-3" style={{ minWidth: "max-content" }}>
+              {assetTab === "characters" && (
+                characterAssets.length === 0 ? (
+                  <div className="flex items-center gap-2 py-2 px-3 text-[11px]" style={{ color: "#BBB" }}>
+                    No character portraits yet.
+                    <Link href={`/dev/casting/${script.id}`} className="underline" style={{ color: "#4F46E5" }}>Go to Casting →</Link>
+                  </div>
+                ) : characterAssets.map(role => (
+                  <div key={role.id} className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                    <div className="relative">
+                      <img src={role.referenceImages[0]} alt={role.name}
+                        className="w-16 h-16 rounded-full object-cover"
+                        style={{ border: "2px solid #D0D0D0" }} />
+                      {role.referenceImages.length > 1 && (
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold"
+                          style={{ background: "#4F46E5", color: "#fff" }}>
+                          +{role.referenceImages.length - 1}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[9px] font-medium text-center w-16 truncate" style={{ color: "#555" }}>{role.name}</span>
+                    {role.referenceImages.length > 1 && (
+                      <div className="flex gap-0.5">
+                        {role.referenceImages.slice(1, 4).map((img, i) => (
+                          <img key={i} src={img} alt="" className="w-7 h-7 rounded object-cover" style={{ border: "1px solid #D8D8D8" }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+
+              {assetTab === "costumes" && (
+                costumeAssets.length === 0 ? (
+                  <div className="flex items-center gap-2 py-2 px-3 text-[11px]" style={{ color: "#BBB" }}>
+                    No costume photos yet.
+                    <Link href={`/dev/casting/${script.id}`} className="underline" style={{ color: "#4F46E5" }}>Add in Casting →</Link>
+                  </div>
+                ) : costumeAssets.map((item, i) => (
+                  <div key={i} className="flex-shrink-0 w-20">
+                    <img src={item.costume.url} alt=""
+                      className="w-20 h-28 rounded object-cover"
+                      style={{ border: "1px solid #D0D0D0" }} />
+                    <p className="text-[8px] font-medium mt-1 truncate" style={{ color: "#555" }}>{item.role.name}</p>
+                    <p className="text-[8px] truncate" style={{ color: "#AAA" }}>{item.costume.scene || ""}</p>
+                  </div>
+                ))
+              )}
+
+              {assetTab === "locations" && (
+                locationAssets.length === 0 ? (
+                  <div className="flex items-center gap-2 py-2 px-3 text-[11px]" style={{ color: "#BBB" }}>
+                    No locations defined in scenes.
+                  </div>
+                ) : locationAssets.map((loc) => (
+                  <div key={loc.loc} className="flex-shrink-0 w-28">
+                    <div className="w-28 h-20 rounded flex items-center justify-center"
+                      style={{ background: "#D8D8D8", border: "1px solid #C8C8C8" }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} style={{ color: "#AAA" }}>
+                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                    </div>
+                    <p className="text-[9px] font-medium mt-1 truncate" style={{ color: "#555" }}>{loc.loc}</p>
+                    <p className="text-[8px]" style={{ color: "#AAA" }}>{loc.sceneCount} scene{loc.sceneCount !== 1 ? "s" : ""}{loc.timeOfDay ? ` · ${loc.timeOfDay}` : ""}</p>
+                    <Link href={`/dev/location/${script.id}`}
+                      className="text-[8px]" style={{ color: "#4F46E5" }}>
+                      Scout →
+                    </Link>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* ── Main Tab Bar ── */}
+    <div className="flex items-center px-3 gap-0 flex-shrink-0" style={{ background: "#E2E2E2", borderBottom: "1px solid #C8C8C8" }}>
+      {([
+        { id: "callsheet", label: "📋 Call Sheet" },
+        { id: "segments", label: "◼ Segments" },
+      ] as const).map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => setMainTab(tab.id)}
+          className="px-4 py-2 text-[11px] font-medium relative transition-colors"
+          style={{ color: mainTab === tab.id ? "#1A1A1A" : "#888" }}
+        >
+          {tab.label}
+          {mainTab === tab.id && (
+            <div className="absolute bottom-0 left-2 right-2 h-[2px] rounded-t" style={{ background: "#4F46E5" }} />
+          )}
+        </button>
+      ))}
+    </div>
+
+    {/* Main content */}
+    <div className="flex-1 flex overflow-hidden">
+      {/* Left: Episode list + controls */}
+      <div className="w-64 flex flex-col flex-shrink-0" style={{ background: "#EBEBEB", borderRight: "1px solid #C0C0C0" }}>
+        {/* Header */}
+        <div className="px-3 py-2.5" style={{ borderBottom: "1px solid #C8C8C8" }}>
+          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Episodes</span>
+        </div>
+
+        {/* Episode list */}
+        <div className="flex-1 overflow-y-auto dev-scrollbar py-1">
+          {episodes.map(ep => {
+            const epSegs = segments.filter(s => s.episodeNum === ep)
+            const epDone = epSegs.filter(s => s.status === "done").length
+            const epActive = epSegs.filter(s => ["submitted", "generating", "reserved"].includes(s.status)).length
+            const isActive = ep === selectedEp
+            return (
+              <button
+                key={ep}
+                onClick={() => { setSelectedEp(ep); setSelectedSegId(null) }}
+                className="w-full text-left px-3 py-2.5 flex items-center gap-2 transition-colors"
+                style={{
+                  background: isActive ? "#DCE0F5" : "transparent",
+                  borderLeft: isActive ? "2px solid #4F46E5" : "2px solid transparent",
+                }}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium" style={{ color: isActive ? "#1A1A1A" : "#444" }}>Episode {ep}</p>
+                  <p className="text-[10px]" style={{ color: "#AAA" }}>
+                    {epSegs.length > 0 ? `${epDone}/${epSegs.length} done` : "No segments"}
+                  </p>
+                </div>
+                {epActive > 0 && (
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                )}
+                {epDone > 0 && epDone === epSegs.length && (
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Model selector */}
+        <div className="px-3 py-3 space-y-2" style={{ borderTop: "1px solid #C8C8C8" }}>
+          <div>
+            <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>Model</label>
+            <select
+              value={model}
+              onChange={e => { setModel(e.target.value); const m = MODELS.find(x => x.id === e.target.value); if (m && !m.res.includes(resolution)) setResolution(m.res[0]) }}
+              className="w-full text-[11px] rounded px-2 py-1 focus:outline-none"
+              style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#444" }}
+            >
+              {MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>Resolution</label>
+            <select
+              value={resolution}
+              onChange={e => setResolution(e.target.value)}
+              className="w-full text-[11px] rounded px-2 py-1 focus:outline-none"
+              style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#444" }}
+            >
+              {(currentModel?.res || ["720p"]).map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px]" style={{ color: "#AAA" }}>Balance: {balance} coins</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CALL SHEET VIEW ── */}
+      {mainTab === "callsheet" && (
+        <div className="flex-1 overflow-y-auto dev-scrollbar" style={{ background: "#F5F5F5" }}>
+          {/* Call Sheet Header */}
+          <div className="px-6 py-4" style={{ background: "#1A1A2E", color: "#E0E0FF" }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[9px] font-semibold uppercase tracking-widest mb-1" style={{ color: "#6366F1" }}>CALL SHEET · PRODUCTION SCHEDULE</p>
+                <h2 className="text-lg font-bold" style={{ color: "#fff" }}>{script.title}</h2>
+                <p className="text-[11px] mt-0.5" style={{ color: "#8888CC" }}>
+                  Episode {selectedEp} of {episodes.length} · {epScenes.length} scenes · {epLocations.length} locations
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] uppercase tracking-wider" style={{ color: "#555" }}>Generated</p>
+                <p className="text-[11px] font-mono" style={{ color: "#666" }}>{new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-5">
+
+            {/* ── Section 1: Cast List ── */}
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #D8D8D8", background: "#fff" }}>
+              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "#F0F0F5", borderBottom: "1px solid #E0E0E8" }}>
+                <div className="flex items-center gap-2">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#4F46E5" }}>
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Cast — Episode {selectedEp}</span>
+                </div>
+                <Link href={`/dev/casting/${script.id}`} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#E8E4FF", color: "#4F46E5" }}>
+                  Edit Casting →
+                </Link>
+              </div>
+
+              {script.roles.length === 0 ? (
+                <div className="px-4 py-6 text-center text-[11px]" style={{ color: "#CCC" }}>
+                  No cast defined yet.{" "}
+                  <Link href={`/dev/casting/${script.id}`} className="underline" style={{ color: "#4F46E5" }}>Go to Casting →</Link>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr style={{ background: "#FAFAFA", borderBottom: "1px solid #EEE" }}>
+                        <th className="text-left px-4 py-2 font-semibold w-8" style={{ color: "#AAA" }}>#</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Character</th>
+                        <th className="text-left px-3 py-2 font-semibold w-24" style={{ color: "#AAA" }}>Role</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Portrait</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Costume</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Scenes</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {script.roles.map((role, idx) => {
+                        const costumes = costumesPerRole.get(role.id) || []
+                        const inEp = epCast.some(r => r.id === role.id)
+                        return (
+                          <tr key={role.id}
+                            style={{
+                              borderBottom: "1px solid #F0F0F0",
+                              background: inEp ? "rgba(79,70,229,0.03)" : "transparent",
+                              opacity: inEp ? 1 : 0.5,
+                            }}>
+                            {/* # */}
+                            <td className="px-4 py-2.5 font-mono" style={{ color: "#DDD" }}>{idx + 1}</td>
+                            {/* Name */}
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center gap-2">
+                                {role.referenceImages?.[0] ? (
+                                  <img src={role.referenceImages[0]} className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                                    style={{ border: "1.5px solid #D0D0D0" }} alt="" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0"
+                                    style={{ background: "#E8E4FF", color: "#4F46E5" }}>
+                                    {role.name[0]}
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-semibold" style={{ color: "#1A1A1A" }}>{role.name}</p>
+                                  {inEp && <p className="text-[9px]" style={{ color: "#4F46E5" }}>● In Ep {selectedEp}</p>}
+                                </div>
+                              </div>
+                            </td>
+                            {/* Role type */}
+                            <td className="px-3 py-2.5">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium capitalize"
+                                style={{
+                                  background: role.role === "protagonist" ? "#EEF2FF" : role.role === "antagonist" ? "#FEF2F2" : "#F5F5F5",
+                                  color: role.role === "protagonist" ? "#4338CA" : role.role === "antagonist" ? "#B91C1C" : "#6B7280",
+                                }}>
+                                {role.role}
+                              </span>
+                            </td>
+                            {/* Portrait thumbnails */}
+                            <td className="px-3 py-2.5">
+                              <div className="flex gap-1">
+                                {role.referenceImages?.slice(0, 3).map((img, i) => (
+                                  <img key={i} src={img} className="w-10 h-14 rounded object-cover"
+                                    style={{ border: "1px solid #E0E0E0" }} alt="" />
+                                ))}
+                                {!role.referenceImages?.length && (
+                                  <span className="text-[9px]" style={{ color: "#CCC" }}>—</span>
+                                )}
+                              </div>
+                            </td>
+                            {/* Costume photos */}
+                            <td className="px-3 py-2.5">
+                              <div className="flex gap-1">
+                                {costumes.slice(0, 2).map((c, i) => (
+                                  <div key={i} className="relative">
+                                    <img src={c.url} className="w-10 h-14 rounded object-cover"
+                                      style={{ border: `1px solid ${c.isApproved ? "#10B981" : "#E0E0E0"}` }} alt="" />
+                                    {c.isApproved && (
+                                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center"
+                                        style={{ background: "#10B981" }}>
+                                        <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3}>
+                                          <polyline points="20 6 9 17 4 12"/>
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                                {costumes.length > 2 && (
+                                  <div className="w-10 h-14 rounded flex items-center justify-center text-[9px] font-medium"
+                                    style={{ background: "#F0F0F0", color: "#888" }}>
+                                    +{costumes.length - 2}
+                                  </div>
+                                )}
+                                {!costumes.length && <span className="text-[9px]" style={{ color: "#CCC" }}>—</span>}
+                              </div>
+                            </td>
+                            {/* Scenes appearing in */}
+                            <td className="px-3 py-2.5">
+                              <div className="flex gap-0.5 flex-wrap max-w-[120px]">
+                                {epScenes.filter(s =>
+                                  (s.action || "").includes(role.name) ||
+                                  (s.heading || "").includes(role.name)
+                                ).map(s => (
+                                  <span key={s.id} className="px-1 py-0.5 rounded text-[8px] font-mono"
+                                    style={{ background: "#EEF2FF", color: "#4338CA" }}>
+                                    {String(s.sceneNum).padStart(2,"0")}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            {/* Notes from description */}
+                            <td className="px-3 py-2.5 max-w-[140px]">
+                              <p className="text-[10px] truncate" style={{ color: "#999" }}>
+                                {role.description?.slice(0, 40) || "—"}
+                              </p>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* ── Section 2: Scene Schedule ── */}
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #D8D8D8", background: "#fff" }}>
+              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "#F0F5F0", borderBottom: "1px solid #E0E8E0" }}>
+                <div className="flex items-center gap-2">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#10B981" }}>
+                    <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+                    <line x1="16" x2="16" y1="2" y2="6"/>
+                    <line x1="8" x2="8" y1="2" y2="6"/>
+                    <line x1="3" x2="21" y1="10" y2="10"/>
+                  </svg>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Scene Schedule</span>
+                </div>
+                <span className="text-[9px]" style={{ color: "#AAA" }}>{epScenes.length} scenes</span>
+              </div>
+
+              {epScenes.length === 0 ? (
+                <div className="px-4 py-6 text-center text-[11px]" style={{ color: "#CCC" }}>No scenes for this episode.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr style={{ background: "#FAFAFA", borderBottom: "1px solid #EEE" }}>
+                        <th className="text-left px-4 py-2 font-semibold w-12" style={{ color: "#AAA" }}>Scene</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Heading / Description</th>
+                        <th className="text-left px-3 py-2 font-semibold w-28" style={{ color: "#AAA" }}>Location</th>
+                        <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>Time</th>
+                        <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>Mood</th>
+                        <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>Segs</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {epScenes.map((scene, i) => {
+                        const sceneSegs = epSegments.filter(s => s.sceneNum === scene.sceneNum)
+                        const timeColors: Record<string, string> = {
+                          day: "#F59E0B", night: "#6366F1", dawn: "#F97316", dusk: "#EC4899", interior: "#06B6D4", exterior: "#10B981"
+                        }
+                        const tod = (scene.timeOfDay || "").toLowerCase()
+                        const todColor = Object.entries(timeColors).find(([k]) => tod.includes(k))?.[1] || "#9CA3AF"
+                        return (
+                          <tr key={scene.id} style={{ borderBottom: "1px solid #F5F5F5", background: i % 2 === 0 ? "transparent" : "#FAFAFA" }}>
+                            <td className="px-4 py-2.5">
+                              <span className="font-mono font-bold text-[12px]" style={{ color: "#4F46E5" }}>
+                                {String(scene.sceneNum).padStart(2, "0")}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <p className="font-medium" style={{ color: "#1A1A1A" }}>
+                                {scene.heading || `Scene ${scene.sceneNum}`}
+                              </p>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <p className="truncate max-w-[100px]" style={{ color: "#666" }}>{scene.location || "—"}</p>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {scene.timeOfDay ? (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-medium"
+                                  style={{ background: `${todColor}22`, color: todColor }}>
+                                  {scene.timeOfDay}
+                                </span>
+                              ) : <span style={{ color: "#DDD" }}>—</span>}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <p className="truncate max-w-[80px] text-[10px]" style={{ color: "#999" }}>{scene.mood || "—"}</p>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {sceneSegs.length > 0 ? (
+                                <div className="flex gap-1 flex-wrap">
+                                  {sceneSegs.map(seg => {
+                                    const ss = STATUS_STYLE[seg.status] || STATUS_STYLE.pending
+                                    return (
+                                      <span key={seg.id} className="text-[8px] px-1 py-0.5 rounded font-mono"
+                                        style={{ background: ss.bg, color: ss.color }}>
+                                        {seg.segmentIndex + 1}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
+                              ) : <span className="text-[9px]" style={{ color: "#DDD" }}>—</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* ── Section 3: Locations ── */}
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #D8D8D8", background: "#fff" }}>
+              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "#F5F0F0", borderBottom: "1px solid #E8E0E0" }}>
+                <div className="flex items-center gap-2">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#EF4444" }}>
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Locations</span>
+                </div>
+                <Link href={`/dev/location/${script.id}`} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#FEE2E2", color: "#EF4444" }}>
+                  Scout →
+                </Link>
+              </div>
+              {epLocations.length === 0 ? (
+                <div className="px-4 py-6 text-center text-[11px]" style={{ color: "#CCC" }}>No locations specified in scenes.</div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3 p-4">
+                  {epLocations.map(loc => (
+                    <div key={loc.loc} className="rounded-lg p-3 flex flex-col gap-1.5"
+                      style={{ background: "#FFF5F5", border: "1px solid #FFE4E4" }}>
+                      <div className="flex items-start gap-2">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ background: "#FEE2E2" }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth={2}>
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-[11px] truncate" style={{ color: "#1A1A1A" }}>{loc.loc}</p>
+                          {loc.timeOfDay && (
+                            <p className="text-[9px]" style={{ color: "#F97316" }}>{loc.timeOfDay}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {loc.scenes.map(n => (
+                          <span key={n} className="text-[9px] px-1 rounded font-mono"
+                            style={{ background: "#FFE4E4", color: "#B91C1C" }}>
+                            SC{String(n).padStart(2,"0")}
+                          </span>
+                        ))}
+                      </div>
+                      {loc.mood && <p className="text-[9px]" style={{ color: "#AAA" }}>{loc.mood}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Section 4: Props summary ── */}
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #D8D8D8", background: "#fff" }}>
+              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "#F5F5F0", borderBottom: "1px solid #E8E8E0" }}>
+                <div className="flex items-center gap-2">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#F59E0B" }}>
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.29 7 12 12 20.71 7"/>
+                    <line x1="12" y1="22" x2="12" y2="12"/>
+                  </svg>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Props</span>
+                </div>
+                <Link href={`/dev/props/${script.id}`} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#FEF3C7", color: "#D97706" }}>
+                  Manage Props →
+                </Link>
+              </div>
+              <div className="px-4 py-4 text-center text-[11px]" style={{ color: "#BBB" }}>
+                Props are managed in the Props module.{" "}
+                <Link href={`/dev/props/${script.id}`} className="underline" style={{ color: "#F59E0B" }}>Open Props →</Link>
+              </div>
+            </div>
+
+            {/* ── Section 5: Segment status per scene ── */}
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #D8D8D8", background: "#fff" }}>
+              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "#F0F0F8", borderBottom: "1px solid #E0E0F0" }}>
+                <div className="flex items-center gap-2">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#6366F1" }}>
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Production Status</span>
+                </div>
+                <button onClick={() => setMainTab("segments")} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#EEF2FF", color: "#4F46E5" }}>
+                  Open Segments →
+                </button>
+              </div>
+              <div className="p-4">
+                {epSegments.length === 0 ? (
+                  <div className="text-center text-[11px] py-4" style={{ color: "#CCC" }}>
+                    No segments yet. <button onClick={() => setMainTab("segments")} className="underline" style={{ color: "#4F46E5" }}>Go to Segments to AI Split →</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3 flex-wrap">
+                    {Object.entries(STATUS_STYLE).map(([status, style]) => {
+                      const count = epSegments.filter(s => s.status === status).length
+                      if (count === 0) return null
+                      return (
+                        <div key={status} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                          style={{ background: style.bg, border: `1px solid ${style.color}33` }}>
+                          <span className="text-[12px] font-bold" style={{ color: style.color }}>{count}</span>
+                          <span className="text-[10px]" style={{ color: style.color }}>{style.label}</span>
+                        </div>
+                      )
+                    })}
+                    <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                      style={{ background: "#F0F0F5", border: "1px solid #D8D8E8" }}>
+                      <span className="text-[10px] font-medium" style={{ color: "#6366F1" }}>
+                        {epSegments.reduce((a, s) => a + s.durationSec, 0)}s total
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── SEGMENTS VIEW ── */}
+      {mainTab === "segments" && <>
+      {/* Center: Segment list */}
+      <div className="flex flex-col" style={{ width: 380, borderRight: "1px solid #C0C0C0", background: "#F0F0F0" }}>
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: "1px solid #C8C8C8", background: "#EBEBEB" }}>
+          <div className="flex-1">
+            <span className="text-[11px] font-semibold" style={{ color: "#333" }}>Episode {selectedEp}</span>
+            {epSegments.length > 0 && (
+              <span className="text-[10px] ml-2" style={{ color: "#AAA" }}>
+                {done}/{epSegments.length} · {totalDuration}s
+              </span>
+            )}
+          </div>
+          {active > 0 && (
+            <button onClick={pollStatus} className="text-[10px] px-2 py-1 rounded transition-colors" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
+              {isPolling ? "..." : "↻ Refresh"}
+            </button>
+          )}
+          {epSegments.length > 0 && (
+            <button onClick={handleResetAll} className="text-[10px] px-2 py-1 rounded transition-colors" style={{ color: "#EF4444" }}>
+              Reset All
+            </button>
+          )}
+          <button
+            onClick={handleAISplit}
+            disabled={isSplitting}
+            className="text-[10px] px-3 py-1 rounded font-medium transition-colors disabled:opacity-50"
+            style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+          >
+            {isSplitting ? "Splitting..." : epSegments.length > 0 ? "Re-split" : "✦ AI Split"}
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={isSubmitting || epSegments.length === 0}
+            className="text-[10px] px-3 py-1 rounded font-medium transition-colors disabled:opacity-50"
+            style={{ background: "#4F46E5", color: "#fff" }}
+          >
+            {isSubmitting ? "Submitting..." : done === epSegments.length && done > 0 ? "Re-generate" : "▶ Generate"}
+          </button>
+        </div>
+
+        {/* Segment list */}
+        <div className="flex-1 overflow-y-auto dev-scrollbar">
+          {epSegments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48" style={{ color: "#CCC" }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-2 opacity-40">
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                <line x1="9" x2="9" y1="3" y2="21" />
+              </svg>
+              <p className="text-xs">No segments</p>
+              <p className="text-[10px] mt-1" style={{ color: "#DDD" }}>Click "✦ AI Split" to generate from script</p>
+            </div>
+          ) : (
+            <div className="p-2 space-y-1.5">
+              {epSegments.map(seg => {
+                const ss = STATUS_STYLE[seg.status] || STATUS_STYLE.pending
+                const isSelected = seg.id === selectedSegId
+                return (
+                  <button
+                    key={seg.id}
+                    onClick={() => setSelectedSegId(seg.id === selectedSegId ? null : seg.id)}
+                    className="w-full text-left rounded-lg p-2.5 transition-all"
+                    style={{
+                      background: isSelected ? "#DCE0F5" : "#E8E8E8",
+                      outline: isSelected ? "1px solid #A5B4FC" : "1px solid #D0D0D0",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-[10px] font-mono w-5 flex-shrink-0" style={{ color: "#AAA" }}>#{seg.segmentIndex + 1}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: ss.bg, color: ss.color }}>{ss.label}</span>
+                      <span className="text-[10px] ml-auto" style={{ color: "#AAA" }}>{seg.durationSec}s</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed line-clamp-2" style={{ color: "#555", paddingLeft: 20 }}>
+                      {seg.prompt.slice(0, 100)}
+                    </p>
+                    {seg.status === "failed" && seg.errorMessage && (
+                      <p className="text-[10px] mt-1 pl-5" style={{ color: "#EF4444" }}>{seg.errorMessage.slice(0, 80)}</p>
+                    )}
+                    {/* Thumbnail preview */}
+                    {seg.thumbnailUrl && (
+                      <div className="mt-2 pl-5">
+                        <img src={seg.thumbnailUrl} alt="" className="h-16 rounded object-cover" style={{ border: "1px solid #D0D0D0" }} />
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right: Video preview / Segment detail */}
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#F5F5F5" }}>
+        {!selectedSeg ? (
+          <div className="flex-1 flex flex-col items-center justify-center" style={{ color: "#CCC" }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-3 opacity-30">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <p className="text-sm">Select a segment to preview</p>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto dev-scrollbar p-4">
+            {/* Video preview */}
+            {selectedSeg.videoUrl ? (
+              <div className="mb-4 rounded-lg overflow-hidden" style={{ background: "#000", border: "1px solid #C0C0C0" }}>
+                <video
+                  src={selectedSeg.videoUrl}
+                  controls
+                  className="w-full max-h-[320px]"
+                  style={{ display: "block" }}
+                />
+              </div>
+            ) : selectedSeg.thumbnailUrl ? (
+              <div className="mb-4 rounded-lg overflow-hidden" style={{ border: "1px solid #C0C0C0" }}>
+                <img src={selectedSeg.thumbnailUrl} alt="" className="w-full max-h-[240px] object-cover" />
+              </div>
+            ) : (
+              <div className="mb-4 rounded-lg flex items-center justify-center h-40" style={{ background: "#E0E0E0", border: "1px solid #C8C8C8" }}>
+                <span className="text-[11px]" style={{ color: "#AAA" }}>
+                  {["submitted", "generating"].includes(selectedSeg.status) ? "Generating..." : "No video yet"}
+                </span>
+              </div>
+            )}
+
+            {/* Segment info */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold" style={{ color: "#1A1A1A" }}>Segment #{selectedSeg.segmentIndex + 1}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={STATUS_STYLE[selectedSeg.status] || STATUS_STYLE.pending}>
+                    {STATUS_STYLE[selectedSeg.status]?.label || selectedSeg.status}
+                  </span>
+                </div>
+                {(selectedSeg.status === "failed" || selectedSeg.status === "done") && (
+                  <button
+                    onClick={() => handleReset(selectedSeg.id)}
+                    className="text-[10px] px-2 py-1 rounded transition-colors"
+                    style={{ background: "#E8E8E8", color: "#666" }}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
+                  <span style={{ color: "#AAA" }}>Duration</span>
+                  <p className="font-medium" style={{ color: "#333" }}>{selectedSeg.durationSec}s</p>
+                </div>
+                <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
+                  <span style={{ color: "#AAA" }}>Scene</span>
+                  <p className="font-medium" style={{ color: "#333" }}>#{selectedSeg.sceneNum}</p>
+                </div>
+                {selectedSeg.shotType && (
+                  <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
+                    <span style={{ color: "#AAA" }}>Shot</span>
+                    <p className="font-medium" style={{ color: "#333" }}>{selectedSeg.shotType}</p>
+                  </div>
+                )}
+                {selectedSeg.cameraMove && selectedSeg.cameraMove !== "static" && (
+                  <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
+                    <span style={{ color: "#AAA" }}>Camera</span>
+                    <p className="font-medium" style={{ color: "#333" }}>{selectedSeg.cameraMove}</p>
+                  </div>
+                )}
+                {selectedSeg.model && (
+                  <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
+                    <span style={{ color: "#AAA" }}>Model</span>
+                    <p className="font-medium truncate" style={{ color: "#333" }}>{selectedSeg.model.replace(/_/g, " ")}</p>
+                  </div>
+                )}
+                {selectedSeg.tokenCost && (
+                  <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
+                    <span style={{ color: "#AAA" }}>Cost</span>
+                    <p className="font-medium" style={{ color: "#333" }}>{selectedSeg.tokenCost} coins</p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#999" }}>Prompt</label>
+                <p className="text-[11px] leading-relaxed p-2.5 rounded" style={{ background: "#EBEBEB", color: "#555" }}>
+                  {selectedSeg.prompt}
+                </p>
+              </div>
+
+              {selectedSeg.errorMessage && (
+                <div className="p-2.5 rounded text-[11px] leading-relaxed" style={{ background: "#FEE2E2", color: "#991B1B" }}>
+                  <strong>Error:</strong> {selectedSeg.errorMessage}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      </>}
+    </div>
+    </div>
+  )
+}
