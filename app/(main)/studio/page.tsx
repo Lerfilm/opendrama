@@ -3,9 +3,8 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Edit, CheckCircle } from "@/components/icons"
+import { CheckCircle } from "@/components/icons"
 import Link from "next/link"
 import { t } from "@/lib/i18n"
 
@@ -43,22 +42,6 @@ export default async function StudioPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t("studio.title")}</h1>
       </div>
-
-      {/* 快捷入口 */}
-      <Link href="/studio/script/new">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer border-dashed">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Edit className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <span className="text-sm font-semibold">{t("studio.newScript")}</span>
-              <p className="text-xs text-muted-foreground">{t("studio.emptySceneDesc")}</p>
-            </div>
-            <Plus className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
-          </CardContent>
-        </Card>
-      </Link>
 
       {/* 我的剧本列表 */}
       <div>
