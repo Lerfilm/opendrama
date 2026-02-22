@@ -423,11 +423,15 @@ model VideoSegment {
   // 生成结果
   status          String    @default("pending") // pending | reserved | submitted | generating | done | failed
   providerTaskId  String?
-  videoUrl        String?
+  videoUrl        String?   // Provider URL (Volcengine TOS) — may expire
   thumbnailUrl    String?
   tokenCost       Int?
   apiCostCents    Int?
   errorMessage    String?
+
+  // Mux 永久存储 (上传后可直接用 HLS 播放)
+  muxAssetId      String?   // Mux Asset ID
+  muxPlaybackId   String?   // Mux Playback ID for HLS streaming
 
   // 链式生成
   chainMode       Boolean   @default(false)  // 是否链式生成模式

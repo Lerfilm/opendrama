@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { queryVideoTask, enrichSegmentWithCharacters, submitVideoTask } from "@/lib/video-generation"
 import { confirmDeduction, refundReservation } from "@/lib/tokens"
+import { uploadSegmentToMux } from "@/lib/mux"
 
 // Segments stuck in generating/submitted for longer than this are auto-failed
 const STALE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
@@ -90,6 +91,10 @@ async function syncActiveSegments(
         if (count > 0 && userId && seg.tokenCost) {
           if (result.status === "done") {
             await confirmDeduction(userId, seg.tokenCost, { segmentId: seg.id })
+            // Upload to Mux for permanent HLS storage (fire-and-forget)
+            if (result.videoUrl) {
+              uploadSegmentToMux(seg.id, result.videoUrl).catch(() => {})
+            }
           }
           if (result.status === "failed") {
             await refundReservation(

@@ -19,6 +19,7 @@ interface VideoSegment {
   thumbnailUrl?: string | null
   tokenCost?: number | null
   errorMessage?: string | null
+  muxPlaybackId?: string | null
 }
 
 interface Scene {
@@ -1029,10 +1030,14 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
         ) : (
           <div className="flex-1 overflow-y-auto dev-scrollbar p-4">
             {/* Video preview */}
-            {selectedSeg.videoUrl ? (
+            {(selectedSeg.muxPlaybackId || selectedSeg.videoUrl) ? (
               <div className="mb-4 rounded-lg overflow-hidden" style={{ background: "#000", border: "1px solid #C0C0C0" }}>
                 <video
-                  src={selectedSeg.videoUrl}
+                  src={
+                    selectedSeg.muxPlaybackId
+                      ? `https://stream.mux.com/${selectedSeg.muxPlaybackId}.m3u8`
+                      : selectedSeg.videoUrl!
+                  }
                   controls
                   className="w-full max-h-[320px]"
                   style={{ display: "block" }}
