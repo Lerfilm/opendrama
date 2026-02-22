@@ -978,10 +978,6 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
           </div>
         </div>
       )}
-      {/* Version tag */}
-      <div style={{ position: "fixed", bottom: 10, right: 14, fontSize: 10, color: "#BBBBBB", pointerEvents: "none", zIndex: 9 }}>
-        v2026-02-22.4
-      </div>
     </div>
   )
 }
