@@ -13,7 +13,7 @@ export default async function LocationPage({ params }: { params: Promise<{ scrip
     where: { id: scriptId, userId: session.user.id as string },
     include: {
       scenes: {
-        select: { id: true, episodeNum: true, sceneNum: true, heading: true, location: true, timeOfDay: true, mood: true },
+        select: { id: true, episodeNum: true, sceneNum: true, heading: true, location: true, timeOfDay: true, mood: true, action: true },
         orderBy: [{ episodeNum: "asc" }, { sceneNum: "asc" }],
       },
     },

@@ -10,6 +10,7 @@ interface SceneRef {
   location?: string | null
   timeOfDay?: string | null
   mood?: string | null
+  action?: string | null
 }
 
 interface LocationPhoto {
@@ -18,13 +19,22 @@ interface LocationPhoto {
   isApproved?: boolean
 }
 
+interface TimeSlot {
+  timeOfDay: string
+  mood?: string
+  sceneNums?: number[]
+  setNotes?: string
+}
+
 interface LocationEntry {
-  name: string               // location name e.g. "Office Lobby"
-  type: string               // INT | EXT | INT/EXT
+  name: string
+  type: string
   address?: string
   contact?: string
   notes?: string
+  description?: string
   photos: LocationPhoto[]
+  timeSlots?: TimeSlot[]
 }
 
 interface Script {
@@ -33,15 +43,28 @@ interface Script {
   scenes: SceneRef[]
 }
 
-interface LocationWorkspaceProps {
-  script: Script
-}
-
 // Derive unique locations from scene headings
 function extractLocations(scenes: SceneRef[]): string[] {
   const set = new Set<string>()
   scenes.forEach(s => { if (s.location) set.add(s.location) })
   return [...set].sort()
+}
+
+// Build scene text for AI (heading + first 300 chars of action)
+function buildSceneText(scene: SceneRef): string {
+  let text = `Scene E${scene.episodeNum}S${scene.sceneNum}: ${scene.heading || ""}`
+  if (scene.action) {
+    const raw = scene.action.trim()
+    let actionText = raw
+    if (raw.startsWith("[")) {
+      try {
+        const blocks = JSON.parse(raw) as Array<{ text?: string; line?: string }>
+        actionText = blocks.map(b => b.text || b.line || "").filter(Boolean).join(" ")
+      } catch { /* keep raw */ }
+    }
+    text += `\n${actionText.substring(0, 300)}`
+  }
+  return text
 }
 
 export function LocationWorkspace({ script }: { script: Script }) {
@@ -52,7 +75,6 @@ export function LocationWorkspace({ script }: { script: Script }) {
   const [entries, setEntries] = useState<Record<string, LocationEntry>>(() => {
     const init: Record<string, LocationEntry> = {}
     scriptLocations.forEach(loc => {
-      // Guess INT/EXT from scenes
       const matchingScene = script.scenes.find(s => s.location === loc)
       const heading = matchingScene?.heading?.toUpperCase() || ""
       const type = heading.startsWith("EXT") ? "EXT" : heading.startsWith("INT/EXT") ? "INT/EXT" : "INT"
@@ -65,12 +87,24 @@ export function LocationWorkspace({ script }: { script: Script }) {
   const [newLocName, setNewLocName] = useState("")
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false)
+  const [isAIExtracting, setIsAIExtracting] = useState(false)
 
   const entry = selectedLoc ? entries[selectedLoc] : null
   const scenesForLoc = useMemo(() =>
     scenes.filter(s => s.location === selectedLoc),
     [scenes, selectedLoc]
   )
+
+  // Group scenes by time-of-day for the selected location
+  const scenesByTime = useMemo(() => {
+    const map: Record<string, SceneRef[]> = {}
+    scenesForLoc.forEach(s => {
+      const key = s.timeOfDay || "Unspecified"
+      if (!map[key]) map[key] = []
+      map[key].push(s)
+    })
+    return map
+  }, [scenesForLoc])
 
   // Refresh scenes from server
   const handleRefresh = useCallback(async () => {
@@ -81,10 +115,9 @@ export function LocationWorkspace({ script }: { script: Script }) {
         const data = await res.json()
         const newScenes: SceneRef[] = (data.script?.scenes || []).map((s: SceneRef) => ({
           id: s.id, episodeNum: s.episodeNum, sceneNum: s.sceneNum,
-          heading: s.heading, location: s.location, timeOfDay: s.timeOfDay, mood: s.mood,
+          heading: s.heading, location: s.location, timeOfDay: s.timeOfDay, mood: s.mood, action: s.action,
         }))
         setScenes(newScenes)
-        // Re-init new locations if any
         const newLocs = extractLocations(newScenes)
         setEntries(prev => {
           const next = { ...prev }
@@ -103,6 +136,51 @@ export function LocationWorkspace({ script }: { script: Script }) {
       setIsRefreshing(false)
     }
   }, [script.id])
+
+  // AI Extract locations from entire script
+  const extractLocationsFromScript = useCallback(async () => {
+    setIsAIExtracting(true)
+    try {
+      const sceneTexts = scenes.map(buildSceneText).join("\n\n---\n\n")
+      const res = await fetch("/api/ai/extract-locations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptId: script.id, sceneTexts }),
+      })
+      if (!res.ok) throw new Error("Failed")
+      const data = await res.json()
+      const aiLocations: Array<{
+        name: string
+        type: string
+        description?: string
+        timeSlots?: TimeSlot[]
+      }> = data.locations || []
+
+      setEntries(prev => {
+        const next = { ...prev }
+        aiLocations.forEach(loc => {
+          const existing = next[loc.name] || { name: loc.name, type: loc.type, photos: [] }
+          next[loc.name] = {
+            ...existing,
+            type: loc.type || existing.type,
+            description: loc.description || existing.description,
+            timeSlots: loc.timeSlots || existing.timeSlots,
+            notes: existing.notes || loc.description || "",
+          }
+        })
+        return next
+      })
+
+      // Auto-select first extracted location
+      if (aiLocations.length > 0 && !selectedLoc) {
+        setSelectedLoc(aiLocations[0].name)
+      }
+    } catch {
+      alert("AI extraction failed")
+    } finally {
+      setIsAIExtracting(false)
+    }
+  }, [scenes, script.id, selectedLoc])
 
   // AI generate location description
   const handleAIDescribe = useCallback(async (locName: string) => {
@@ -180,6 +258,22 @@ export function LocationWorkspace({ script }: { script: Script }) {
           </div>
         )}
 
+        {/* AI Extract button */}
+        <div className="px-3 py-2" style={{ borderBottom: "1px solid #C8C8C8" }}>
+          <button
+            onClick={extractLocationsFromScript}
+            disabled={isAIExtracting || scenes.length === 0}
+            className="w-full flex items-center justify-center gap-1.5 text-[10px] px-2 py-1.5 rounded disabled:opacity-50 transition-colors"
+            style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+          >
+            {isAIExtracting ? (
+              <><div className="w-2.5 h-2.5 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Extracting...</>
+            ) : (
+              <>✦ AI Extract from Script</>
+            )}
+          </button>
+        </div>
+
         <div className="flex-1 overflow-y-auto dev-scrollbar py-1">
           {allLocs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12" style={{ color: "#BBB" }}>
@@ -187,14 +281,15 @@ export function LocationWorkspace({ script }: { script: Script }) {
                 <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
                 <circle cx="12" cy="10" r="3" />
               </svg>
-              <p className="text-[11px]">No locations in script</p>
+              <p className="text-[11px] text-center px-3">No locations yet.<br />Use ✦ AI Extract or add manually.</p>
             </div>
           ) : (
             allLocs.map(loc => {
               const isSelected = loc === selectedLoc
               const e = entries[loc]
               const photoCount = e?.photos?.length ?? 0
-              const sceneCount = script.scenes.filter(s => s.location === loc).length
+              const sceneCount = scenes.filter(s => s.location === loc).length
+              const timeSlotCount = e?.timeSlots?.length ?? 0
               return (
                 <button key={loc} onClick={() => setSelectedLoc(loc)}
                   className="w-full text-left px-3 py-2.5 flex items-start gap-2 transition-colors"
@@ -204,8 +299,9 @@ export function LocationWorkspace({ script }: { script: Script }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium truncate" style={{ color: isSelected ? "#1A1A1A" : "#333" }}>{loc}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className="text-[9px]" style={{ color: "#AAA" }}>{sceneCount} scene{sceneCount !== 1 ? "s" : ""}</span>
+                      {timeSlotCount > 0 && <span className="text-[9px]" style={{ color: "#7C3AED" }}>🕐 {timeSlotCount} slots</span>}
                       {photoCount > 0 && <span className="text-[9px]" style={{ color: "#4F46E5" }}>📷 {photoCount}</span>}
                     </div>
                   </div>
@@ -225,6 +321,9 @@ export function LocationWorkspace({ script }: { script: Script }) {
               <circle cx="12" cy="10" r="3" />
             </svg>
             <p className="text-sm">Select a location</p>
+            {allLocs.length === 0 && scenes.length > 0 && (
+              <p className="text-[11px] mt-2 px-8 text-center">Click ✦ AI Extract to pull locations from your script</p>
+            )}
           </div>
         ) : (
           <div className="max-w-2xl mx-auto p-6">
@@ -292,8 +391,65 @@ export function LocationWorkspace({ script }: { script: Script }) {
               </div>
             </div>
 
-            {/* Scenes using this location */}
-            {scenesForLoc.length > 0 && (
+            {/* Time-of-Day Shooting Schedule — AI-extracted or derived from scenes */}
+            {(entry.timeSlots && entry.timeSlots.length > 0) ? (
+              <div className="mb-6">
+                <label className="text-[10px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: "#999" }}>
+                  Shooting Schedule by Time · {entry.timeSlots.length} slot{entry.timeSlots.length !== 1 ? "s" : ""}
+                </label>
+                <div className="space-y-2">
+                  {entry.timeSlots.map((slot, i) => (
+                    <div key={i} className="p-3 rounded" style={{ background: "#F5F5F5", border: "1px solid #E0E0E0" }}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
+                          {slot.timeOfDay}
+                        </span>
+                        {slot.mood && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#EDE9FE", color: "#7C3AED" }}>
+                            {slot.mood}
+                          </span>
+                        )}
+                        {slot.sceneNums && slot.sceneNums.length > 0 && (
+                          <span className="text-[9px] font-mono ml-auto" style={{ color: "#AAA" }}>
+                            S{slot.sceneNums.join(", S")}
+                          </span>
+                        )}
+                      </div>
+                      {slot.setNotes && (
+                        <p className="text-[11px] leading-relaxed" style={{ color: "#666" }}>{slot.setNotes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : Object.keys(scenesByTime).length > 0 ? (
+              <div className="mb-6">
+                <label className="text-[10px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: "#999" }}>
+                  Scenes by Time of Day
+                </label>
+                <div className="space-y-3">
+                  {Object.entries(scenesByTime).map(([timeOfDay, timeScenes]) => (
+                    <div key={timeOfDay}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
+                          {timeOfDay}
+                        </span>
+                        <span className="text-[9px]" style={{ color: "#AAA" }}>{timeScenes.length} scene{timeScenes.length !== 1 ? "s" : ""}</span>
+                      </div>
+                      <div className="space-y-1 ml-1">
+                        {timeScenes.map(s => (
+                          <div key={s.id} className="flex items-center gap-2 px-3 py-1.5 rounded" style={{ background: "#F0F0F0" }}>
+                            <span className="text-[10px] font-mono font-bold" style={{ color: "#4F46E5" }}>E{s.episodeNum}S{s.sceneNum}</span>
+                            <span className="text-[11px] truncate flex-1" style={{ color: "#444" }}>{s.heading || "Untitled scene"}</span>
+                            {s.mood && <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#EDE9FE", color: "#7C3AED" }}>{s.mood}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : scenesForLoc.length > 0 ? (
               <div className="mb-6">
                 <label className="text-[10px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: "#999" }}>Scenes at this Location</label>
                 <div className="space-y-1">
@@ -307,7 +463,7 @@ export function LocationWorkspace({ script }: { script: Script }) {
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Location photos */}
             <div>

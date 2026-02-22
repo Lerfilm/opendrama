@@ -219,52 +219,18 @@ export function SceneDetailPanel({
   const pendingFocusIdx = useRef<number | null>(null)
   const blockRefs = useRef<Map<string, HTMLElement>>(new Map())
 
-  // No scene selected
-  if (!scene) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center"
-        style={{ background: "#F8F6F1", color: "#C0C0C0" }}>
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-4 opacity-30">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" />
-        </svg>
-        <p className="text-sm mb-1" style={{ fontFamily: "sans-serif" }}>Select a scene</p>
-        <p className="text-xs" style={{ color: "#CCC", fontFamily: "sans-serif" }}>or</p>
-        {scenes.length === 0 ? (
-          <div className="flex flex-col gap-2 mt-3">
-            <button onClick={() => onGenerate(false)} disabled={isGenerating}
-              className="px-4 py-1.5 text-xs rounded disabled:opacity-50"
-              style={{ background: "#E0E4F8", color: "#4F46E5", fontFamily: "sans-serif" }}>
-              {isGenerating ? "Generating..." : "AI Generate Episode 1"}
-            </button>
-            <button onClick={() => onGenerate(true)} disabled={isGenerating}
-              className="px-4 py-1.5 text-xs rounded disabled:opacity-50"
-              style={{ background: "#4F46E5", color: "#fff", fontFamily: "sans-serif" }}>
-              {isGenerating ? "Generating..." : "AI Generate All Episodes"}
-            </button>
-          </div>
-        ) : (
-          <button onClick={() => onAddScene()}
-            className="mt-3 px-4 py-1.5 text-xs rounded"
-            style={{ background: "#E8E8E8", color: "#888", fontFamily: "sans-serif" }}>
-            Add Scene
-          </button>
-        )}
-      </div>
-    )
-  }
-
-  const isSaving = savingScenes.has(scene.id)
-  const isEdited = scene.id in editingScenes
-  const rawAction = getSceneValue(scene, "action")
+  // ── Derived scene state (safe to compute even if scene is null) ─────────────
+  const rawAction = scene ? getSceneValue(scene, "action") : null
   const blocks = parseBlocks(rawAction)
+  const isSaving = scene ? savingScenes.has(scene.id) : false
+  const isEdited = scene ? scene.id in editingScenes : false
   const sceneIdx = scenes.findIndex(s => s.id === selectedSceneId)
 
-  // ── Block mutation helpers ─────────────────────────────────────────────────
+  // ── Block mutation helpers (must be before early return — Rules of Hooks) ──
   const updateBlocks = useCallback((newBlocks: Block[]) => {
+    if (!scene) return
     onUpdateField(scene.id, "action", serializeBlocks(newBlocks))
-  }, [scene.id, onUpdateField])
+  }, [scene, onUpdateField])
 
   const insertBlock = useCallback((afterIndex: number, type: Block["type"]) => {
     const newBlock: Block = type === "action"
@@ -355,6 +321,42 @@ export function SceneDetailPanel({
       deleteBlock(focusedBlockIdx)
     }
   }, [focusedBlockIdx, blocks.length, onSaveAll, onNavigateScene, insertBlock, deleteBlock])
+
+  // No scene selected
+  if (!scene) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center"
+        style={{ background: "#F8F6F1", color: "#C0C0C0" }}>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-4 opacity-30">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" />
+        </svg>
+        <p className="text-sm mb-1" style={{ fontFamily: "sans-serif" }}>Select a scene</p>
+        <p className="text-xs" style={{ color: "#CCC", fontFamily: "sans-serif" }}>or</p>
+        {scenes.length === 0 ? (
+          <div className="flex flex-col gap-2 mt-3">
+            <button onClick={() => onGenerate(false)} disabled={isGenerating}
+              className="px-4 py-1.5 text-xs rounded disabled:opacity-50"
+              style={{ background: "#E0E4F8", color: "#4F46E5", fontFamily: "sans-serif" }}>
+              {isGenerating ? "Generating..." : "AI Generate Episode 1"}
+            </button>
+            <button onClick={() => onGenerate(true)} disabled={isGenerating}
+              className="px-4 py-1.5 text-xs rounded disabled:opacity-50"
+              style={{ background: "#4F46E5", color: "#fff", fontFamily: "sans-serif" }}>
+              {isGenerating ? "Generating..." : "AI Generate All Episodes"}
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => onAddScene()}
+            className="mt-3 px-4 py-1.5 text-xs rounded"
+            style={{ background: "#E8E8E8", color: "#888", fontFamily: "sans-serif" }}>
+            Add Scene
+          </button>
+        )}
+      </div>
+    )
+  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
