@@ -2,11 +2,8 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { chargeAiFeature } from "@/lib/ai-pricing"
-import { aiComplete } from "@/lib/ai"
-import { mirrorUrlToStorage, isStorageConfigured, storagePath } from "@/lib/storage"
-
-const ARK_BASE = "https://ark.cn-beijing.volces.com/api/v3"
-const T2I_MODEL = "doubao-seedream-3-0-t2i-250415"
+import { aiComplete, aiGenerateImage } from "@/lib/ai"
+import { uploadToStorage, isStorageConfigured, storagePath } from "@/lib/storage"
 
 /**
  * POST /api/ai/generate-character
@@ -60,40 +57,19 @@ Generate a character portrait prompt:`,
 
     const prompt = llmResult.content.trim()
 
-    // Step 2: Generate image via ARK API
-    const apiKey = process.env.ARK_API_KEY
-    if (!apiKey) throw new Error("ARK_API_KEY not set")
+    // Step 2: Generate image via OpenRouter Gemini (Nano Banana)
+    const b64DataUrl = await aiGenerateImage(prompt, "1:1")
 
-    const res = await fetch(`${ARK_BASE}/images/generations`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: T2I_MODEL,
-        prompt,
-        size: "1024x1024",
-        n: 1,
-      }),
-    })
-
-    const json = await res.json() as { data?: Array<{ url: string }>; error?: { message?: string } }
-
-    if (!res.ok) {
-      throw new Error(`ARK T2I error ${res.status}: ${JSON.stringify(json)}`)
-    }
-
-    let imageUrl = json.data?.[0]?.url
-    if (!imageUrl) throw new Error("No image URL in response")
-
-    // Mirror to Supabase for permanent storage (ARK URLs expire)
+    // Upload base64 image to Supabase for permanent storage
+    let imageUrl: string = b64DataUrl
     if (isStorageConfigured()) {
       try {
-        const path = storagePath(session.user.id, "role-images", `${name}-portrait.jpg`)
-        imageUrl = await mirrorUrlToStorage("role-images", path, imageUrl)
+        const b64 = b64DataUrl.split(",")[1]
+        const buffer = Buffer.from(b64, "base64")
+        const path = storagePath(session.user.id, "role-images", `${name}-${Date.now()}.png`)
+        imageUrl = await uploadToStorage("role-images", path, buffer, "image/png")
       } catch (err) {
-        console.warn("[generate-character] Supabase mirror failed, using ARK URL:", err)
+        console.warn("[generate-character] Supabase upload failed, returning data URL:", err)
       }
     }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useCallback } from "react"
+import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 import { LocationSidebar } from "./components/location-sidebar"
 import { LocationDetail } from "./components/location-detail"
 
@@ -86,6 +86,50 @@ export function LocationWorkspace({ script }: { script: Script }) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false)
   const [isAIExtracting, setIsAIExtracting] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isLoadedRef = useRef(false)
+
+  // Load locations from DB on mount
+  useEffect(() => {
+    fetch(`/api/scripts/${script.id}/locations`)
+      .then(r => r.json())
+      .then(d => {
+        const saved: LocationEntry[] = d.locations || []
+        if (saved.length > 0) {
+          setEntries(prev => {
+            const next = { ...prev }
+            saved.forEach(loc => {
+              next[loc.name] = { ...next[loc.name], ...loc }
+            })
+            return next
+          })
+          setSelectedLoc(prev => prev ?? saved[0]?.name ?? null)
+        }
+        isLoadedRef.current = true
+      })
+      .catch(() => { isLoadedRef.current = true })
+  }, [script.id])
+
+  // Auto-save locations when entries change
+  useEffect(() => {
+    if (!isLoadedRef.current) return
+    const locationList = Object.values(entries)
+    if (locationList.length === 0) return
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    setSaveStatus("saving")
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await fetch(`/api/scripts/${script.id}/locations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ locations: locationList }),
+        })
+        setSaveStatus("saved")
+        setTimeout(() => setSaveStatus("idle"), 2000)
+      } catch { setSaveStatus("idle") }
+    }, 800)
+  }, [entries, script.id])
 
   const entry = selectedLoc ? entries[selectedLoc] : null
 
@@ -219,6 +263,7 @@ export function LocationWorkspace({ script }: { script: Script }) {
         selectedLoc={selectedLoc}
         isRefreshing={isRefreshing}
         isAIExtracting={isAIExtracting}
+        saveStatus={saveStatus}
         onSelectLoc={setSelectedLoc}
         onRefresh={handleRefresh}
         onAIExtract={handleAIExtract}

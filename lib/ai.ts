@@ -1,11 +1,13 @@
 /**
  * OpenRouter AI 客户端
  * 通过 OpenRouter 路由调用 MiniMax 及其他模型
+ * 图像生成: google/gemini-2.5-flash-image (Nano Banana Gemini)
  */
 
 import { jsonrepair } from "jsonrepair"
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+const IMAGE_GEN_MODEL = "google/gemini-2.5-flash-image"
 
 export interface AIMessage {
   role: "system" | "user" | "assistant"
@@ -248,4 +250,80 @@ Requirements:
 - Each episode ends with a cliffhanger
 
 IMPORTANT: Output ONLY the raw JSON object. No markdown code blocks, no comments, no other text.`
+}
+
+/**
+ * Generate an image via OpenRouter using Google Gemini (Nano Banana).
+ * Model: google/gemini-2.5-flash-image
+ * Returns a base64 data URL: "data:image/png;base64,..."
+ */
+export async function aiGenerateImage(
+  prompt: string,
+  aspectRatio: "1:1" | "9:16" | "16:9" = "1:1",
+): Promise<string> {
+  const apiKey = process.env.OPENROUTER_API_KEY
+  if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY")
+
+  const body: Record<string, unknown> = {
+    model: IMAGE_GEN_MODEL,
+    messages: [{ role: "user", content: prompt }],
+    modalities: ["image"],
+    image_config: { aspect_ratio: aspectRatio },
+  }
+
+  const res = await fetch(OPENROUTER_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://opendrama.ai",
+      "X-Title": "OpenDrama AI",
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`Gemini image generation error ${res.status}: ${errText}`)
+  }
+
+  const data = await res.json()
+
+  if (data.error) {
+    throw new Error(`Gemini image error: ${data.error.message || JSON.stringify(data.error)}`)
+  }
+
+  const message = data.choices?.[0]?.message
+  if (!message) throw new Error("Empty response from image generation API")
+
+  // Parse image from response — OpenRouter may return content as array of parts
+  // or as a direct data URL string
+  const content = message.content
+
+  if (typeof content === "string") {
+    // Direct data URL or base64 string
+    if (content.startsWith("data:")) return content
+    // Plain base64 without prefix
+    if (content.length > 100) return `data:image/png;base64,${content}`
+  }
+
+  if (Array.isArray(content)) {
+    for (const part of content) {
+      if (part?.type === "image_url" && part.image_url?.url) {
+        return part.image_url.url
+      }
+      if (part?.type === "image" && part.image?.data) {
+        return `data:${part.image.media_type || "image/png"};base64,${part.image.data}`
+      }
+    }
+  }
+
+  // Fallback: check top-level images array (some OpenRouter formats)
+  if (Array.isArray(message.images)) {
+    const img = message.images[0]
+    if (img?.image_url?.url) return img.image_url.url
+  }
+
+  console.error("[aiGenerateImage] Unexpected response format:", JSON.stringify(data).slice(0, 500))
+  throw new Error("Could not extract image from AI response")
 }

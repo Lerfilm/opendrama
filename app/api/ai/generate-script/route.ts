@@ -59,6 +59,7 @@ Current episode: ${targetEpisode} of ${script.targetEpisodes}
 Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also generate the roles list." : "Roles already exist — only generate scenes, return an empty roles array []."}`
 
   const result = await aiComplete({
+    model: "anthropic/claude-sonnet-4-6",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },

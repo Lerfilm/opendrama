@@ -329,8 +329,13 @@ export async function POST(req: NextRequest) {
 
           const { extractText } = await import("unpdf")
           const arrayBuffer = await pdfFile.arrayBuffer()
-          const { text: extractedText } = await extractText(new Uint8Array(arrayBuffer), { mergePages: true })
-          text = Array.isArray(extractedText) ? extractedText.join("\n") : (extractedText || "")
+          // NOTE: mergePages: true collapses all whitespace to spaces (destroys newlines).
+          // Use mergePages: false to get per-page text arrays, then join with \n\n
+          // so that EP markers at the start of each page remain on their own lines.
+          const { text: extractedText, totalPages } = await extractText(new Uint8Array(arrayBuffer), { mergePages: false })
+          console.log(`PDF extracted: ${totalPages} pages`)
+          text = Array.isArray(extractedText) ? extractedText.join("\n\n") : (extractedText as string || "")
+          console.log(`PDF text length: ${text.length}, first 200 chars:`, JSON.stringify(text.slice(0, 200)))
         } else {
           const body = await req.json()
           text = body.text
@@ -482,6 +487,7 @@ export async function POST(req: NextRequest) {
           let chunkResult: ChunkResult = {}
           try {
             const result = await aiComplete({
+              model: "anthropic/claude-sonnet-4-6",
               messages: [
                 { role: "system", content: PDF_IMPORT_SYSTEM_PROMPT },
                 { role: "user", content: userMsg },

@@ -28,6 +28,7 @@ interface LocationSidebarProps {
   selectedLoc: string | null
   isRefreshing: boolean
   isAIExtracting: boolean
+  saveStatus: "idle" | "saving" | "saved"
   onSelectLoc: (loc: string) => void
   onRefresh: () => void
   onAIExtract: () => void
@@ -36,7 +37,7 @@ interface LocationSidebarProps {
 
 export function LocationSidebar({
   allLocs, entries, scenes, selectedLoc,
-  isRefreshing, isAIExtracting,
+  isRefreshing, isAIExtracting, saveStatus,
   onSelectLoc, onRefresh, onAIExtract, onAddLocation,
 }: LocationSidebarProps) {
   const [addingLoc, setAddingLoc] = useState(false)
@@ -56,10 +57,21 @@ export function LocationSidebar({
     <div className="w-64 flex flex-col flex-shrink-0" style={{ background: "#EBEBEB", borderRight: "1px solid #C0C0C0" }}>
       {/* Header */}
       <div className="px-3 py-2.5 flex items-center justify-between" style={{ borderBottom: "1px solid #C8C8C8" }}>
-        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>
+        <span className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "#888" }}>
           Locations · {allLocs.length}
+          {saveStatus === "saving" && <span style={{ color: "#AAA", fontSize: 9 }}>Saving...</span>}
+          {saveStatus === "saved" && <span style={{ color: "#10B981", fontSize: 9 }}>Saved</span>}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowConfirm(true)}
+            disabled={isAIExtracting}
+            className="text-[9px] px-2 py-0.5 rounded disabled:opacity-50"
+            style={{ background: "#E0E4F8", color: "#4F46E5" }}
+            title="AI Extract locations from script"
+          >
+            {isAIExtracting ? "..." : "✦ AI"}
+          </button>
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
@@ -93,22 +105,6 @@ export function LocationSidebar({
           </button>
         </div>
       )}
-
-      {/* AI Extract button */}
-      <div className="px-3 py-2" style={{ borderBottom: "1px solid #C8C8C8" }}>
-        <button
-          onClick={() => setShowConfirm(true)}
-          disabled={isAIExtracting || scenes.length === 0}
-          className="w-full flex items-center justify-center gap-1.5 text-[10px] px-2 py-1.5 rounded disabled:opacity-50 transition-colors"
-          style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
-        >
-          {isAIExtracting ? (
-            <><div className="w-2.5 h-2.5 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Extracting...</>
-          ) : (
-            <>✦ AI Extract from Script</>
-          )}
-        </button>
-      </div>
 
       {/* Location list */}
       <div className="flex-1 overflow-y-auto dev-scrollbar py-1">

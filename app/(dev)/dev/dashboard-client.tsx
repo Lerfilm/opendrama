@@ -181,6 +181,7 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
     formData.append("genre", pdfGenre)
     formData.append("format", pdfFormat)
     formData.append("language", pdfLanguage)
+    formData.append("targetEpisodes", targetEpisodes)
     if (resumeScriptId) formData.append("resumeScriptId", resumeScriptId)
 
     let currentScriptId: string | null = resumeScriptId

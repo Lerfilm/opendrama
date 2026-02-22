@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma"
-import { aiComplete } from "@/lib/ai"
-import { mirrorUrlToStorage, isStorageConfigured } from "@/lib/storage"
+import { aiComplete, aiGenerateImage } from "@/lib/ai"
+import { uploadToStorage, isStorageConfigured } from "@/lib/storage"
 
 /**
  * Generate a cover prompt for an episode using LLM.
@@ -54,54 +54,30 @@ ${sceneSummary}`,
   return result.content
 }
 
-// ARK API image generation (Doubao Seedream)
-const ARK_BASE = "https://ark.cn-beijing.volces.com/api/v3"
-const T2I_MODEL = "doubao-seedream-3-0-t2i-250415"
-
-interface ArkImageResponse {
-  data: Array<{ url: string }>
-}
-
 /**
- * Generate a single image via ARK API (synchronous, returns URL directly).
- * Size: "1080x1920" for 9:16 vertical.
+ * Generate a cover image via OpenRouter Gemini (Nano Banana, 9:16 vertical).
+ * Uploads to Supabase immediately and returns the permanent URL.
  */
-async function generateImageViaArk(prompt: string): Promise<string> {
-  const apiKey = process.env.ARK_API_KEY
-  if (!apiKey) throw new Error("ARK_API_KEY env var not set")
+async function generateCoverImage(scriptId: string, episodeNum: number, prompt: string): Promise<string> {
+  const b64DataUrl = await aiGenerateImage(prompt, "9:16")
 
-  const res = await fetch(`${ARK_BASE}/images/generations`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: T2I_MODEL,
-      prompt,
-      size: "1080x1920",
-      n: 1,
-    }),
-  })
-
-  const json = await res.json() as ArkImageResponse & { error?: { message?: string } }
-
-  if (!res.ok) {
-    throw new Error(`ARK T2I error ${res.status}: ${JSON.stringify(json)}`)
+  if (isStorageConfigured()) {
+    const b64 = b64DataUrl.split(",")[1]
+    const buffer = Buffer.from(b64, "base64")
+    const path = `${scriptId}/cover-tall-ep${episodeNum}-${Date.now()}.png`
+    const supabaseUrl = await uploadToStorage("covers", path, buffer, "image/png")
+    console.log(`[Cover] Uploaded to Supabase: ${supabaseUrl}`)
+    return supabaseUrl
   }
 
-  const url = json.data?.[0]?.url
-  if (!url) {
-    throw new Error(`ARK T2I: no image URL in response: ${JSON.stringify(json)}`)
-  }
-
-  return url
+  // Fallback when Supabase not configured (local dev)
+  return b64DataUrl
 }
 
 /**
  * Submit cover generation task (9:16 vertical).
- * Uses ARK synchronous image generation — returns a synthetic task ID
- * that encodes the image URL for the status endpoint.
+ * Uses OpenRouter Gemini (Nano Banana) — synchronous, uploads to Supabase,
+ * encodes the permanent URL as a task ID for the status endpoint.
  */
 export async function submitCoverGeneration(
   scriptId: string,
@@ -110,10 +86,8 @@ export async function submitCoverGeneration(
 ): Promise<{ tallTaskId: string }> {
   console.log(`[Cover] Submitting cover generation for script=${scriptId} ep=${episodeNum}`)
 
-  // ARK is synchronous — generate the image immediately and encode the URL
-  // as a base64 task ID so the status endpoint can decode it.
-  const imageUrl = await generateImageViaArk(prompt)
-  console.log(`[Cover] Image generated: ${imageUrl.slice(0, 80)}...`)
+  const imageUrl = await generateCoverImage(scriptId, episodeNum, prompt)
+  console.log(`[Cover] Cover ready: ${imageUrl.slice(0, 80)}...`)
 
   // Encode URL as a "task ID" so existing polling infrastructure works
   const tallTaskId = `ark:${Buffer.from(imageUrl).toString("base64")}`
@@ -151,19 +125,11 @@ export async function pollAndSaveCovers(
 
   let tallUrl = r.status === "done" ? r.imageUrl : undefined
 
-  // Mirror to Supabase for permanent storage (ARK URLs expire)
-  if (tallUrl && isStorageConfigured()) {
-    try {
-      const storedUrl = await mirrorUrlToStorage(
-        "covers",
-        `${scriptId}/cover-tall-${Date.now()}.jpg`,
-        tallUrl
-      )
-      tallUrl = storedUrl
-      console.log(`[Cover] Mirrored to Supabase: ${storedUrl}`)
-    } catch (err) {
-      console.warn("[Cover] Supabase mirror failed, using ARK URL:", err)
-    }
+  // Skip mirroring if URL is already on Supabase (uploaded during generation)
+  const supabaseBase = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+  const alreadyOnSupabase = supabaseBase && tallUrl?.startsWith(supabaseBase)
+  if (tallUrl && !alreadyOnSupabase && isStorageConfigured()) {
+    console.warn("[Cover] URL not on Supabase, skipping mirror (unexpected):", tallUrl?.slice(0, 80))
   }
 
   // Save to Script

@@ -3,10 +3,10 @@
 import { useState } from "react"
 
 const PACKAGES = [
-  { id: "starter",  name: "Starter",  coins: 60,   price: 0.99,  popular: false, color: "#3B82F6" },
-  { id: "value",    name: "Value",    coins: 300,  price: 4.99,  popular: true,  color: "#10B981" },
-  { id: "premium",  name: "Premium",  coins: 1000, price: 14.99, popular: false, color: "#8B5CF6" },
-  { id: "ultimate", name: "Ultimate", coins: 2000, price: 29.99, popular: false, color: "#F59E0B" },
+  { id: "package_60",   name: "Starter",  coins: 60,   price: 0.99,  popular: false, color: "#3B82F6" },
+  { id: "package_300",  name: "Value",    coins: 300,  price: 4.99,  popular: true,  color: "#10B981" },
+  { id: "package_1000", name: "Premium",  coins: 1000, price: 14.99, popular: false, color: "#8B5CF6" },
+  { id: "package_2000", name: "Ultimate", coins: 2000, price: 29.99, popular: false, color: "#F59E0B" },
 ]
 
 interface RechargeModalProps {
