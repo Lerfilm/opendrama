@@ -501,6 +501,9 @@ const zh = {
   "studio.coverSection": "封面海报",
   "studio.generateCover": "生成封面",
   "studio.regenerateCover": "重新生成封面",
+  "studio.generatingCover": "封面生成中...",
+  "studio.coverGeneratingHint": "大约需要1-2分钟，生成期间可继续编辑。",
+  "studio.coverFailed": "封面生成失败，请重试。",
   "studio.relatedScenes": "对应场景",
 
   // Cover generation

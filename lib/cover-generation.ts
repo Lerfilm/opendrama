@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma"
 import { aiComplete } from "@/lib/ai"
-import { volcRequest } from "@/lib/volcengine"
 
 /**
  * Generate a cover prompt for an episode using LLM.
@@ -54,43 +53,54 @@ ${sceneSummary}`,
   return result.content
 }
 
-// Jimeng text-to-image req_key
-const T2I_REQ_KEY = "jimeng_high_aes_general_v21_L20"
+// ARK API image generation (Doubao Seedream)
+const ARK_BASE = "https://ark.cn-beijing.volces.com/api/v3"
+const T2I_MODEL = "doubao-seedream-3-0-t2i-250415"
 
-interface T2ISubmitResult {
-  task_id: string
-}
-
-interface T2IQueryResult {
-  task_id: string
-  status: string      // "pending" | "running" | "done" | "failed"
-  resp_data?: string  // JSON string containing image_urls
+interface ArkImageResponse {
+  data: Array<{ url: string }>
 }
 
 /**
- * Submit a single text-to-image task to Jimeng.
- * Returns the provider task_id.
+ * Generate a single image via ARK API (synchronous, returns URL directly).
+ * Size: "1080x1920" for 9:16 vertical.
  */
-async function submitT2ITask(prompt: string, width: number, height: number): Promise<string> {
-  const result = await volcRequest<T2ISubmitResult>(
-    "CVSync2AsyncSubmitTask",
-    {
-      req_key: T2I_REQ_KEY,
+async function generateImageViaArk(prompt: string): Promise<string> {
+  const apiKey = process.env.ARK_API_KEY
+  if (!apiKey) throw new Error("ARK_API_KEY env var not set")
+
+  const res = await fetch(`${ARK_BASE}/images/generations`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: T2I_MODEL,
       prompt,
-      width,
-      height,
-      return_url: true,
-      logo_info: { add_logo: false },
-    }
-  )
-  if (!result.task_id) {
-    throw new Error(`T2I submission failed: no task_id. Response: ${JSON.stringify(result)}`)
+      size: "1080x1920",
+      n: 1,
+    }),
+  })
+
+  const json = await res.json() as ArkImageResponse & { error?: { message?: string } }
+
+  if (!res.ok) {
+    throw new Error(`ARK T2I error ${res.status}: ${JSON.stringify(json)}`)
   }
-  return result.task_id
+
+  const url = json.data?.[0]?.url
+  if (!url) {
+    throw new Error(`ARK T2I: no image URL in response: ${JSON.stringify(json)}`)
+  }
+
+  return url
 }
 
 /**
- * Submit cover generation task (9:16 vertical) to Jimeng.
+ * Submit cover generation task (9:16 vertical).
+ * Uses ARK synchronous image generation — returns a synthetic task ID
+ * that encodes the image URL for the status endpoint.
  */
 export async function submitCoverGeneration(
   scriptId: string,
@@ -99,69 +109,46 @@ export async function submitCoverGeneration(
 ): Promise<{ tallTaskId: string }> {
   console.log(`[Cover] Submitting cover generation for script=${scriptId} ep=${episodeNum}`)
 
-  const tallTaskId = await submitT2ITask(prompt, 1080, 1920)  // 9:16 vertical
+  // ARK is synchronous — generate the image immediately and encode the URL
+  // as a base64 task ID so the status endpoint can decode it.
+  const imageUrl = await generateImageViaArk(prompt)
+  console.log(`[Cover] Image generated: ${imageUrl.slice(0, 80)}...`)
 
-  console.log(`[Cover] Submitted: tall=${tallTaskId}`)
+  // Encode URL as a "task ID" so existing polling infrastructure works
+  const tallTaskId = `ark:${Buffer.from(imageUrl).toString("base64")}`
+
   return { tallTaskId }
 }
 
 /**
- * Query a single T2I task result.
- * Returns { status, imageUrl }.
+ * Query a cover result. For ARK tasks (prefix "ark:"), the URL is decoded
+ * from the task ID itself. For legacy Volc tasks, returns failed.
  */
 export async function queryCoverResult(taskId: string): Promise<{ imageUrl?: string; status: string }> {
-  const result = await volcRequest<T2IQueryResult>(
-    "CVSync2AsyncGetResult",
-    { req_key: T2I_REQ_KEY, task_id: taskId }
-  )
-
-  const status = result.status || "pending"
-
-  if (status === "done") {
-    let imageUrl: string | undefined
-    if (result.resp_data) {
-      try {
-        const respData = JSON.parse(result.resp_data)
-        imageUrl =
-          respData.image_urls?.[0] ||
-          respData.images?.[0] ||
-          respData.url ||
-          undefined
-      } catch {
-        console.warn("[Cover] Failed to parse resp_data:", result.resp_data)
-      }
+  if (taskId.startsWith("ark:")) {
+    try {
+      const imageUrl = Buffer.from(taskId.slice(4), "base64").toString("utf8")
+      return { status: "done", imageUrl }
+    } catch {
+      return { status: "failed" }
     }
-    return { status: "done", imageUrl }
   }
 
-  if (status === "failed" || status === "error") {
-    return { status: "failed" }
-  }
-
-  return { status: "generating" }
+  // Legacy Volc task IDs — these will fail since we no longer use that API
+  return { status: "failed" }
 }
 
 /**
  * Poll the tall cover task until done, save result to Script.
- * Called server-side after submitCoverGeneration.
- * Max wait ~3 minutes (36 × 5s).
+ * For ARK tasks, this resolves immediately (synchronous generation).
  */
 export async function pollAndSaveCovers(
   scriptId: string,
   tallTaskId: string
 ): Promise<{ coverTall?: string }> {
-  const MAX_POLLS = 36
-  const POLL_INTERVAL_MS = 5000
+  const r = await queryCoverResult(tallTaskId).catch((): { status: string; imageUrl?: string } => ({ status: "failed" }))
 
-  let tallUrl: string | undefined
-
-  for (let i = 0; i < MAX_POLLS; i++) {
-    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
-
-    const r = await queryCoverResult(tallTaskId).catch((): { status: string; imageUrl?: string } => ({ status: "failed" }))
-    if (r.status === "done") { tallUrl = r.imageUrl; break }
-    if (r.status === "failed") { break }
-  }
+  const tallUrl = r.status === "done" ? r.imageUrl : undefined
 
   // Save to Script
   if (tallUrl) {

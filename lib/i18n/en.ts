@@ -499,6 +499,9 @@ const en: Record<string, string> = {
   "studio.coverSection": "Cover Poster",
   "studio.generateCover": "Generate Cover",
   "studio.regenerateCover": "Regenerate Cover",
+  "studio.generatingCover": "Generating cover...",
+  "studio.coverGeneratingHint": "This may take 1-2 minutes. You can continue editing while it generates.",
+  "studio.coverFailed": "Cover generation failed. Please try again.",
   "studio.relatedScenes": "Related Scenes",
 
   // Cover generation
