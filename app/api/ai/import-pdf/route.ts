@@ -1,9 +1,12 @@
 export const dynamic = "force-dynamic"
 export const maxDuration = 120 // 2 minutes for PDF processing
+
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { aiComplete, extractJSON } from "@/lib/ai"
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse")
 
 const PDF_IMPORT_SYSTEM_PROMPT = `You are a professional screenplay parser. You will receive raw text extracted from a screenplay PDF.
 Your job is to parse it into a structured JSON format for a script management system.
@@ -49,10 +52,52 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { text, filename, genre, format, language, targetEpisodes } = await req.json()
+    const contentType = req.headers.get("content-type") || ""
+    let text: string
+    let filename: string | undefined
+    let genre: string | undefined
+    let format: string | undefined
+    let language: string | undefined
+    let targetEpisodes: number | undefined
+
+    if (contentType.includes("multipart/form-data")) {
+      // New path: receive raw PDF binary via FormData, extract text server-side
+      const formData = await req.formData()
+      const pdfFile = formData.get("pdf") as File | null
+      if (!pdfFile) {
+        return NextResponse.json({ error: "No PDF file provided" }, { status: 400 })
+      }
+
+      const MAX_BYTES = 15 * 1024 * 1024
+      if (pdfFile.size > MAX_BYTES) {
+        return NextResponse.json({ error: "PDF file exceeds 15 MB limit" }, { status: 400 })
+      }
+
+      filename = pdfFile.name
+      genre = (formData.get("genre") as string) || undefined
+      format = (formData.get("format") as string) || undefined
+      language = (formData.get("language") as string) || undefined
+      const te = formData.get("targetEpisodes")
+      targetEpisodes = te ? parseInt(te as string, 10) : undefined
+
+      // Parse PDF server-side using pdf-parse
+      const arrayBuffer = await pdfFile.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      const parsed = await pdfParse(buffer)
+      text = parsed.text || ""
+    } else {
+      // Legacy JSON path (keep for backwards compatibility)
+      const body = await req.json()
+      text = body.text
+      filename = body.filename
+      genre = body.genre
+      format = body.format
+      language = body.language
+      targetEpisodes = body.targetEpisodes
+    }
 
     if (!text?.trim()) {
-      return NextResponse.json({ error: "No text provided" }, { status: 400 })
+      return NextResponse.json({ error: "No text could be extracted from PDF" }, { status: 400 })
     }
 
     // Limit text size to avoid excessive token usage

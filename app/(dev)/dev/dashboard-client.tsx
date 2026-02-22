@@ -74,21 +74,6 @@ function daysUntilPurge(deletedAt: Date): number {
   return Math.max(0, Math.ceil((purgeDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
 }
 
-// Extract text from PDF using PDF.js-like approach via FileReader
-async function extractTextFromPDF(file: File): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      const text = e.target?.result as string
-      const cleaned = text
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, " ")
-        .replace(/\s+/g, " ")
-        .slice(0, 50000)
-      resolve(cleaned)
-    }
-    reader.readAsText(file, "latin1")
-  })
-}
 
 export function DevDashboardClient({ scripts: initialScripts, trashedScripts: initialTrashed }: DevDashboardClientProps) {
   const router = useRouter()
@@ -170,16 +155,17 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
 
   async function handlePDFImport() {
     if (!pdfFile) return
+    const MAX_PDF_MB = 15
+    if (pdfFile.size > MAX_PDF_MB * 1024 * 1024) {
+      alert(`PDF file is too large (${(pdfFile.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is ${MAX_PDF_MB} MB.`)
+      return
+    }
     setCreating(true)
     setPdfImportProgress(0)
-    setPdfImportStep("Reading PDF file...")
+    setPdfImportStep("Uploading PDF...")
 
     try {
-      setPdfImportProgress(15)
-      setPdfImportStep("Extracting text from PDF...")
-      const text = await extractTextFromPDF(pdfFile)
-
-      setPdfImportProgress(30)
+      setPdfImportProgress(20)
       setPdfImportStep("AI is analyzing screenplay structure...")
 
       const progressInterval = setInterval(() => {
@@ -189,16 +175,16 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
         })
       }, 800)
 
+      // Send the raw PDF as FormData — server extracts text with pdf-parse
+      const formData = new FormData()
+      formData.append("pdf", pdfFile)
+      formData.append("genre", pdfGenre)
+      formData.append("format", pdfFormat)
+      formData.append("language", pdfLanguage)
+
       const res = await fetch("/api/ai/import-pdf", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          filename: pdfFile.name,
-          genre: pdfGenre,
-          format: pdfFormat,
-          language: pdfLanguage,
-        }),
+        body: formData,
       })
 
       clearInterval(progressInterval)
