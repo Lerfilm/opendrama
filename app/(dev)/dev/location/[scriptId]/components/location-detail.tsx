@@ -57,6 +57,7 @@ export function LocationDetail({
   onUpdateEntry, onAIDescribe, onAIExtract,
 }: LocationDetailProps) {
   const [showDescribeConfirm, setShowDescribeConfirm] = useState(false)
+  const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false)
 
   if (!entry || !selectedLoc) {
     return (
@@ -89,6 +90,28 @@ export function LocationDetail({
     e.target.value = ""
   }
 
+  async function handleAIGeneratePhoto() {
+    if (!selectedLoc || !entry) return
+    setIsGeneratingPhoto(true)
+    try {
+      const res = await fetch("/api/ai/generate-location-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locName: entry.name || selectedLoc,
+          type: entry.type || "INT",
+          description: entry.notes?.trim() || "",
+        }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        const newPhotos = [...(entry.photos || []), { url: data.url, isApproved: false }]
+        onUpdateEntry(selectedLoc, { photos: newPhotos })
+      }
+    } catch { /* silent */ }
+    finally { setIsGeneratingPhoto(false) }
+  }
+
   return (
     <>
     <div className="flex-1 overflow-y-auto dev-scrollbar">
@@ -105,43 +128,18 @@ export function LocationDetail({
 
         {/* Location info */}
         <div className="space-y-4 mb-6">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#999" }}>Type</label>
-              <select
-                value={entry.type}
-                onChange={e => onUpdateEntry(selectedLoc, { type: e.target.value })}
-                className="w-full h-8 px-2 text-sm rounded focus:outline-none"
-                style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }}
-              >
-                <option value="INT">INT — Interior</option>
-                <option value="EXT">EXT — Exterior</option>
-                <option value="INT/EXT">INT/EXT — Both</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#999" }}>Contact Person</label>
-              <input
-                type="text"
-                value={entry.contact || ""}
-                onChange={e => onUpdateEntry(selectedLoc, { contact: e.target.value })}
-                placeholder="Location manager name & phone"
-                className="w-full h-8 px-2.5 text-sm rounded focus:outline-none"
-                style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }}
-              />
-            </div>
-          </div>
-
           <div>
-            <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#999" }}>Address</label>
-            <input
-              type="text"
-              value={entry.address || ""}
-              onChange={e => onUpdateEntry(selectedLoc, { address: e.target.value })}
-              placeholder="Full address or GPS coordinates"
-              className="w-full h-8 px-2.5 text-sm rounded focus:outline-none"
+            <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#999" }}>Type</label>
+            <select
+              value={entry.type}
+              onChange={e => onUpdateEntry(selectedLoc, { type: e.target.value })}
+              className="w-full h-8 px-2 text-sm rounded focus:outline-none"
               style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }}
-            />
+            >
+              <option value="INT">INT — Interior</option>
+              <option value="EXT">EXT — Exterior</option>
+              <option value="INT/EXT">INT/EXT — Both</option>
+            </select>
           </div>
 
           <div>
@@ -216,7 +214,7 @@ export function LocationDetail({
                     </span>
                     <span className="text-[9px]" style={{ color: "#AAA" }}>{timeScenes.length} scene{timeScenes.length !== 1 ? "s" : ""}</span>
                   </div>
-                  <div className="space-y-1 ml-1">
+                  <div className="space-y-1 ml-1 max-h-[160px] overflow-y-auto dev-scrollbar">
                     {timeScenes.map(s => (
                       <div key={s.id} className="flex items-center gap-2 px-3 py-1.5 rounded" style={{ background: "#F0F0F0" }}>
                         <span className="text-[10px] font-mono font-bold" style={{ color: "#4F46E5" }}>E{s.episodeNum}S{s.sceneNum}</span>
@@ -232,7 +230,7 @@ export function LocationDetail({
         ) : scenesForLoc.length > 0 ? (
           <div className="mb-6">
             <label className="text-[10px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: "#999" }}>Scenes at this Location</label>
-            <div className="space-y-1">
+            <div className="space-y-1 max-h-[160px] overflow-y-auto dev-scrollbar">
               {scenesForLoc.map(s => (
                 <div key={s.id} className="flex items-center gap-2 px-3 py-1.5 rounded" style={{ background: "#F0F0F0" }}>
                   <span className="text-[10px] font-mono font-bold" style={{ color: "#4F46E5" }}>E{s.episodeNum}S{s.sceneNum}</span>
@@ -251,10 +249,24 @@ export function LocationDetail({
             <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#999" }}>
               Scout Photos ({entry.photos?.length ?? 0})
             </label>
-            <label className="text-[11px] px-2.5 py-1 rounded cursor-pointer" style={{ background: "#4F46E5", color: "#fff" }}>
-              ↑ Upload
-              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-            </label>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleAIGeneratePhoto}
+                disabled={isGeneratingPhoto}
+                className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded disabled:opacity-50 transition-colors"
+                style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+              >
+                {isGeneratingPhoto ? (
+                  <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Generating...</>
+                ) : (
+                  <>✦ AI Generate</>
+                )}
+              </button>
+              <label className="text-[11px] px-2.5 py-1 rounded cursor-pointer" style={{ background: "#4F46E5", color: "#fff" }}>
+                ↑ Upload
+                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+              </label>
+            </div>
           </div>
 
           {(entry.photos?.length ?? 0) === 0 ? (

@@ -90,7 +90,7 @@ export function PropDetail({
 
         {/* Details */}
         <div className="space-y-4 mb-6">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#999" }}>Category</label>
               <select
@@ -100,21 +100,6 @@ export function PropDetail({
                 style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }}
               >
                 {PROP_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#999" }}>Source</label>
-              <select
-                value={selectedProp.source || ""}
-                onChange={e => onUpdateProp(selectedProp.id, { source: e.target.value })}
-                className="w-full h-8 px-2 text-[11px] rounded focus:outline-none"
-                style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }}
-              >
-                <option value="">—</option>
-                <option value="rent">Rent 租借</option>
-                <option value="buy">Buy 购买</option>
-                <option value="make">Make/Custom 定制</option>
-                <option value="found">Found/On Location 现场取用</option>
               </select>
             </div>
             <div>

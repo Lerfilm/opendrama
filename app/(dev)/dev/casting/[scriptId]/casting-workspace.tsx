@@ -40,24 +40,45 @@ interface CastingWorkspaceProps {
 
 const ROLE_TYPES = ["protagonist", "antagonist", "supporting", "minor"]
 const ROLE_TYPE_LABELS: Record<string, string> = {
+  lead: "主角",        // alias from PDF import AI
   protagonist: "主角",
   antagonist: "反派",
   supporting: "配角",
   minor: "路人",
 }
 const ROLE_TYPE_STYLES: Record<string, { background: string; color: string }> = {
+  lead: { background: "#DBEAFE", color: "#1D4ED8" },
   protagonist: { background: "#DBEAFE", color: "#1D4ED8" },
   antagonist: { background: "#FEE2E2", color: "#991B1B" },
   supporting: { background: "#D1FAE5", color: "#065F46" },
   minor: { background: "#F3F4F6", color: "#6B7280" },
 }
 
-// Role importance order for sorting
+// Role importance order for sorting (lead/protagonist first)
 const ROLE_IMPORTANCE: Record<string, number> = {
+  lead: 0,
   protagonist: 0,
   antagonist: 1,
   supporting: 2,
   minor: 3,
+}
+
+// Avatar background based on gender + role type
+function getAvatarStyle(role: Role): { background: string; color: string } {
+  const r = role.role || "minor"
+  const g = (role.gender || "").toLowerCase()
+  const isSupporting = r === "supporting"
+  const isMinor = r === "minor"
+  const isMale = g === "male" || g === "男" || g === "男性"
+  const isFemale = g === "female" || g === "女" || g === "女性"
+  const isLead = r === "lead" || r === "protagonist"
+  if (isMinor) return { background: "#E5E7EB", color: "#6B7280" }
+  if (isSupporting) return { background: "#D1FAE5", color: "#065F46" }
+  if (isMale && isLead) return { background: "#1D4ED8", color: "#fff" }
+  if (isMale) return { background: "#BFDBFE", color: "#1D4ED8" }
+  if (isFemale && isLead) return { background: "#DC2626", color: "#fff" }
+  if (isFemale) return { background: "#FEE2E2", color: "#991B1B" }
+  return { background: "#D0D0D0", color: "#888" }
 }
 
 // Voice emotion presets for audition
@@ -381,7 +402,7 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                     {role.referenceImages?.[0] ? (
                       <img src={role.referenceImages[0]} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                     ) : (
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0" style={{ background: "#D0D0D0", color: "#888" }}>
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0" style={getAvatarStyle(role)}>
                         {role.name[0]?.toUpperCase()}
                       </div>
                     )}

@@ -168,7 +168,7 @@ export function PropsSidebar({
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium truncate" style={{ color: isSelected ? "#1A1A1A" : "#333" }}>
-                      {prop.isKey && <span className="mr-1 text-amber-500">★</span>}
+                      {prop.isKey && <span className="inline-block w-2 h-2 rounded-full mr-1.5 flex-shrink-0" style={{ background: "#F59E0B", verticalAlign: "middle" }} />}
                       {prop.name}
                     </p>
                     <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: cs.color + "20", color: cs.color }}>

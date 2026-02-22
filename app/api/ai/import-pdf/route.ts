@@ -578,7 +578,11 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Finalize script ──────────────────────────────────────────────────
-        const finalTitle = globalTitle || filename?.replace(/\.pdf$/i, "") || "Imported Script"
+        const cleanFilename = filename
+          ?.replace(/\.pdf$/i, "")
+          .replace(/\s*[\[(]?\d+-\d+[\])]?\s*$/, "")  // strip trailing " 1-30" or "(1-30)"
+          .trim()
+        const finalTitle = globalTitle || cleanFilename || "Imported Script"
         const finalGenre = globalGenre || genre || "drama"
 
         // Preserve metadata (pdfUrl) while updating script
