@@ -3,7 +3,7 @@ export const maxDuration = 300 // 5 minutes
 
 import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
-import prisma from "@/lib/prisma"
+import { createFreshPrismaClient } from "@/lib/prisma"
 import { aiComplete, extractJSON } from "@/lib/ai"
 import { chargeAiFeature } from "@/lib/ai-pricing"
 import { uploadToStorage, isStorageConfigured } from "@/lib/storage"
@@ -208,6 +208,10 @@ export async function POST(req: NextRequest) {
         try { controller.close() } catch { /* already closed */ }
       }
 
+      // Use a fresh Prisma client for this long-running import
+      // to avoid DbHandler exit from idle connection timeouts
+      const db = createFreshPrismaClient()
+
       try {
         // ── Parse request ────────────────────────────────────────────────────
         const contentType = req.headers.get("content-type") || ""
@@ -277,7 +281,7 @@ export async function POST(req: NextRequest) {
 
         if (resumeScriptId) {
           // Verify ownership
-          const existing = await prisma.script.findFirst({
+          const existing = await db.script.findFirst({
             where: { id: resumeScriptId, userId: session.user.id },
           })
           if (!existing) {
@@ -286,7 +290,7 @@ export async function POST(req: NextRequest) {
           scriptId = resumeScriptId
 
           // Find already-imported episodes
-          const doneEpisodes = await prisma.scriptScene.findMany({
+          const doneEpisodes = await db.scriptScene.findMany({
             where: { scriptId },
             select: { episodeNum: true },
             distinct: ["episodeNum"],
@@ -296,7 +300,7 @@ export async function POST(req: NextRequest) {
           }
 
           // Get existing scene counters
-          const counts = await prisma.scriptScene.groupBy({
+          const counts = await db.scriptScene.groupBy({
             by: ["episodeNum"],
             where: { scriptId },
             _count: { _all: true },
@@ -309,7 +313,7 @@ export async function POST(req: NextRequest) {
           emit({ type: "resume", scriptId, skipping: [...existingEpisodes], alreadyScenes: totalScenesCreated })
 
           // Set back to "importing" in case it was changed
-          await prisma.script.update({
+          await db.script.update({
             where: { id: scriptId },
             data: { status: "importing" },
           })
@@ -340,7 +344,7 @@ export async function POST(req: NextRequest) {
           }
 
           // Create script immediately so user has a scriptId even if we fail
-          const script = await prisma.script.create({
+          const script = await db.script.create({
             data: {
               userId: session.user.id,
               title: filename?.replace(/\.pdf$/i, "") || "Importing...",
@@ -451,7 +455,7 @@ export async function POST(req: NextRequest) {
               duration: scene.duration || 60,
             }))
 
-            await prisma.scriptScene.createMany({ data: scenesToSave })
+            await db.scriptScene.createMany({ data: scenesToSave })
             epSceneCounters[part.episodeNum] = startSceneNum + chunkResult.scenes.length
             totalScenesCreated += chunkResult.scenes.length
 
@@ -468,7 +472,7 @@ export async function POST(req: NextRequest) {
         // ── Save roles (new ones only) ───────────────────────────────────────
         let totalRolesCount = 0
         if (allRoles.length > 0) {
-          const existingRoles = await prisma.scriptRole.findMany({
+          const existingRoles = await db.scriptRole.findMany({
             where: { scriptId },
             select: { name: true },
           })
@@ -476,7 +480,7 @@ export async function POST(req: NextRequest) {
           const newRoles = allRoles.filter(r => !existingNames.has(r.name.toLowerCase()))
 
           if (newRoles.length > 0) {
-            await prisma.scriptRole.createMany({
+            await db.scriptRole.createMany({
               data: newRoles.map(r => ({
                 scriptId,
                 name: r.name || "Unknown",
@@ -485,7 +489,7 @@ export async function POST(req: NextRequest) {
               })),
             })
           }
-          totalRolesCount = await prisma.scriptRole.count({ where: { scriptId } })
+          totalRolesCount = await db.scriptRole.count({ where: { scriptId } })
         }
 
         // ── Finalize script ──────────────────────────────────────────────────
@@ -493,9 +497,9 @@ export async function POST(req: NextRequest) {
         const finalGenre = globalGenre || genre || "drama"
 
         // Preserve metadata (pdfUrl) while updating script
-        const existingScript = await prisma.script.findUnique({ where: { id: scriptId }, select: { metadata: true } })
+        const existingScript = await db.script.findUnique({ where: { id: scriptId }, select: { metadata: true } })
         const existingMeta = existingScript?.metadata ? (() => { try { return JSON.parse(existingScript.metadata) } catch { return {} } })() : {}
-        await prisma.script.update({
+        await db.script.update({
           where: { id: scriptId },
           data: {
             title: finalTitle,
@@ -518,6 +522,8 @@ export async function POST(req: NextRequest) {
         console.error("PDF import fatal error:", error)
         emit({ type: "error", error: "Import failed: " + String(error) })
         try { controller.close() } catch { /* already closed */ }
+      } finally {
+        await db.$disconnect().catch(() => {})
       }
     },
   })
