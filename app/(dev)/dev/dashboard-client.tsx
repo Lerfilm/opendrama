@@ -54,6 +54,7 @@ const LANGUAGE_OPTIONS = [
 
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   draft: { bg: "#E0E0E0", color: "#666" },
+  importing: { bg: "#FEF3C7", color: "#92400E" },
   generating: { bg: "#FEF3C7", color: "#92400E" },
   ready: { bg: "#D1FAE5", color: "#065F46" },
   published: { bg: "#E0E7FF", color: "#3730A3" },
@@ -106,9 +107,14 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfImportProgress, setPdfImportProgress] = useState(0)
   const [pdfImportStep, setPdfImportStep] = useState("")
+  const [pdfImportError, setPdfImportError] = useState<string | null>(null)
+  const [pdfScriptId, setPdfScriptId] = useState<string | null>(null)
   const [pdfGenre, setPdfGenre] = useState("drama")
   const [pdfFormat, setPdfFormat] = useState("movie")
   const [pdfLanguage, setPdfLanguage] = useState("en")
+  // Resume state
+  const [resumeScriptId, setResumeScriptId] = useState<string | null>(null)
+  const [resumeScriptTitle, setResumeScriptTitle] = useState<string | null>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
 
   function resetForm() {
@@ -122,6 +128,10 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
     setPdfFile(null)
     setPdfImportProgress(0)
     setPdfImportStep("")
+    setPdfImportError(null)
+    setPdfScriptId(null)
+    setResumeScriptId(null)
+    setResumeScriptTitle(null)
     setModalTab("manual")
   }
 
@@ -157,74 +167,130 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
     if (!pdfFile) return
     const MAX_PDF_MB = 15
     if (pdfFile.size > MAX_PDF_MB * 1024 * 1024) {
-      alert(`PDF file is too large (${(pdfFile.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is ${MAX_PDF_MB} MB.`)
+      alert(`PDF too large (${(pdfFile.size / 1024 / 1024).toFixed(1)} MB). Max ${MAX_PDF_MB} MB.`)
       return
     }
     setCreating(true)
-    setPdfImportProgress(0)
+    setPdfImportProgress(2)
     setPdfImportStep("Uploading PDF...")
+    setPdfImportError(null)
+    setPdfScriptId(null)
+
+    const formData = new FormData()
+    formData.append("pdf", pdfFile)
+    formData.append("genre", pdfGenre)
+    formData.append("format", pdfFormat)
+    formData.append("language", pdfLanguage)
+    if (resumeScriptId) formData.append("resumeScriptId", resumeScriptId)
+
+    let currentScriptId: string | null = resumeScriptId
+    let totalChunks = 1
 
     try {
-      setPdfImportProgress(20)
-      setPdfImportStep("Extracting text from PDF...")
-
-      // Cycle through status messages to indicate multi-episode processing
-      const steps = [
-        "Extracting text from PDF...",
-        "AI is parsing screenplay structure...",
-        "Processing episodes and scenes...",
-        "Extracting dialogue and action blocks...",
-        "Almost done — creating scenes...",
-      ]
-      let stepIdx = 0
-      const progressInterval = setInterval(() => {
-        setPdfImportProgress(prev => {
-          if (prev < 80) return prev + 1.5
-          return prev
-        })
-        stepIdx = (stepIdx + 1) % steps.length
-        setPdfImportStep(steps[stepIdx])
-      }, 1200)
-
-      // Send the raw PDF as FormData — server extracts text with pdf-parse
-      const formData = new FormData()
-      formData.append("pdf", pdfFile)
-      formData.append("genre", pdfGenre)
-      formData.append("format", pdfFormat)
-      formData.append("language", pdfLanguage)
-
-      const res = await fetch("/api/ai/import-pdf", {
-        method: "POST",
-        body: formData,
-      })
-
-      clearInterval(progressInterval)
+      const res = await fetch("/api/ai/import-pdf", { method: "POST", body: formData })
 
       if (!res.ok) {
-        const err = await res.json()
-        alert(err.error || "Import failed")
-        return
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || "Import failed")
       }
 
-      setPdfImportProgress(90)
-      setPdfImportStep("Creating scenes and characters...")
+      if (!res.body) throw new Error("No response body")
 
-      const data = await res.json()
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
 
-      setPdfImportProgress(100)
-      const epInfo = data.episodesProcessed > 1 ? `, ${data.episodesProcessed} episodes` : ""
-      setPdfImportStep(`✓ Imported: ${data.scenesCreated} scenes, ${data.rolesCreated} roles${epInfo}`)
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
 
-      await new Promise(r => setTimeout(r, 800))
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || ""
 
-      setShowModal(false)
-      resetForm()
-      router.push(`/dev/script/${data.scriptId}`)
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          let msg: Record<string, unknown>
+          try { msg = JSON.parse(trimmed) } catch { continue }
+
+          switch (msg.type) {
+            case "status":
+              setPdfImportStep(msg.step as string)
+              break
+            case "total":
+              totalChunks = msg.total as number
+              setPdfImportStep(`Found ${msg.episodes} episode(s), ${msg.total} chunk(s) to process`)
+              setPdfImportProgress(5)
+              break
+            case "script_created":
+              currentScriptId = msg.scriptId as string
+              setPdfScriptId(msg.scriptId as string)
+              break
+            case "resume":
+              setPdfImportStep(`Resuming — skipping ${(msg.skipping as number[]).length} already-imported episode(s), ${msg.alreadyScenes} scenes saved`)
+              setPdfImportProgress(5)
+              break
+            case "skip":
+              setPdfImportProgress(Math.round(((msg.chunk as number) / totalChunks) * 90) + 5)
+              setPdfImportStep(`Skipping Episode ${msg.episode} (already imported) — ${msg.chunk}/${totalChunks}`)
+              break
+            case "progress":
+              setPdfImportProgress(Math.round(((msg.chunk as number) / totalChunks) * 90) + 5)
+              setPdfImportStep(
+                `Processing Episode ${msg.episode}${(msg.part as number) > 0 ? ` part ${(msg.part as number) + 1}` : ""} — ${msg.chunk}/${totalChunks}`
+              )
+              break
+            case "chunk_done":
+              setPdfImportStep(
+                `Episode ${msg.episode} done (+${msg.scenes} scenes, total: ${msg.totalScenes}) — ${msg.chunk}/${totalChunks}`
+              )
+              break
+            case "chunk_error":
+              setPdfImportStep(`⚠ Episode ${msg.episode} failed, continuing... (${msg.chunk}/${totalChunks})`)
+              break
+            case "done": {
+              setPdfImportProgress(100)
+              setPdfImportStep(`✓ ${msg.scenes} scenes, ${msg.roles} roles imported`)
+              await new Promise(r => setTimeout(r, 700))
+              setShowModal(false)
+              resetForm()
+              router.push(`/dev/script/${msg.scriptId}`)
+              return
+            }
+            case "error":
+              throw new Error(msg.error as string)
+          }
+        }
+      }
+
+      // Stream ended without "done" — partial import
+      if (currentScriptId) {
+        setPdfImportError("Connection lost — partial import saved. You can view or resume the project.")
+        setPdfScriptId(currentScriptId)
+      } else {
+        throw new Error("Connection lost before script was created")
+      }
     } catch (err) {
-      alert("Import failed: " + (err instanceof Error ? err.message : "Unknown error"))
+      const msg = err instanceof Error ? err.message : "Unknown error"
+      setPdfImportError(msg)
+      setPdfImportStep("Import failed")
+      if (currentScriptId) setPdfScriptId(currentScriptId)
     } finally {
       setCreating(false)
     }
+  }
+
+  function startResume(script: ScriptItem) {
+    setResumeScriptId(script.id)
+    setResumeScriptTitle(script.title)
+    setPdfFile(null)
+    setPdfImportError(null)
+    setPdfScriptId(null)
+    setPdfImportProgress(0)
+    setPdfImportStep("")
+    setModalTab("pdf")
+    setShowModal(true)
   }
 
   // ── Delete (soft) ──────────────────────────────────────────────────────────
@@ -421,6 +487,18 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
                           </div>
                         </div>
                       </Link>
+
+                      {/* Resume button for partially-imported scripts */}
+                      {script.status === "importing" && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); startResume(script) }}
+                          title="Resume PDF import"
+                          className="absolute top-2 right-8 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
+                          style={{ background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D" }}
+                        >
+                          ↩ Resume
+                        </button>
+                      )}
 
                       {/* Delete button — top-right corner, visible on hover */}
                       <button
@@ -708,6 +786,27 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
             {/* PDF import tab */}
             {modalTab === "pdf" && (
               <div className="p-6 space-y-4">
+                {/* Resume mode notice */}
+                {resumeScriptId && resumeScriptTitle && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg" style={{ background: "#FEF9E7", border: "1px solid #FCD34D" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#D97706", flexShrink: 0, marginTop: 1 }}>
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                      <path d="M3 3v5h5" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-semibold" style={{ color: "#92400E" }}>Resume Import Mode</p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "#78350F" }}>
+                        Resuming: <span className="font-medium">{resumeScriptTitle}</span>
+                        <br />Re-upload the same PDF — already-imported episodes will be skipped.
+                      </p>
+                    </div>
+                    <button onClick={() => { setResumeScriptId(null); setResumeScriptTitle(null) }}
+                      className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#FDE68A", color: "#92400E" }}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-[11px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: "#888" }}>
                     Screenplay PDF File <span style={{ color: "#EF4444" }}>*</span>
@@ -793,18 +892,55 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
                   </p>
                 </div>
 
-                {creating && (
+                {(creating || pdfImportError) && (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px]" style={{ color: "#4F46E5" }}>{pdfImportStep}</span>
-                      <span className="text-[11px] font-medium" style={{ color: "#4F46E5" }}>{pdfImportProgress}%</span>
-                    </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: "#E0E4F8" }}>
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pdfImportProgress}%`, background: "linear-gradient(90deg, #4F46E5, #7C3AED)" }}
-                      />
-                    </div>
+                    {pdfImportStep && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px]" style={{ color: pdfImportError ? "#D97706" : "#4F46E5" }}>{pdfImportStep}</span>
+                        {creating && <span className="text-[11px] font-medium tabular-nums" style={{ color: "#4F46E5" }}>{Math.round(pdfImportProgress)}%</span>}
+                      </div>
+                    )}
+                    {creating && (
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: "#E0E4F8" }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${pdfImportProgress}%`, background: "linear-gradient(90deg, #4F46E5, #7C3AED)" }}
+                        />
+                      </div>
+                    )}
+                    {pdfImportError && (
+                      <div className="p-3 rounded-lg space-y-2" style={{ background: "#FEF3C7", border: "1px solid #FCD34D" }}>
+                        <p className="text-[11px] font-medium" style={{ color: "#92400E" }}>⚠ {pdfImportError}</p>
+                        {pdfScriptId && (
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/dev/script/${pdfScriptId}`}
+                              className="text-[11px] px-2 py-1 rounded font-medium"
+                              style={{ background: "#4F46E5", color: "#fff" }}
+                              onClick={() => { setShowModal(false); resetForm() }}
+                            >
+                              View partial project →
+                            </Link>
+                            <button
+                              onClick={() => {
+                                const title = resumeScriptTitle || "this script"
+                                setResumeScriptId(pdfScriptId)
+                                setResumeScriptTitle(title)
+                                setPdfImportError(null)
+                                setPdfScriptId(null)
+                                setPdfFile(null)
+                                setPdfImportProgress(0)
+                                setPdfImportStep("")
+                              }}
+                              className="text-[11px] px-2 py-1 rounded font-medium"
+                              style={{ background: "#E8E8E8", color: "#555" }}
+                            >
+                              ↩ Resume import
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
