@@ -86,6 +86,8 @@ export function LocationWorkspace({ script }: { script: Script }) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false)
   const [isAIExtracting, setIsAIExtracting] = useState(false)
+  const [isGeneratingAllPhotos, setIsGeneratingAllPhotos] = useState(false)
+  const [generateAllPhotosProgress, setGenerateAllPhotosProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isLoadedRef = useRef(false)
@@ -252,6 +254,41 @@ export function LocationWorkspace({ script }: { script: Script }) {
     }
   }, [scenes, updateEntry])
 
+  const handleGenerateAllPhotos = useCallback(async () => {
+    const locs = Object.keys(entries).sort()
+    if (locs.length === 0) return
+    setIsGeneratingAllPhotos(true)
+    setGenerateAllPhotosProgress(0)
+    for (let i = 0; i < locs.length; i++) {
+      const loc = locs[i]
+      const e = entries[loc]
+      try {
+        const res = await fetch("/api/ai/generate-location-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            locName: e?.name || loc,
+            type: e?.type || "INT",
+            description: e?.notes?.trim() || "",
+          }),
+        })
+        const data = await res.json()
+        if (data.url) {
+          setEntries(prev => ({
+            ...prev,
+            [loc]: {
+              ...prev[loc],
+              photos: [...(prev[loc]?.photos || []), { url: data.url, isApproved: false }],
+            },
+          }))
+        }
+      } catch { /* skip failed location */ }
+      setGenerateAllPhotosProgress(Math.round(((i + 1) / locs.length) * 100))
+    }
+    setIsGeneratingAllPhotos(false)
+    setGenerateAllPhotosProgress(0)
+  }, [entries])
+
   const allLocs = Object.keys(entries).sort()
 
   return (
@@ -263,11 +300,14 @@ export function LocationWorkspace({ script }: { script: Script }) {
         selectedLoc={selectedLoc}
         isRefreshing={isRefreshing}
         isAIExtracting={isAIExtracting}
+        isGeneratingAllPhotos={isGeneratingAllPhotos}
+        generateAllPhotosProgress={generateAllPhotosProgress}
         saveStatus={saveStatus}
         onSelectLoc={setSelectedLoc}
         onRefresh={handleRefresh}
         onAIExtract={handleAIExtract}
         onAddLocation={handleAddLocation}
+        onGenerateAllPhotos={handleGenerateAllPhotos}
       />
       <LocationDetail
         entry={entry}

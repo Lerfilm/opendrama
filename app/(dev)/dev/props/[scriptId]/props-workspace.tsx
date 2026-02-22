@@ -26,6 +26,8 @@ export function PropsWorkspace({ script }: { script: Script }) {
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null)
   const [isAIExtracting, setIsAIExtracting] = useState(false)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
+  const [isGeneratingAllPhotos, setIsGeneratingAllPhotos] = useState(false)
+  const [generateAllPhotosProgress, setGenerateAllPhotosProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isLoadedRef = useRef(false)
@@ -129,6 +131,37 @@ export function PropsWorkspace({ script }: { script: Script }) {
     }
   }
 
+  async function generateAllPhotos() {
+    if (props.length === 0) return
+    setIsGeneratingAllPhotos(true)
+    setGenerateAllPhotosProgress(0)
+    for (let i = 0; i < props.length; i++) {
+      const prop = props[i]
+      try {
+        const res = await fetch("/api/ai/generate-prop-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            propName: prop.name,
+            category: prop.category,
+            description: prop.description?.trim() || "",
+          }),
+        })
+        const data = await res.json()
+        if (data.url) {
+          setProps(prev => prev.map(p =>
+            p.id === prop.id
+              ? { ...p, photos: [...p.photos, { url: data.url, isApproved: false }] }
+              : p
+          ))
+        }
+      } catch { /* skip failed prop */ }
+      setGenerateAllPhotosProgress(Math.round(((i + 1) / props.length) * 100))
+    }
+    setIsGeneratingAllPhotos(false)
+    setGenerateAllPhotosProgress(0)
+  }
+
   async function uploadPhoto(propId: string, file: File) {
     setUploadingFor(propId)
     try {
@@ -154,10 +187,13 @@ export function PropsWorkspace({ script }: { script: Script }) {
         selectedPropId={selectedPropId}
         saveStatus={saveStatus}
         isAIExtracting={isAIExtracting}
+        isGeneratingAllPhotos={isGeneratingAllPhotos}
+        generateAllPhotosProgress={generateAllPhotosProgress}
         onSelectProp={setSelectedPropId}
         onDeleteProp={deleteProp}
         onAddProp={addProp}
         onAIExtract={extractPropsFromScript}
+        onGenerateAllPhotos={generateAllPhotos}
       />
       <PropDetail
         selectedProp={selectedProp}

@@ -28,17 +28,20 @@ interface LocationSidebarProps {
   selectedLoc: string | null
   isRefreshing: boolean
   isAIExtracting: boolean
+  isGeneratingAllPhotos: boolean
+  generateAllPhotosProgress: number
   saveStatus: "idle" | "saving" | "saved"
   onSelectLoc: (loc: string) => void
   onRefresh: () => void
   onAIExtract: () => void
   onAddLocation: (name: string) => void
+  onGenerateAllPhotos: () => void
 }
 
 export function LocationSidebar({
   allLocs, entries, scenes, selectedLoc,
-  isRefreshing, isAIExtracting, saveStatus,
-  onSelectLoc, onRefresh, onAIExtract, onAddLocation,
+  isRefreshing, isAIExtracting, isGeneratingAllPhotos, generateAllPhotosProgress, saveStatus,
+  onSelectLoc, onRefresh, onAIExtract, onAddLocation, onGenerateAllPhotos,
 }: LocationSidebarProps) {
   const [addingLoc, setAddingLoc] = useState(false)
   const [newLocName, setNewLocName] = useState("")
@@ -85,6 +88,31 @@ export function LocationSidebar({
             + Add
           </button>
         </div>
+      </div>
+
+      {/* AI Generate All Photos row */}
+      <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #C8C8C8", background: "#E6E6E6" }}>
+        <button
+          onClick={onGenerateAllPhotos}
+          disabled={isGeneratingAllPhotos || allLocs.length === 0}
+          className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded disabled:opacity-50 flex-shrink-0"
+          style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+        >
+          {isGeneratingAllPhotos
+            ? <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Generating...</>
+            : <>✦ AI Generate All</>}
+        </button>
+        {isGeneratingAllPhotos && (
+          <div className="flex-1 flex items-center gap-1.5">
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#D0D4E8" }}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${generateAllPhotosProgress}%`, background: "#4F46E5" }}
+              />
+            </div>
+            <span className="text-[9px] flex-shrink-0" style={{ color: "#6B7280" }}>{generateAllPhotosProgress}%</span>
+          </div>
+        )}
       </div>
 
       {/* Add location form */}
