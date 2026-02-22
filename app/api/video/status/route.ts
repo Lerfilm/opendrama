@@ -4,6 +4,9 @@ import prisma from "@/lib/prisma"
 import { queryVideoTask } from "@/lib/video-generation"
 import { confirmDeduction, refundReservation } from "@/lib/tokens"
 
+// Segments stuck in generating/submitted for longer than this are auto-failed
+const STALE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+
 /**
  * Sync active segments with the video generation provider,
  * then return updated data.
@@ -16,6 +19,7 @@ async function syncActiveSegments(
     providerTaskId: string | null
     tokenCost: number | null
     scriptId: string
+    createdAt: Date
   }>
 ) {
   const active = segments.filter(
@@ -37,7 +41,28 @@ async function syncActiveSegments(
     userId = script?.userId ?? null
   }
 
+  const now = Date.now()
+
   for (const seg of active) {
+    // Auto-fail segments that have been stuck for too long (provider task likely expired)
+    const ageMs = now - new Date(seg.createdAt).getTime()
+    if (ageMs > STALE_TIMEOUT_MS) {
+      console.warn(`[VideoStatus] Segment ${seg.id} stuck for ${Math.round(ageMs / 60000)}min — auto-failing`)
+      const { count } = await prisma.videoSegment.updateMany({
+        where: { id: seg.id, status: { in: ["submitted", "generating"] } },
+        data: { status: "failed", errorMessage: "Generation timed out (>30min)" },
+      })
+      if (count > 0 && userId && seg.tokenCost) {
+        await refundReservation(
+          userId,
+          seg.tokenCost,
+          `Refund: segment ${seg.id} timed out`
+        ).catch(() => {})
+      }
+      Object.assign(seg, { status: "failed", errorMessage: "Generation timed out (>30min)" })
+      continue
+    }
+
     try {
       const result = await queryVideoTask(seg.model!, seg.providerTaskId!)
 

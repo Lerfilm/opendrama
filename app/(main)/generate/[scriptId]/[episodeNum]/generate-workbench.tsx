@@ -395,7 +395,7 @@ export function GenerateWorkbench({
             <Coins className="w-4 h-4 text-amber-500" />
             <span className="font-medium">{balance}</span>
           </div>
-          {hasExistingSegments && !isWorking && (
+          {hasExistingSegments && (
             <Button
               size="sm"
               variant="ghost"
@@ -635,7 +635,7 @@ export function GenerateWorkbench({
                       variant="ghost"
                       className="text-xs h-7 px-2 ml-auto text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       onClick={() => handleResetSegment(seg.id)}
-                      disabled={isSegGenerating || resettingSegment === seg.id}
+                      disabled={resettingSegment === seg.id}
                     >
                       {resettingSegment === seg.id
                         ? <Loader2 className="w-3 h-3 animate-spin" />
