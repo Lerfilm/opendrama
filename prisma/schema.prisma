@@ -308,8 +308,9 @@ model Script {
   language       String   @default("zh")
   status         String   @default("draft") // draft, generating, completed, ready, producing, published
   metadata       String?  @db.Text // JSON
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime? // soft-delete: set when user deletes, purge after 30 days
 
   user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   scenes        ScriptScene[]
@@ -321,6 +322,7 @@ model Script {
 
   @@index([userId])
   @@index([status])
+  @@index([deletedAt])
   @@map("scripts")
 }
 

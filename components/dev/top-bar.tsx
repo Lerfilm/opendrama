@@ -14,7 +14,7 @@ export function TopBar({ user, balance, className }: TopBarProps) {
   const pathname = usePathname()
 
   // Detect which module we're in and extract scriptId
-  const moduleMatch = pathname.match(/^\/dev\/(script|casting|location|props|theater|editing|finishing)\/([^/]+)/)
+  const moduleMatch = pathname.match(/^\/dev\/(script|casting|location|props|theater|editing|finishing|media)\/([^/]+)/)
   const currentModule = moduleMatch?.[1] ?? null
   const moduleLabels: Record<string, string> = {
     script: "Script",
@@ -24,7 +24,9 @@ export function TopBar({ user, balance, className }: TopBarProps) {
     theater: "Theater",
     editing: "Editing",
     finishing: "Finishing",
+    media: "Media Library",
   }
+  const buildVersion = process.env.NEXT_PUBLIC_BUILD_VERSION || "V1.0.dev"
   const isInModule = !!currentModule
 
   return (
@@ -116,6 +118,15 @@ export function TopBar({ user, balance, className }: TopBarProps) {
             <div className="w-px h-4" style={{ background: "#3A3A3A" }} />
           </>
         )}
+        {/* Build version */}
+        <span
+          className="text-[9px] font-mono px-1.5 py-0.5 rounded"
+          style={{ background: "rgba(99,102,241,0.15)", color: "#6366F1", letterSpacing: "0.02em" }}
+          title={`Build: ${buildVersion}`}
+        >
+          {buildVersion}
+        </span>
+        <div className="w-px h-4" style={{ background: "#3A3A3A" }} />
         <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "#666" }}>
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           <span>Ready</span>

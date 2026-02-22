@@ -7,8 +7,8 @@ export function LeftNav() {
   const pathname = usePathname()
 
   // Extract scriptId from any of the module paths:
-  // /dev/script/[id], /dev/casting/[id], /dev/theater/[id], /dev/editing/[id], /dev/finishing/[id]
-  const modulePathMatch = pathname.match(/^\/dev\/(?:script|casting|location|props|theater|editing|finishing)\/([^/]+)/)
+  // /dev/script/[id], /dev/casting/[id], /dev/theater/[id], /dev/editing/[id], /dev/finishing/[id], /dev/media/[id]
+  const modulePathMatch = pathname.match(/^\/dev\/(?:script|casting|location|props|theater|editing|finishing|media)\/([^/]+)/)
   const scriptId = modulePathMatch?.[1] ?? null
 
   const navItems = [
@@ -94,6 +94,20 @@ export function LeftNav() {
       href: scriptId ? `/dev/editing/${scriptId}` : "/dev",
       enabled: !!scriptId,
       active: pathname.startsWith("/dev/editing/"),
+    },
+    {
+      id: "media",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+          <rect width="18" height="18" x="3" y="3" rx="2" />
+          <circle cx="9" cy="9" r="2" />
+          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+        </svg>
+      ),
+      label: "Media",
+      href: scriptId ? `/dev/media/${scriptId}` : "/dev",
+      enabled: !!scriptId,
+      active: pathname.startsWith("/dev/media/"),
     },
     {
       id: "finishing",
