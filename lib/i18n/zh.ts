@@ -547,6 +547,7 @@ const zh = {
   "generate.progressWorking": "已完成 {done}/{total} 个片段，继续生成中……",
   "generate.progressWaiting": "正在准备生成……",
   "generate.progressFailed": "{count} 个片段失败，点击重试可重新生成",
+  "generate.progressQueued": "排队中 {count} 个",
   "generate.progressDone": "已完成",
   "generate.progressGenerating": "生成中",
   "generate.regenerate": "重新生成",

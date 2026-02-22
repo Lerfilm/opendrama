@@ -499,6 +499,63 @@ export function GenerateWorkbench({
       {/* Existing segments list */}
       {hasExistingSegments && !hasPending && (
         <div className="space-y-3">
+
+          {/* ── Progress bar (visible while generating) ── */}
+          {isWorking && (
+            <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+              <CardContent className="p-3 space-y-2">
+                {/* Header row */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500 shrink-0" />
+                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                      {t("generate.progressTitle")}
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold tabular-nums text-blue-700 dark:text-blue-300">
+                    {doneCount} / {total}
+                  </span>
+                </div>
+
+                {/* Progress bar track */}
+                <div className="w-full bg-blue-100 dark:bg-blue-900/40 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-700 ease-out"
+                    style={{ width: `${Math.max(percent, total > 0 ? 3 : 0)}%` }}
+                  />
+                </div>
+
+                {/* Current segment indicator (sequential mode) */}
+                {(() => {
+                  const activeIdx = existingSegments.findIndex(
+                    s => s.status === "submitted" || s.status === "generating"
+                  )
+                  const reservedCount = existingSegments.filter(s => s.status === "reserved").length
+                  if (activeIdx >= 0) {
+                    return (
+                      <p className="text-[11px] text-blue-600 dark:text-blue-400">
+                        {t("generate.progressWorking", { done: doneCount, total })}
+                        {reservedCount > 0 && (
+                          <span className="ml-1 text-muted-foreground">
+                            · {t("generate.progressQueued", { count: reservedCount })}
+                          </span>
+                        )}
+                      </p>
+                    )
+                  }
+                  return null
+                })()}
+
+                {/* Failed count warning */}
+                {failedCount > 0 && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    {t("generate.progressFailed", { count: failedCount })}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Re-generate all button (when failures exist and not working) */}
           {failedCount > 0 && !isWorking && (
             <Button
@@ -727,18 +784,11 @@ export function GenerateWorkbench({
         </Card>
       )}
 
-      {/* ── Floating progress card (bottom-right, hidden when all done or all pending) ── */}
-      {hasExistingSegments && !hasPending && !allDone && (
+      {/* ── Floating failure badge (bottom-right) — only shown when there are failures and nothing is running ── */}
+      {hasExistingSegments && !hasPending && !allDone && failedCount > 0 && !isWorking && (
         <div className="fixed bottom-24 right-4 z-40 w-44">
-          <Card className={`shadow-xl border-2 ${
-            isWorking
-              ? "border-blue-300 dark:border-blue-700"
-              : failedCount > 0
-                ? "border-red-300 dark:border-red-700"
-                : "border-green-300 dark:border-green-700"
-          }`}>
+          <Card className="shadow-xl border-2 border-red-300 dark:border-red-700">
             <CardContent className="p-3 space-y-2">
-              {/* Current / Total */}
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-muted-foreground font-medium">
                   {t("generate.progressTitle")}
@@ -747,28 +797,16 @@ export function GenerateWorkbench({
                   {doneCount}/{total}
                 </span>
               </div>
-
-              {/* Progress bar */}
               <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                 <div
-                  className={`h-1.5 rounded-full transition-all duration-700 ${
-                    failedCount > 0 && !isWorking
-                      ? "bg-red-500"
-                      : isWorking
-                        ? "bg-blue-500"
-                        : "bg-green-500"
-                  } ${isWorking ? "animate-pulse" : ""}`}
-                  style={{ width: `${Math.max(percent, isWorking ? 5 : 0)}%` }}
+                  className="h-1.5 rounded-full transition-all duration-700 bg-red-500"
+                  style={{ width: `${Math.max(percent, 3)}%` }}
                 />
               </div>
-
-              {/* Status */}
               <div className="flex items-center gap-1.5">
-                {isWorking && <Loader2 className="w-3 h-3 animate-spin text-blue-500 shrink-0" />}
-                {failedCount > 0 && !isWorking && <XIcon className="w-3 h-3 text-red-500 shrink-0" />}
+                <XIcon className="w-3 h-3 text-red-500 shrink-0" />
                 <span className="text-[10px] text-muted-foreground line-clamp-2">{statusHint}</span>
               </div>
-
               {/* Chain mode progress */}
               {isChainMode && chainCurrentIdx >= 0 && (
                 <div className="flex items-center gap-1 text-[10px] text-purple-600 font-medium">

@@ -545,6 +545,7 @@ const en: Record<string, string> = {
   "generate.progressWorking": "{done} of {total} segments complete — generating the rest...",
   "generate.progressWaiting": "Preparing video generation...",
   "generate.progressFailed": "{count} segment(s) failed — tap Retry to regenerate.",
+  "generate.progressQueued": "{count} queued",
   "generate.progressDone": "done",
   "generate.progressGenerating": "generating",
   "generate.regenerate": "Regenerate",
