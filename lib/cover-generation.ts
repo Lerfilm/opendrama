@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma"
 import { aiComplete } from "@/lib/ai"
+import { mirrorUrlToStorage, isStorageConfigured } from "@/lib/storage"
 
 /**
  * Generate a cover prompt for an episode using LLM.
@@ -148,7 +149,22 @@ export async function pollAndSaveCovers(
 ): Promise<{ coverTall?: string }> {
   const r = await queryCoverResult(tallTaskId).catch((): { status: string; imageUrl?: string } => ({ status: "failed" }))
 
-  const tallUrl = r.status === "done" ? r.imageUrl : undefined
+  let tallUrl = r.status === "done" ? r.imageUrl : undefined
+
+  // Mirror to Supabase for permanent storage (ARK URLs expire)
+  if (tallUrl && isStorageConfigured()) {
+    try {
+      const storedUrl = await mirrorUrlToStorage(
+        "covers",
+        `${scriptId}/cover-tall-${Date.now()}.jpg`,
+        tallUrl
+      )
+      tallUrl = storedUrl
+      console.log(`[Cover] Mirrored to Supabase: ${storedUrl}`)
+    } catch (err) {
+      console.warn("[Cover] Supabase mirror failed, using ARK URL:", err)
+    }
+  }
 
   // Save to Script
   if (tallUrl) {

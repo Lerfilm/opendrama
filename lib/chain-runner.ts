@@ -21,6 +21,7 @@ import {
 } from "@/lib/video-generation"
 import { confirmDeduction, refundReservation } from "@/lib/tokens"
 import { extractLastFrame } from "@/lib/ffmpeg-extract"
+import { mirrorUrlToStorage, isStorageConfigured } from "@/lib/storage"
 
 // ── T2I seed image config ──────────────────────────────────────────────────
 // Vertical (9:16) seed image for short drama / vertical video
@@ -208,9 +209,22 @@ export async function runChain(
 
       // ── Step 2: Save seed image URL to this segment ─────────────────────
       if (currentFrameUrl) {
+        // Mirror to Supabase for permanent storage if it's an external URL
+        let storedSeedUrl = currentFrameUrl
+        if (isStorageConfigured() && !currentFrameUrl.startsWith("data:")) {
+          try {
+            storedSeedUrl = await mirrorUrlToStorage(
+              "seed-images",
+              `${seg.scriptId}/seed-s${seg.sceneNum}-${Date.now()}.jpg`,
+              currentFrameUrl
+            )
+          } catch (err) {
+            console.warn("[Chain] Supabase seed image mirror failed:", err)
+          }
+        }
         await prisma.videoSegment.update({
           where: { id: seg.id },
-          data: { seedImageUrl: currentFrameUrl },
+          data: { seedImageUrl: storedSeedUrl },
         })
       }
 

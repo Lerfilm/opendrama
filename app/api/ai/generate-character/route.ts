@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { aiComplete } from "@/lib/ai"
+import { mirrorUrlToStorage, isStorageConfigured, storagePath } from "@/lib/storage"
 
 const ARK_BASE = "https://ark.cn-beijing.volces.com/api/v3"
 const T2I_MODEL = "doubao-seedream-3-0-t2i-250415"
@@ -76,8 +77,18 @@ Generate a character portrait prompt:`,
       throw new Error(`ARK T2I error ${res.status}: ${JSON.stringify(json)}`)
     }
 
-    const imageUrl = json.data?.[0]?.url
+    let imageUrl = json.data?.[0]?.url
     if (!imageUrl) throw new Error("No image URL in response")
+
+    // Mirror to Supabase for permanent storage (ARK URLs expire)
+    if (isStorageConfigured()) {
+      try {
+        const path = storagePath(session.user.id, "role-images", `${name}-portrait.jpg`)
+        imageUrl = await mirrorUrlToStorage("role-images", path, imageUrl)
+      } catch (err) {
+        console.warn("[generate-character] Supabase mirror failed, using ARK URL:", err)
+      }
+    }
 
     return NextResponse.json({ imageUrl, prompt })
   } catch (e) {
