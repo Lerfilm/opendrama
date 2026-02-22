@@ -678,7 +678,7 @@ export function GenerateWorkbench({
                           variant="default"
                           className="text-xs h-7 px-2 bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => setPreviewVideo({
-                            url: seg.videoUrl!,
+                            url: `/api/video/stream?segmentId=${seg.id}`,
                             title: `${t("studio.segment")} #${seg.segmentIndex + 1}`,
                           })}
                         >
