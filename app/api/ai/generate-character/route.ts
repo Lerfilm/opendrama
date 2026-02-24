@@ -35,20 +35,24 @@ export async function POST(req: NextRequest) {
     ].filter(Boolean).join(", ")
 
     // Step 1: Use LLM to generate a good character portrait prompt
+    const ethnicityNote = ethnicity
+      ? `Ethnicity: ${ethnicity} — reflect this accurately in facial features.`
+      : `Ethnicity: not specified — match the character's description; do NOT default to any particular ethnicity.`
+
     const llmResult = await aiComplete({
       messages: [
         {
           role: "system",
-          content: `You are a casting director for Chinese short dramas (短剧).
+          content: `You are a casting director for short drama productions.
 Generate a HIGHLY photorealistic character portrait prompt in English for AI image generation.
 
 Requirements:
 - 1:1 square portrait, head and shoulders or bust shot
 - Ultra-realistic, 8K, RAW photo quality — NOT illustration, NOT anime, NOT painting
 - Real human actor/actress appearance, pores and skin texture visible
-- Asian actor/actress appearance (unless specified otherwise)
 - Natural face, professional film lighting, shallow depth of field
 - Cinematic film still or professional headshot style
+- Match the specified ethnicity/appearance exactly — do NOT default to any race if unspecified
 - DO NOT include text, watermarks, or logos
 - Output ONLY the image prompt, no explanation`,
         },
@@ -57,6 +61,7 @@ Requirements:
           content: `Character: ${name}
 Role type: ${role || "supporting"}
 Genre: ${genre || "drama"}
+${ethnicityNote}
 Physical specs: ${specLines || "not specified"}
 Description: ${description || "no description"}
 
