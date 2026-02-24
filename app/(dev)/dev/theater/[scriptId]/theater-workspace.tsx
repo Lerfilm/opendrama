@@ -86,6 +86,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const [isSplitting, setIsSplitting] = useState(false)
   const [isStitching, setIsStitching] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false)
   const [balance, setBalance] = useState(initialBalance)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -135,7 +136,6 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   // Submit batch generation
   async function handleGenerate() {
     if (epSegments.length === 0) { alert("No segments to generate. Run AI Split in Script module first."); return }
-    if (!confirm(`Generate ${epSegments.length} video segments? This will cost tokens from your balance.`)) return
     setIsSubmitting(true)
     try {
       const res = await fetch("/api/video/submit", {
@@ -260,10 +260,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   // ── Main tab: call sheet or segments ──
   const [mainTab, setMainTab] = useState<"callsheet" | "segments">("callsheet")
 
-  // ── Assets: collect all visual references ──
-  const [assetsOpen, setAssetsOpen] = useState(false)
-  const [assetTab, setAssetTab] = useState<"characters" | "costumes" | "locations">("characters")
-
+  // ── Assets: collect visual references used in segment detail ──
   const characterAssets = useMemo(() =>
     script.roles.filter(r => (r.referenceImages?.length ?? 0) > 0),
     [script.roles]
@@ -280,24 +277,6 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     }
     return items
   }, [script.roles])
-
-  // Unique locations from scenes
-  const locationAssets = useMemo(() => {
-    const map = new Map<string, { heading: string; timeOfDay?: string | null; sceneCount: number }>()
-    for (const s of script.scenes) {
-      if (!s.location) continue
-      const existing = map.get(s.location)
-      if (existing) {
-        existing.sceneCount++
-      } else {
-        map.set(s.location, { heading: s.heading || s.location, timeOfDay: s.timeOfDay, sceneCount: 1 })
-      }
-    }
-    return [...map.entries()].map(([loc, data]) => ({ loc, ...data }))
-  }, [script.scenes])
-
-  const totalAssets = characterAssets.reduce((n, r) => n + r.referenceImages.length, 0)
-    + costumeAssets.length
 
   // ── Call Sheet helpers ──
   const epScenes = useMemo(() =>
@@ -361,131 +340,6 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
 
   return (
     <div className="h-full flex flex-col" style={{ background: "#E8E8E8" }}>
-    {/* ── Assets strip (collapsible) ── */}
-    <div style={{ borderBottom: assetsOpen ? "1px solid #C0C0C0" : "none" }}>
-      {/* Toggle bar */}
-      <button
-        onClick={() => setAssetsOpen(v => !v)}
-        className="w-full flex items-center gap-2 px-4 py-1.5 text-[10px] transition-colors"
-        style={{ background: "#E2E2E2", borderBottom: "1px solid #C8C8C8" }}
-      >
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
-          style={{ transform: assetsOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s", color: "#888" }}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-        <span className="font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Visual Assets</span>
-        {totalAssets > 0 && (
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-medium" style={{ background: "#D8DBF0", color: "#4F46E5" }}>
-            {totalAssets} images
-          </span>
-        )}
-        <span className="ml-auto text-[9px]" style={{ color: "#BBB" }}>
-          {characterAssets.length} characters · {costumeAssets.length} costumes · {locationAssets.length} locations
-        </span>
-      </button>
-
-      {/* Assets panel */}
-      {assetsOpen && (
-        <div style={{ background: "#EBEBEB" }}>
-          {/* Sub-tabs */}
-          <div className="flex px-4 gap-0" style={{ borderBottom: "1px solid #D0D0D0" }}>
-            {(["characters", "costumes", "locations"] as const).map(tab => (
-              <button key={tab} onClick={() => setAssetTab(tab)}
-                className="px-3 py-1.5 text-[10px] font-medium capitalize transition-colors relative"
-                style={{ color: assetTab === tab ? "#1A1A1A" : "#999" }}>
-                {tab}
-                {assetTab === tab && <div className="absolute bottom-0 left-2 right-2 h-[2px] rounded-t" style={{ background: "#4F46E5" }} />}
-              </button>
-            ))}
-            <div className="ml-auto flex items-center gap-2">
-              <Link href={`/dev/casting/${script.id}`}
-                className="text-[9px] px-2 py-0.5 rounded transition-colors"
-                style={{ color: "#4F46E5", background: "#E0E4F8" }}>
-                Edit in Casting →
-              </Link>
-            </div>
-          </div>
-
-          {/* Asset grid */}
-          <div className="overflow-x-auto">
-            <div className="flex gap-2 p-3" style={{ minWidth: "max-content" }}>
-              {assetTab === "characters" && (() => {
-                return characterAssets.length === 0 ? (
-                  <div className="flex items-center gap-2 py-2 px-3 text-[11px]" style={{ color: "#BBB" }}>
-                    No character portraits yet.
-                    <Link href={`/dev/casting/${script.id}`} className="underline" style={{ color: "#4F46E5" }}>Go to Casting →</Link>
-                  </div>
-                ) : characterAssets.map(role => (
-                  <div key={role.id} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                    <div className="relative">
-                      <img src={role.referenceImages[0]} alt={role.name}
-                        className="w-16 h-16 rounded-full object-cover"
-                        style={{ border: "2px solid #D0D0D0" }} />
-                      {role.referenceImages.length > 1 && (
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold"
-                          style={{ background: "#4F46E5", color: "#fff" }}>
-                          +{role.referenceImages.length - 1}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-[9px] font-medium text-center w-16 truncate" style={{ color: "#555" }}>{role.name}</span>
-                    {role.referenceImages.length > 1 && (
-                      <div className="flex gap-0.5">
-                        {role.referenceImages.slice(1, 4).map((img, i) => (
-                          <img key={i} src={img} alt="" className="w-7 h-7 rounded object-cover" style={{ border: "1px solid #D8D8D8" }} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
-              })()}
-
-              {assetTab === "costumes" && (
-                costumeAssets.length === 0 ? (
-                  <div className="flex items-center gap-2 py-2 px-3 text-[11px]" style={{ color: "#BBB" }}>
-                    No costume photos yet.
-                    <Link href={`/dev/casting/${script.id}`} className="underline" style={{ color: "#4F46E5" }}>Add in Casting →</Link>
-                  </div>
-                ) : costumeAssets.map((item, i) => (
-                  <div key={i} className="flex-shrink-0 w-20">
-                    <img src={item.costume.url} alt=""
-                      className="w-20 h-28 rounded object-cover"
-                      style={{ border: "1px solid #D0D0D0" }} />
-                    <p className="text-[8px] font-medium mt-1 truncate" style={{ color: "#555" }}>{item.role.name}</p>
-                    <p className="text-[8px] truncate" style={{ color: "#AAA" }}>{item.costume.scene || ""}</p>
-                  </div>
-                ))
-              )}
-
-              {assetTab === "locations" && (
-                locationAssets.length === 0 ? (
-                  <div className="flex items-center gap-2 py-2 px-3 text-[11px]" style={{ color: "#BBB" }}>
-                    No locations defined in scenes.
-                  </div>
-                ) : locationAssets.map((loc) => (
-                  <div key={loc.loc} className="flex-shrink-0 w-28">
-                    <div className="w-28 h-20 rounded flex items-center justify-center"
-                      style={{ background: "#D8D8D8", border: "1px solid #C8C8C8" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} style={{ color: "#AAA" }}>
-                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                        <circle cx="12" cy="10" r="3" />
-                      </svg>
-                    </div>
-                    <p className="text-[9px] font-medium mt-1 truncate" style={{ color: "#555" }}>{loc.loc}</p>
-                    <p className="text-[8px]" style={{ color: "#AAA" }}>{loc.sceneCount} scene{loc.sceneCount !== 1 ? "s" : ""}{loc.timeOfDay ? ` · ${loc.timeOfDay}` : ""}</p>
-                    <Link href={`/dev/location/${script.id}`}
-                      className="text-[8px]" style={{ color: "#4F46E5" }}>
-                      Scout →
-                    </Link>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-
     {/* ── Main Tab Bar ── */}
     <div className="flex items-center px-3 gap-0 flex-shrink-0" style={{ background: "#E2E2E2", borderBottom: "1px solid #C8C8C8" }}>
       {([
@@ -842,7 +696,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                   <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Locations</span>
                 </div>
                 <Link href={`/dev/location/${script.id}`} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#FEE2E2", color: "#EF4444" }}>
-                  Scout →
+                  Edit Location →
                 </Link>
               </div>
               {epLocations.length === 0 ? (
@@ -894,12 +748,12 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                   <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Props</span>
                 </div>
                 <Link href={`/dev/props/${script.id}`} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#FEF3C7", color: "#D97706" }}>
-                  Manage Props →
+                  Edit Props →
                 </Link>
               </div>
               <div className="px-4 py-4 text-center text-[11px]" style={{ color: "#BBB" }}>
                 Props are managed in the Props module.{" "}
-                <Link href={`/dev/props/${script.id}`} className="underline" style={{ color: "#F59E0B" }}>Open Props →</Link>
+                <Link href={`/dev/props/${script.id}`} className="underline" style={{ color: "#F59E0B" }}>Go to Props →</Link>
               </div>
             </div>
 
@@ -1004,7 +858,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
             </span>
           )}
           <button
-            onClick={handleGenerate}
+            onClick={() => setShowGenerateConfirm(true)}
             disabled={isSubmitting || epSegments.length === 0}
             className="text-[10px] px-3 py-1 rounded font-medium transition-colors disabled:opacity-50"
             style={{ background: "#4F46E5", color: "#fff" }}
@@ -1163,6 +1017,79 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                 </p>
               </div>
 
+              {/* Scene Characters */}
+              {(() => {
+                const scene = script.scenes.find(s => s.episodeNum === selectedSeg.episodeNum && s.sceneNum === selectedSeg.sceneNum)
+                if (!scene) return null
+                // Extract character names from scene action blocks
+                const sceneCharNames = new Set<string>()
+                if (scene.action) {
+                  try {
+                    const blocks = JSON.parse(scene.action) as Array<{ type: string; character?: string }>
+                    if (Array.isArray(blocks)) {
+                      for (const b of blocks) {
+                        if (b.type === "dialogue" && b.character) sceneCharNames.add(b.character.trim())
+                      }
+                    }
+                  } catch { /* ok */ }
+                }
+                // Match to roles
+                const sceneRoles = script.roles.filter(r =>
+                  sceneCharNames.has(r.name) ||
+                  sceneCharNames.has(r.name.toUpperCase()) ||
+                  [...sceneCharNames].some(n => n.toUpperCase() === r.name.toUpperCase())
+                )
+                // Get costumes for scene roles
+                const sceneCostumes = costumeAssets.filter(c => sceneRoles.some(r => r.id === c.role.id))
+                if (sceneRoles.length === 0 && sceneCostumes.length === 0 && !scene.location) return null
+                return (
+                  <div className="pt-1">
+                    {scene.heading && (
+                      <div className="mb-2 text-[10px] font-mono px-2 py-1 rounded" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
+                        {scene.heading}
+                      </div>
+                    )}
+                    {sceneRoles.length > 0 && (
+                      <div className="mb-3">
+                        <label className="text-[10px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: "#999" }}>Characters</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {sceneRoles.map(role => (
+                            <div key={role.id} className="flex flex-col items-center gap-1">
+                              {role.referenceImages?.[0] ? (
+                                <img src={role.referenceImages[0]} alt={role.name}
+                                  className="w-10 h-10 rounded-full object-cover"
+                                  style={{ border: "1.5px solid #D0D0D0" }} />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
+                                  style={{ background: "#D0D0D0", color: "#888" }}>
+                                  {role.name[0]?.toUpperCase()}
+                                </div>
+                              )}
+                              <span className="text-[9px] text-center w-12 truncate" style={{ color: "#555" }}>{role.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {sceneCostumes.length > 0 && (
+                      <div>
+                        <label className="text-[10px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: "#999" }}>Costumes</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {sceneCostumes.map((item, ci) => (
+                            <div key={ci} className="flex flex-col items-center gap-1">
+                              <img src={item.costume.url} alt=""
+                                className="w-10 h-14 rounded object-cover"
+                                style={{ border: "1px solid #D0D0D0" }} />
+                              <span className="text-[9px] text-center w-12 truncate" style={{ color: "#555" }}>{item.role.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               {selectedSeg.errorMessage && (
                 <div className="p-2.5 rounded text-[11px] leading-relaxed" style={{ background: "#FEE2E2", color: "#991B1B" }}>
                   <strong>Error:</strong> {selectedSeg.errorMessage}
@@ -1174,6 +1101,62 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
       </div>
       </>}
     </div>
+
+    {/* Generate confirm modal */}
+    {showGenerateConfirm && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        style={{ background: "rgba(0,0,0,0.45)" }}
+        onClick={() => setShowGenerateConfirm(false)}
+      >
+        <div
+          className="w-80 rounded-xl shadow-2xl overflow-hidden"
+          style={{ background: "#FAFAFA", border: "1px solid #E0E0E0" }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="px-5 pt-5 pb-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>AI 功能确认</span>
+            <p className="text-sm font-semibold mt-1" style={{ color: "#1A1A1A" }}>
+              Generate {epSegments.length} Video Segment{epSegments.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <div className="mx-5 mb-4 rounded-lg px-4 py-3" style={{ background: "#F0F0F0" }}>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px]" style={{ color: "#666" }}>预计消耗</span>
+              <span className="text-sm font-bold" style={{ color: "#4F46E5" }}>~{estimatedCost} 🪙</span>
+            </div>
+            <div className="flex items-center justify-between mt-1.5">
+              <span className="text-[11px]" style={{ color: "#666" }}>当前余额</span>
+              <span className="text-sm font-semibold" style={{ color: balance >= estimatedCost ? "#1A1A1A" : "#EF4444" }}>
+                {balance} 🪙
+              </span>
+            </div>
+            {balance < estimatedCost && (
+              <p className="text-[11px] pt-1.5" style={{ color: "#EF4444" }}>
+                余额不足，还需 {estimatedCost - balance} 🪙，请前往充值
+              </p>
+            )}
+          </div>
+          <div className="px-5 pb-5 flex gap-2">
+            <button
+              onClick={() => setShowGenerateConfirm(false)}
+              className="flex-1 h-9 rounded-lg text-[12px] font-medium transition-colors"
+              style={{ background: "#E8E8E8", color: "#555" }}
+            >
+              取消
+            </button>
+            <button
+              onClick={() => { setShowGenerateConfirm(false); handleGenerate() }}
+              disabled={balance < estimatedCost && estimatedCost > 0}
+              className="flex-1 h-9 rounded-lg text-[12px] font-semibold transition-colors disabled:opacity-40"
+              style={{ background: "#4F46E5", color: "#fff" }}
+            >
+              确认 ~{estimatedCost} 🪙
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   )
 }

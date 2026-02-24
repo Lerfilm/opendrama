@@ -366,33 +366,9 @@ export function LocationWorkspace({ script }: { script: Script }) {
 
   return (
     <div className="h-full flex flex-col" style={{ background: "#E8E8E8" }}>
-      {/* Persistent top action bar */}
-      <div className="flex items-center gap-3 px-4 py-2 flex-shrink-0" style={{ background: "#DCDCDC", borderBottom: "1px solid #C0C0C0" }}>
-        <button
-          onClick={handleGenerateAllPhotos}
-          disabled={isGeneratingAllPhotos || allLocs.length === 0}
-          className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded disabled:opacity-50"
-          style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
-        >
-          {isGeneratingAllPhotos
-            ? <><div className="w-2.5 h-2.5 rounded-full border border-indigo-400 border-t-transparent animate-spin inline-block mr-1" />Generating...</>
-            : <>✦ AI Generate All Photos</>}
-        </button>
-        {isGeneratingAllPhotos && genAllTotal > 0 && (
-          <div className="flex items-center gap-2">
-            <div className="w-32 h-1.5 rounded-full overflow-hidden" style={{ background: "#D0D4E8" }}>
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${Math.round((genAllDone / genAllTotal) * 100)}%`, background: "#4F46E5" }}
-              />
-            </div>
-            <span className="text-[10px]" style={{ color: "#6B7280" }}>
-              {genAllDone}/{genAllTotal} locations
-            </span>
-          </div>
-        )}
-        {/* AI Extract progress bar */}
-        {isAIExtracting && extractProgress > 0 && (
+      {/* AI Extract progress bar (only shown during extraction) */}
+      {isAIExtracting && extractProgress > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 flex-shrink-0" style={{ background: "#DCDCDC", borderBottom: "1px solid #C0C0C0" }}>
           <div className="flex items-center gap-2">
             <div className="w-28 h-1.5 rounded-full overflow-hidden" style={{ background: "#D0D4E8" }}>
               <div
@@ -402,8 +378,8 @@ export function LocationWorkspace({ script }: { script: Script }) {
             </div>
             <span className="text-[10px]" style={{ color: "#6B7280" }}>Extracting locations...</span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Main content: sidebar + detail */}
       <div className="flex-1 flex min-h-0">
@@ -428,9 +404,13 @@ export function LocationWorkspace({ script }: { script: Script }) {
           scenesForLoc={scenesForLoc}
           scenesByTime={scenesByTime}
           isGeneratingDesc={isGeneratingDesc}
+          isGeneratingAllPhotos={isGeneratingAllPhotos}
+          genAllDone={genAllDone}
+          genAllTotal={genAllTotal}
           onUpdateEntry={updateEntry}
           onAIDescribe={handleAIDescribe}
           onAIExtract={handleAIExtract}
+          onGenerateAllPhotos={handleGenerateAllPhotos}
         />
       </div>
     </div>

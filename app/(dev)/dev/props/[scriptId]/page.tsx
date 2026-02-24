@@ -13,7 +13,7 @@ export default async function PropsPage({ params }: { params: Promise<{ scriptId
     where: { id: scriptId, userId: session.user.id as string },
     include: {
       scenes: {
-        select: { id: true, episodeNum: true, sceneNum: true, heading: true, location: true, timeOfDay: true, action: true },
+        select: { id: true, episodeNum: true, sceneNum: true, heading: true, location: true, timeOfDay: true },
         orderBy: [{ episodeNum: "asc" }, { sceneNum: "asc" }],
       },
     },

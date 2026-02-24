@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { scriptId, sceneTexts } = await req.json()
+    const { scriptId } = await req.json()
     if (!scriptId) return NextResponse.json({ error: "scriptId required" }, { status: 400 })
 
     // Verify ownership
@@ -25,6 +25,27 @@ export async function POST(req: NextRequest) {
       where: { id: scriptId, userId: session.user.id },
     })
     if (!script) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+    // Fetch scene action data server-side (avoids sending large JSON payloads from client)
+    const scenes = await prisma.scriptScene.findMany({
+      where: { scriptId },
+      select: { episodeNum: true, sceneNum: true, heading: true, action: true },
+      orderBy: [{ episodeNum: "asc" }, { sceneNum: "asc" }],
+      take: 20,
+    })
+    const sceneTexts = scenes.map(s => {
+      let content = s.action || ""
+      try {
+        const blocks = JSON.parse(content) as Array<{ type: string; text?: string; character?: string; line?: string }>
+        if (Array.isArray(blocks)) {
+          content = blocks.map(b =>
+            b.type === "action" ? (b.text || "") :
+            b.type === "dialogue" ? `${b.character}: ${b.line}` : ""
+          ).filter(Boolean).join("\n")
+        }
+      } catch { /* use raw */ }
+      return `[E${s.episodeNum}S${s.sceneNum}] ${s.heading || ""}\n${content.slice(0, 300)}`
+    }).join("\n\n")
 
     const systemPrompt = `You are a professional props master for film/TV production.
 Extract all physical props mentioned or implied in the screenplay scenes provided.

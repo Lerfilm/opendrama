@@ -198,6 +198,31 @@ function chineseToNum(s: string): number {
   return result || 0
 }
 
+/**
+ * Try to extract the screenplay title from the first lines of raw PDF text.
+ * Screenplays typically have the title as an ALL-CAPS line near the top of page 1.
+ */
+function extractTitleFromRawText(text: string): string | null {
+  const lines = text.split("\n").slice(0, 60)
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line || line.length < 4 || line.length > 100) continue
+    // Skip obvious non-title lines
+    if (/^\d+$/.test(line)) continue                              // bare page number
+    if (/^(page|pg\.?)\s+\d+/i.test(line)) continue
+    if (/^(written\s+by|author:|copyright|draft|rev[ision]*|version|v\d+)/i.test(line)) continue
+    if (/^ep\.?\s*\d+|^episode\s+\d+|^第.*集/i.test(line)) continue
+    if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(line)) continue  // date
+    if (/^(int\.|ext\.|int\/ext)/i.test(line)) continue           // scene heading
+    // ALL CAPS line with at least one letter — strong title candidate
+    if (line === line.toUpperCase() && /[A-Z]/.test(line)) {
+      // Strip trailing punctuation for cleanliness but keep ! and ?
+      return line.replace(/[.,;:]+$/, "").trim()
+    }
+  }
+  return null
+}
+
 const MAX_CHUNK_CHARS = 40000
 
 function splitChunkIfNeeded(chunk: { episodeNum: number; text: string }): Array<{ episodeNum: number; text: string; partIndex: number }> {
@@ -590,11 +615,20 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Finalize script ──────────────────────────────────────────────────
+        // Pre-scan PDF text for a title line if AI didn't return one
+        const textExtractedTitle = !globalTitle
+          ? extractTitleFromRawText(allParts[0]?.text || "")
+          : null
+
         const cleanFilename = filename
           ?.replace(/\.pdf$/i, "")
-          .replace(/\s*[\[(]?\d+-\d+[\])]?\s*$/, "")  // strip trailing " 1-30" or "(1-30)"
+          .replace(/\s*[\[(]?\d+-\d+(?:pages?)?\s*[\])]?\s*$/i, "")  // strip " 1-30", "1-5page"
+          .replace(/[_\s]+v\d+[_\s]*\d{4,8}\s*$/i, "")               // strip "_V4_122024", " V4 2024"
+          .replace(/[_\s]+\d{4,8}\s*$/i, "")                           // strip trailing date "_122024"
+          // Strip leading author prefix like "Josie's version-" or "John edit-"
+          .replace(/^[A-Za-z']+(?:\s+[A-Za-z]+){0,2}[''s]*\s*(?:version|draft|edit|copy|script)[-–_\s]+/i, "")
           .trim()
-        const finalTitle = globalTitle || cleanFilename || "Imported Script"
+        const finalTitle = globalTitle || textExtractedTitle || cleanFilename || "Imported Script"
         const finalGenre = globalGenre || genre || "drama"
 
         // Preserve metadata (pdfUrl) while updating script

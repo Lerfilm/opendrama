@@ -45,19 +45,25 @@ interface LocationDetailProps {
   scenesForLoc: SceneRef[]
   scenesByTime: Record<string, SceneRef[]>
   isGeneratingDesc: boolean
+  isGeneratingAllPhotos?: boolean
+  genAllDone?: number
+  genAllTotal?: number
   onUpdateEntry: (loc: string, patch: Partial<LocationEntry>) => void
   onAIDescribe: (loc: string) => void
   onAIExtract: () => void
+  onGenerateAllPhotos?: () => void
 }
 
 export function LocationDetail({
   entry, selectedLoc, allLocs, scenes,
   scenesForLoc, scenesByTime,
   isGeneratingDesc,
-  onUpdateEntry, onAIDescribe, onAIExtract,
+  isGeneratingAllPhotos, genAllDone, genAllTotal,
+  onUpdateEntry, onAIDescribe, onAIExtract, onGenerateAllPhotos,
 }: LocationDetailProps) {
   const [showDescribeConfirm, setShowDescribeConfirm] = useState(false)
   const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false)
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
 
   if (!entry || !selectedLoc) {
     return (
@@ -103,6 +109,7 @@ export function LocationDetail({
           description: entry.notes?.trim() || "",
         }),
       })
+      if (!res.ok) return
       const data = await res.json()
       if (data.url) {
         const newPhotos = [...(entry.photos || []), { url: data.url, isApproved: false }]
@@ -117,13 +124,39 @@ export function LocationDetail({
     <div className="flex-1 overflow-y-auto dev-scrollbar">
       <div className="max-w-2xl mx-auto p-6">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-base font-semibold" style={{ color: "#1A1A1A" }}>{entry.name}</h2>
             <p className="text-[11px]" style={{ color: "#999" }}>
               {scenesForLoc.length} scene{scenesForLoc.length !== 1 ? "s" : ""} in script
             </p>
           </div>
+          {/* Generate All Photos button — top right of detail panel */}
+          {onGenerateAllPhotos && (
+            <div className="flex items-center gap-2">
+              {isGeneratingAllPhotos && (genAllTotal ?? 0) > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "#D0D4E8" }}>
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{ width: `${Math.round(((genAllDone ?? 0) / (genAllTotal ?? 1)) * 100)}%`, background: "#4F46E5" }}
+                    />
+                  </div>
+                  <span className="text-[9px]" style={{ color: "#888" }}>{genAllDone}/{genAllTotal}</span>
+                </div>
+              )}
+              <button
+                onClick={onGenerateAllPhotos}
+                disabled={isGeneratingAllPhotos}
+                className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded disabled:opacity-50 transition-colors"
+                style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+              >
+                {isGeneratingAllPhotos
+                  ? <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Generating...</>
+                  : <>✦ AI All Photos</>}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Location info */}
@@ -254,12 +287,12 @@ export function LocationDetail({
                 onClick={handleAIGeneratePhoto}
                 disabled={isGeneratingPhoto}
                 className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded disabled:opacity-50 transition-colors"
-                style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+                style={{ background: "#EDE9FE", color: "#6D28D9", border: "1px solid #DDD6FE" }}
               >
                 {isGeneratingPhoto ? (
-                  <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Generating...</>
+                  <><div className="w-2 h-2 rounded-full border border-purple-400 border-t-transparent animate-spin" /> Generating...</>
                 ) : (
-                  <>✦ AI Generate</>
+                  <>✦ AI Photo</>
                 )}
               </button>
               <label className="text-[11px] px-2.5 py-1 rounded cursor-pointer" style={{ background: "#4F46E5", color: "#fff" }}>
@@ -279,27 +312,33 @@ export function LocationDetail({
                 <circle cx="9" cy="9" r="2" />
                 <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
               </svg>
-              <p className="text-[11px]" style={{ color: "#BBB" }}>Upload location scout photos</p>
+              <p className="text-[11px]" style={{ color: "#BBB" }}>Upload or AI-generate location photos</p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {entry.photos.map((photo, i) => (
-                <div key={i} className="relative group rounded overflow-hidden aspect-video" style={{ background: "#E0E0E0" }}>
+                <div
+                  key={i}
+                  className="relative group aspect-square rounded overflow-hidden cursor-pointer"
+                  style={{ background: "#E0E0E0" }}
+                  onClick={() => setLightboxPhoto(photo.url)}
+                >
                   <img src={photo.url} alt="" className="w-full h-full object-cover" />
-                  <div className="absolute top-1 left-1 flex gap-1">
-                    <button
-                      onClick={() => {
-                        const newPhotos = entry.photos.map((p, j) => j === i ? { ...p, isApproved: !p.isApproved } : p)
-                        onUpdateEntry(selectedLoc, { photos: newPhotos })
-                      }}
-                      className="text-[9px] px-1.5 py-0.5 rounded font-semibold"
-                      style={{ background: photo.isApproved ? "#10B981" : "rgba(0,0,0,0.5)", color: "#fff" }}
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 transition-all" style={{ background: "rgba(0,0,0,0)" }} />
+                  {/* Approved badge */}
+                  {photo.isApproved && (
+                    <div
+                      className="absolute top-1 left-1 text-[9px] px-1.5 py-0.5 rounded font-semibold"
+                      style={{ background: "#10B981", color: "#fff" }}
                     >
-                      {photo.isApproved ? "✓ Approved" : "Approve"}
-                    </button>
-                  </div>
+                      ✓
+                    </div>
+                  )}
+                  {/* Delete button */}
                   <button
-                    onClick={() => {
+                    onClick={e => {
+                      e.stopPropagation()
                       const newPhotos = entry.photos.filter((_, j) => j !== i)
                       onUpdateEntry(selectedLoc, { photos: newPhotos })
                     }}
@@ -310,6 +349,18 @@ export function LocationDetail({
                       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                   </button>
+                  {/* Approve button */}
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      const newPhotos = entry.photos.map((p, j) => j === i ? { ...p, isApproved: !p.isApproved } : p)
+                      onUpdateEntry(selectedLoc, { photos: newPhotos })
+                    }}
+                    className="absolute bottom-1 left-1 text-[9px] px-1.5 py-0.5 rounded font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}
+                  >
+                    {photo.isApproved ? "✓ Approved" : "Approve"}
+                  </button>
                 </div>
               ))}
             </div>
@@ -317,6 +368,33 @@ export function LocationDetail({
         </div>
       </div>
     </div>
+
+    {/* Lightbox */}
+    {lightboxPhoto && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        style={{ background: "rgba(0,0,0,0.85)" }}
+        onClick={() => setLightboxPhoto(null)}
+      >
+        <div className="relative" onClick={e => e.stopPropagation()}>
+          <img
+            src={lightboxPhoto}
+            alt=""
+            className="max-w-[80vw] max-h-[80vh] rounded-lg object-contain"
+            style={{ boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }}
+          />
+          <button
+            onClick={() => setLightboxPhoto(null)}
+            className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    )}
 
     {showDescribeConfirm && (
       <AIConfirmModal

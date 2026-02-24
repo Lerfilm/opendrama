@@ -13,7 +13,6 @@ interface SceneRef {
   heading?: string | null
   location?: string | null
   timeOfDay?: string | null
-  action?: string | null
 }
 
 interface Script {
@@ -94,23 +93,10 @@ export function PropsWorkspace({ script }: { script: Script }) {
   async function extractPropsFromScript() {
     setIsAIExtracting(true)
     try {
-      const sceneTexts = script.scenes.slice(0, 20).map(s => {
-        let content = s.action || ""
-        try {
-          const blocks = JSON.parse(content)
-          if (Array.isArray(blocks)) {
-            content = blocks.map((b: { type: string; text?: string; character?: string; line?: string }) =>
-              b.type === "action" ? b.text : b.type === "dialogue" ? `${b.character}: ${b.line}` : ""
-            ).join("\n")
-          }
-        } catch { /* use raw */ }
-        return `[E${s.episodeNum}S${s.sceneNum}] ${s.heading || ""}\n${content.slice(0, 300)}`
-      }).join("\n\n")
-
       const res = await fetch("/api/ai/extract-props", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptId: script.id, sceneTexts }),
+        body: JSON.stringify({ scriptId: script.id }),
       })
 
       if (res.ok) {
