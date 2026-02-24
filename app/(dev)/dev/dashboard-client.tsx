@@ -165,7 +165,7 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
 
   async function handlePDFImport() {
     if (!pdfFile) return
-    const MAX_PDF_MB = 15
+    const MAX_PDF_MB = 1
     if (pdfFile.size > MAX_PDF_MB * 1024 * 1024) {
       alert(`PDF too large (${(pdfFile.size / 1024 / 1024).toFixed(1)} MB). Max ${MAX_PDF_MB} MB.`)
       return

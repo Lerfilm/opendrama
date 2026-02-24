@@ -326,17 +326,13 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     return names
   }, [epScenes])
 
-  // Characters to show: all roles where name is mentioned, or just show all roles
+  // Characters in this episode: only show roles actually mentioned in the episode's scenes
   const epCast = useMemo(() =>
     script.roles.filter(r =>
       mentionedInEp.has(r.name.toUpperCase()) ||
       mentionedInEp.has(r.name) ||
       epScenes.some(s => (s.action || "").includes(r.name))
-    ).concat(script.roles.filter(r =>
-      !mentionedInEp.has(r.name.toUpperCase()) &&
-      !mentionedInEp.has(r.name) &&
-      !epScenes.some(s => (s.action || "").includes(r.name))
-    ).filter(r => r.role === "protagonist" || r.role === "antagonist")),
+    ),
     [script.roles, mentionedInEp, epScenes]
   )
 
@@ -413,8 +409,8 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           {/* Asset grid */}
           <div className="overflow-x-auto">
             <div className="flex gap-2 p-3" style={{ minWidth: "max-content" }}>
-              {assetTab === "characters" && (
-                characterAssets.length === 0 ? (
+              {assetTab === "characters" && (() => {
+                return characterAssets.length === 0 ? (
                   <div className="flex items-center gap-2 py-2 px-3 text-[11px]" style={{ color: "#BBB" }}>
                     No character portraits yet.
                     <Link href={`/dev/casting/${script.id}`} className="underline" style={{ color: "#4F46E5" }}>Go to Casting →</Link>
@@ -442,7 +438,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     )}
                   </div>
                 ))
-              )}
+              })()}
 
               {assetTab === "costumes" && (
                 costumeAssets.length === 0 ? (
@@ -642,15 +638,13 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                       </tr>
                     </thead>
                     <tbody>
-                      {script.roles.map((role, idx) => {
+                      {epCast.map((role, idx) => {
                         const costumes = costumesPerRole.get(role.id) || []
-                        const inEp = epCast.some(r => r.id === role.id)
                         return (
                           <tr key={role.id}
                             style={{
                               borderBottom: "1px solid #F0F0F0",
-                              background: inEp ? "rgba(79,70,229,0.03)" : "transparent",
-                              opacity: inEp ? 1 : 0.5,
+                              background: "rgba(79,70,229,0.03)",
                             }}>
                             {/* # */}
                             <td className="px-4 py-2.5 font-mono" style={{ color: "#DDD" }}>{idx + 1}</td>
@@ -668,7 +662,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                 )}
                                 <div>
                                   <p className="font-semibold" style={{ color: "#1A1A1A" }}>{role.name}</p>
-                                  {inEp && <p className="text-[9px]" style={{ color: "#4F46E5" }}>● In Ep {selectedEp}</p>}
+                                  <p className="text-[9px]" style={{ color: "#4F46E5" }}>● Ep {selectedEp}</p>
                                 </div>
                               </div>
                             </td>

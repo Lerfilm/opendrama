@@ -21,13 +21,13 @@ export async function POST(req: NextRequest) {
       {
         role: "system",
         content: `You are a casting director. Extract physical casting specifications from a character description.
-Return ONLY valid JSON with these fields (use empty string if not mentioned):
+Return ONLY valid JSON with these fields:
 {
-  "age": "e.g. 28, or 25-35",
+  "age": "e.g. 28, or 25-35. Empty string if not mentioned.",
   "gender": "Female" | "Male" | "Non-binary" | "Any" | "",
-  "height": "e.g. 168cm, or 170-175cm",
-  "ethnicity": "e.g. East Asian, Caucasian",
-  "nationality": "e.g. Chinese, Mandarin fluent",
+  "height": "e.g. 168cm, or 170-175cm. Empty string if not mentioned.",
+  "ethnicity": "ONLY fill if the description EXPLICITLY states an ethnic background (e.g. Caucasian, Black, Hispanic, East Asian, Mixed). Do NOT assume or default to any Asian ethnicity. Leave empty string '' if not explicitly mentioned.",
+  "nationality": "Nationality and language. If not explicitly mentioned in description, default to 'English'. e.g. 'American', 'British', 'English'.",
   "physique": "Slim" | "Athletic" | "Average" | "Curvy" | "Muscular" | "Heavy-set" | ""
 }`,
       },

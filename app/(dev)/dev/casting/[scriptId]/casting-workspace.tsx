@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { AIConfirmModal } from "@/components/dev/ai-confirm-modal"
+import { useUnsavedWarning } from "@/lib/use-unsaved-warning"
 
 interface CostumePhoto {
   scene: string       // e.g. "INT. OFFICE - DAY"
@@ -25,6 +26,7 @@ interface Role {
   nationality?: string
   physique?: string
   costumes?: CostumePhoto[]
+  imagePromptMap?: Record<string, string>
 }
 
 interface SceneRef {
@@ -137,6 +139,7 @@ function parseRoleMeta(role: Role): { age: string; gender: string; height: strin
 }
 
 export function CastingWorkspace({ script }: CastingWorkspaceProps) {
+  const { markDirty, markClean } = useUnsavedWarning()
   // Hydrate roles with parsed metadata, sorted by importance
   const [roles, setRoles] = useState<Role[]>(script.roles.map(r => {
     // Try to parse extra fields from voiceType field (a spare column we use for JSON metadata)
@@ -165,6 +168,12 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [showGenerateConfirm, setShowGenerateConfirm] = useState<string | null>(null)
+  // Delete confirmation: user must type the role's name to proceed
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("")
+  const [lightboxImg, setLightboxImg] = useState<{ url: string; prompt?: string } | null>(null)
+  const [lightboxCopied, setLightboxCopied] = useState(false)
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set())
   const [isFillingSpecs, setIsFillingSpecs] = useState(false)
   const [generatingCostumeFor, setGeneratingCostumeFor] = useState<string | null>(null) // scene id
   const [isFillingAllSpecs, setIsFillingAllSpecs] = useState(false)
@@ -186,6 +195,7 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
   const selectedRole = roles.find(r => r.id === selectedRoleId) ?? null
 
   function updateLocal(id: string, patch: Partial<Role>) {
+    markDirty()
     setRoles(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r))
   }
 
@@ -203,12 +213,14 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
         nationality: role.nationality || "",
         physique: role.physique || "",
         costumes: role.costumes || [],
+        imagePromptMap: role.imagePromptMap || {},
       })
       await fetch("/api/roles", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, name: role.name, description: role.description, role: role.role, voiceType: metaJson }),
       })
+      markClean()
     } finally {
       setSaving(null)
     }
@@ -220,10 +232,12 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
     const metaJson = JSON.stringify({
       age: role.age || "",
       gender: role.gender || "",
+      height: role.height || "",
       ethnicity: role.ethnicity || "",
       nationality: role.nationality || "",
       physique: role.physique || "",
       costumes,
+      imagePromptMap: role.imagePromptMap || {},
     })
     await fetch("/api/roles", {
       method: "PUT",
@@ -252,7 +266,16 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
   }
 
   async function deleteRole(id: string) {
-    if (!confirm("Delete this character?")) return
+    // Trigger confirmation modal instead of browser confirm()
+    setDeleteConfirmId(id)
+    setDeleteConfirmInput("")
+  }
+
+  async function confirmDeleteRole() {
+    const id = deleteConfirmId
+    if (!id) return
+    setDeleteConfirmId(null)
+    setDeleteConfirmInput("")
     setDeletingId(id)
     try {
       await fetch("/api/roles", {
@@ -348,12 +371,26 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
       const { imageUrl, prompt } = await res.json()
       setGenerationPrompt(prompt)
       const newImages = [...(role.referenceImages || []), imageUrl]
+      const newPromptMap = { ...(role.imagePromptMap || {}), [imageUrl]: prompt || "" }
+      // Build metaJson with updated promptMap so it persists to DB in one call
+      const metaJson = JSON.stringify({
+        age: role.age || "",
+        gender: role.gender || "",
+        height: role.height || "",
+        ethnicity: role.ethnicity || "",
+        nationality: role.nationality || "",
+        physique: role.physique || "",
+        costumes: role.costumes || [],
+        imagePromptMap: newPromptMap,
+      })
       await fetch("/api/roles", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: roleId, referenceImages: newImages }),
+        body: JSON.stringify({ id: roleId, referenceImages: newImages, voiceType: metaJson }),
       })
-      updateLocal(roleId, { referenceImages: newImages })
+      updateLocal(roleId, { referenceImages: newImages, imagePromptMap: newPromptMap })
+      // Open lightbox immediately for the new portrait
+      setLightboxImg({ url: imageUrl, prompt: prompt || undefined })
     } finally {
       setGeneratingFor(null)
     }
@@ -376,10 +413,27 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
       if (specs.gender) patch.gender = specs.gender
       if (specs.height) patch.height = specs.height
       if (specs.ethnicity) patch.ethnicity = specs.ethnicity
-      if (specs.nationality) patch.nationality = specs.nationality
+      // Always set nationality — default to "English" if AI returns empty
+      patch.nationality = specs.nationality || "English"
       if (specs.physique) patch.physique = specs.physique
       updateLocal(roleId, patch)
-      setTimeout(() => saveRole(roleId), 100)
+      // Save directly with merged data to avoid stale React state closure
+      const merged = { ...role, ...patch }
+      const metaJson = JSON.stringify({
+        age: merged.age || "",
+        gender: merged.gender || "",
+        height: merged.height || "",
+        ethnicity: merged.ethnicity || "",
+        nationality: merged.nationality || "",
+        physique: merged.physique || "",
+        costumes: merged.costumes || [],
+        imagePromptMap: merged.imagePromptMap || {},
+      })
+      await fetch("/api/roles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: roleId, name: role.name, description: role.description, role: role.role, voiceType: metaJson }),
+      })
     } finally {
       setIsFillingSpecs(false)
     }
@@ -566,6 +620,20 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
       body: JSON.stringify({ id: roleId, referenceImages: newImages }),
     })
     updateLocal(roleId, { referenceImages: newImages })
+    setBrokenImages(prev => { const s = new Set(prev); s.delete(imgUrl); return s })
+    if (lightboxImg?.url === imgUrl) setLightboxImg(null)
+  }
+
+  async function setAsMainImage(roleId: string, imgUrl: string) {
+    const role = roles.find(r => r.id === roleId)
+    if (!role) return
+    const newImages = [imgUrl, ...role.referenceImages.filter(i => i !== imgUrl)]
+    await fetch("/api/roles", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: roleId, referenceImages: newImages }),
+    })
+    updateLocal(roleId, { referenceImages: newImages })
   }
 
   return (
@@ -622,8 +690,9 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                   <button onClick={() => setSelectedRoleId(role.id)}
                     className="w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition-colors"
                     style={{ background: isSelected ? "#DCE0F5" : "transparent", borderLeft: isSelected ? "2px solid #4F46E5" : "2px solid transparent" }}>
-                    {role.referenceImages?.[0] ? (
-                      <img src={role.referenceImages[0]} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                    {role.referenceImages?.[0] && !brokenImages.has(role.referenceImages[0]) ? (
+                      <img src={role.referenceImages[0]} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                        onError={() => setBrokenImages(prev => new Set([...prev, role.referenceImages[0]]))} />
                     ) : (
                       <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0" style={getAvatarStyle(role)}>
                         {role.name[0]?.toUpperCase()}
@@ -751,8 +820,9 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                 <div className="max-w-2xl mx-auto p-6">
                   {/* Hero */}
                   <div className="flex items-center gap-4 mb-6">
-                    {selectedRole.referenceImages?.[0] ? (
-                      <img src={selectedRole.referenceImages[0]} alt="" className="w-20 h-20 rounded-full object-cover" style={{ border: "2px solid #D0D0D0" }} />
+                    {selectedRole.referenceImages?.[0] && !brokenImages.has(selectedRole.referenceImages[0]) ? (
+                      <img src={selectedRole.referenceImages[0]} alt="" className="w-20 h-20 rounded-full object-cover" style={{ border: "2px solid #D0D0D0" }}
+                        onError={() => setBrokenImages(prev => new Set([...prev, selectedRole.referenceImages[0]]))} />
                     ) : (
                       <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold" style={{ background: "#D0D0D0", color: "#888" }}>
                         {selectedRole.name[0]?.toUpperCase()}
@@ -916,7 +986,7 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                       </div>
                     )}
 
-                    {(selectedRole.referenceImages?.length ?? 0) === 0 ? (
+                    {(selectedRole.referenceImages?.filter(img => !brokenImages.has(img)).length ?? 0) === 0 ? (
                       <div className="border-2 border-dashed rounded-lg flex flex-col items-center justify-center py-10 cursor-pointer"
                         style={{ borderColor: "#C8C8C8", background: "#F5F5F5" }}
                         onClick={() => { pendingRoleIdRef.current = selectedRole.id; fileInputRef.current?.click() }}>
@@ -929,17 +999,30 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                       </div>
                     ) : (
                       <div className="grid grid-cols-4 gap-2">
-                        {selectedRole.referenceImages.map((img, i) => (
-                          <div key={i} className="relative group aspect-square rounded overflow-hidden" style={{ background: "#E0E0E0" }}>
-                            <img src={img} alt="" className="w-full h-full object-cover" />
-                            <button onClick={() => removeImage(selectedRole.id, img)}
+                        {selectedRole.referenceImages.filter(img => !brokenImages.has(img)).map((img, i) => (
+                          <div key={img} className="relative group aspect-square rounded overflow-hidden cursor-pointer" style={{ background: "#E0E0E0" }}
+                            onClick={() => setLightboxImg({ url: img, prompt: selectedRole.imagePromptMap?.[img] })}>
+                            <img src={img} alt="" className="w-full h-full object-cover"
+                              onError={() => setBrokenImages(prev => new Set([...prev, img]))} />
+                            {/* Remove button */}
+                            <button onClick={e => { e.stopPropagation(); removeImage(selectedRole.id, img) }}
                               className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                               style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                               </svg>
                             </button>
-                            {i === 0 && <div className="absolute bottom-1 left-1 text-[8px] px-1 py-0.5 rounded" style={{ background: "#4F46E5", color: "#fff" }}>Main</div>}
+                            {/* Main badge or Set as Main button */}
+                            {i === 0 ? (
+                              <div className="absolute bottom-1 left-1 text-[8px] px-1 py-0.5 rounded" style={{ background: "#4F46E5", color: "#fff" }}>Main</div>
+                            ) : (
+                              <button
+                                onClick={e => { e.stopPropagation(); setAsMainImage(selectedRole.id, img) }}
+                                className="absolute bottom-1 left-1 text-[8px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}
+                                title="Set as main portrait"
+                              >Set Main</button>
+                            )}
                           </div>
                         ))}
                         <button onClick={() => { pendingRoleIdRef.current = selectedRole.id; fileInputRef.current?.click() }}
@@ -1221,6 +1304,116 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
           onConfirm={() => { const id = showGenerateConfirm; setShowGenerateConfirm(null); generateCharacterImage(id) }}
           onCancel={() => setShowGenerateConfirm(null)}
         />
+      )}
+
+      {/* Delete Role Confirmation Modal */}
+      {deleteConfirmId && (() => {
+        const role = roles.find(r => r.id === deleteConfirmId)
+        if (!role) return null
+        const nameMatch = deleteConfirmInput.trim() === role.name.trim()
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+            onClick={() => { setDeleteConfirmId(null); setDeleteConfirmInput("") }}
+          >
+            <div
+              className="w-80 rounded-xl p-6 shadow-2xl"
+              style={{ background: "#fff" }}
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-semibold mb-1" style={{ color: "#1A1A1A" }}>Delete Character</h3>
+              <p className="text-[11px] mb-4" style={{ color: "#888" }}>
+                Type <strong style={{ color: "#EF4444" }}>{role.name}</strong> to confirm deletion. This cannot be undone.
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmInput}
+                onChange={e => setDeleteConfirmInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && nameMatch && confirmDeleteRole()}
+                placeholder={`Type "${role.name}" to confirm`}
+                autoFocus
+                className="w-full h-8 px-3 text-sm rounded mb-4 focus:outline-none"
+                style={{ background: "#F5F5F5", border: "1px solid #E0E0E0", color: "#1A1A1A" }}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setDeleteConfirmId(null); setDeleteConfirmInput("") }}
+                  className="flex-1 h-8 text-sm rounded"
+                  style={{ background: "#F0F0F0", color: "#666" }}
+                >Cancel</button>
+                <button
+                  onClick={confirmDeleteRole}
+                  disabled={!nameMatch}
+                  className="flex-1 h-8 text-sm rounded font-medium disabled:opacity-40 transition-opacity"
+                  style={{ background: "#EF4444", color: "#fff" }}
+                >Delete</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Image Lightbox */}
+      {lightboxImg && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.88)" }}
+          onClick={() => setLightboxImg(null)}
+        >
+          <div
+            className="max-w-lg w-full rounded-xl overflow-hidden shadow-2xl"
+            style={{ background: "#1A1A1A" }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Image */}
+            <div className="relative" style={{ background: "#111" }}>
+              <img src={lightboxImg.url} alt="" className="w-full max-h-[65vh] object-contain" />
+              <button
+                onClick={() => setLightboxImg(null)}
+                className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(0,0,0,0.65)", color: "#fff" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            {/* Prompt section */}
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>AI Prompt</span>
+                {lightboxImg.prompt && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(lightboxImg.prompt || "").catch(() => {})
+                      setLightboxCopied(true)
+                      setTimeout(() => setLightboxCopied(false), 1500)
+                    }}
+                    className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded transition-colors"
+                    style={{ background: lightboxCopied ? "#1A3A1A" : "#2A2A2A", color: lightboxCopied ? "#4ADE80" : "#AAA" }}
+                  >
+                    {lightboxCopied ? (
+                      <>✓ Copied</>
+                    ) : (
+                      <>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                        </svg>
+                        Copy
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              {lightboxImg.prompt ? (
+                <p className="text-[11px] leading-relaxed" style={{ color: "#888" }}>{lightboxImg.prompt}</p>
+              ) : (
+                <p className="text-[11px] italic" style={{ color: "#444" }}>Prompt not available for this image</p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Hidden file inputs */}

@@ -5,6 +5,7 @@
  */
 
 import { jsonrepair } from "jsonrepair"
+import sharp from "sharp"
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 const IMAGE_GEN_MODEL = "google/gemini-2.5-flash-image"
@@ -299,31 +300,61 @@ export async function aiGenerateImage(
   // Parse image from response — OpenRouter may return content as array of parts
   // or as a direct data URL string
   const content = message.content
+  let rawResult: string | null = null
 
   if (typeof content === "string") {
     // Direct data URL or base64 string
-    if (content.startsWith("data:")) return content
+    if (content.startsWith("data:")) rawResult = content
     // Plain base64 without prefix
-    if (content.length > 100) return `data:image/png;base64,${content}`
+    else if (content.length > 100) rawResult = `data:image/png;base64,${content}`
   }
 
-  if (Array.isArray(content)) {
+  if (!rawResult && Array.isArray(content)) {
     for (const part of content) {
       if (part?.type === "image_url" && part.image_url?.url) {
-        return part.image_url.url
+        rawResult = part.image_url.url; break
       }
       if (part?.type === "image" && part.image?.data) {
-        return `data:${part.image.media_type || "image/png"};base64,${part.image.data}`
+        rawResult = `data:${part.image.media_type || "image/png"};base64,${part.image.data}`; break
       }
     }
   }
 
   // Fallback: check top-level images array (some OpenRouter formats)
-  if (Array.isArray(message.images)) {
+  if (!rawResult && Array.isArray(message.images)) {
     const img = message.images[0]
-    if (img?.image_url?.url) return img.image_url.url
+    if (img?.image_url?.url) rawResult = img.image_url.url
   }
 
-  console.error("[aiGenerateImage] Unexpected response format:", JSON.stringify(data).slice(0, 500))
-  throw new Error("Could not extract image from AI response")
+  if (!rawResult) {
+    console.error("[aiGenerateImage] Unexpected response format:", JSON.stringify(data).slice(0, 500))
+    throw new Error("Could not extract image from AI response")
+  }
+
+  // Apply 720p max resize to base64 data URLs before returning
+  if (rawResult.startsWith("data:")) {
+    return resizeTo720p(rawResult)
+  }
+  return rawResult
+}
+
+
+/**
+ * Resize a base64 data URL so that neither dimension exceeds 1280px (≈720p level).
+ * Uses sharp. Aspect ratio is preserved. Does not enlarge small images.
+ */
+export async function resizeTo720p(dataUrl: string): Promise<string> {
+  try {
+    const b64 = dataUrl.split(",")[1]
+    if (!b64) return dataUrl
+    const inputBuf = Buffer.from(b64, "base64")
+    const resized = await sharp(inputBuf)
+      .resize(1280, 1280, { fit: "inside", withoutEnlargement: true })
+      .png()
+      .toBuffer()
+    return `data:image/png;base64,${resized.toString("base64")}`
+  } catch {
+    // If resize fails for any reason, return original
+    return dataUrl
+  }
 }

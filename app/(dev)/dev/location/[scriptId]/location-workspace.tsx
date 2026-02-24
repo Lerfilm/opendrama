@@ -3,6 +3,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 import { LocationSidebar } from "./components/location-sidebar"
 import { LocationDetail } from "./components/location-detail"
+import { useUnsavedWarning } from "@/lib/use-unsaved-warning"
 
 interface SceneRef {
   id: string
@@ -68,6 +69,7 @@ function buildSceneText(scene: SceneRef): string {
 }
 
 export function LocationWorkspace({ script }: { script: Script }) {
+  const { markDirty, markClean } = useUnsavedWarning()
   const [scenes, setScenes] = useState<SceneRef[]>(script.scenes)
   const scriptLocations = useMemo(() => extractLocations(scenes), [scenes])
 
@@ -86,32 +88,128 @@ export function LocationWorkspace({ script }: { script: Script }) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false)
   const [isAIExtracting, setIsAIExtracting] = useState(false)
+  const [extractProgress, setExtractProgress] = useState(0)
+  const extractTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [isGeneratingAllPhotos, setIsGeneratingAllPhotos] = useState(false)
-  const [generateAllPhotosProgress, setGenerateAllPhotosProgress] = useState(0)
+  const [genAllTotal, setGenAllTotal] = useState(0)
+  const [genAllDone, setGenAllDone] = useState(0)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isLoadedRef = useRef(false)
+  const locJobIdRef = useRef<string | null>(null)
+  // Always-current entries reference for use inside async runners
+  const entriesRef = useRef(entries)
 
-  // Load locations from DB on mount
+  // Keep entriesRef in sync with latest entries state
+  useEffect(() => { entriesRef.current = entries }, [entries])
+
+  // Runner: generate photos for remaining locations (supports both fresh start and resume)
+  async function runGenerateAllLocationPhotos(locIds: string[], completedLocIds: string[], jobId: string) {
+    const remaining = locIds.filter(id => !completedLocIds.includes(id))
+    setGenAllTotal(locIds.length)
+    setGenAllDone(locIds.length - remaining.length)
+    setIsGeneratingAllPhotos(true)
+    let doneCount = locIds.length - remaining.length
+
+    for (const locId of remaining) {
+      const e = entriesRef.current[locId]
+      try {
+        const res = await fetch("/api/ai/generate-location-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            locName: e?.name || locId,
+            type: e?.type || "INT",
+            description: e?.notes?.trim() || "",
+          }),
+        })
+        const data = await res.json()
+        if (data.url) {
+          setEntries(prev => ({
+            ...prev,
+            [locId]: { ...prev[locId], photos: [...(prev[locId]?.photos || []), { url: data.url, isApproved: false }] },
+          }))
+        }
+      } catch { /* skip failed location */ }
+
+      doneCount++
+      setGenAllDone(doneCount)
+
+      // Persist progress to DB job
+      await fetch("/api/casting/bulk-job", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId,
+          completedLocId: locId,
+          progress: Math.round((doneCount / locIds.length) * 100),
+        }),
+      }).catch(() => {})
+    }
+
+    // Mark job complete
+    await fetch(`/api/casting/bulk-job?jobId=${jobId}`, { method: "DELETE" }).catch(() => {})
+    locJobIdRef.current = null
+    setIsGeneratingAllPhotos(false)
+    setGenAllTotal(0)
+    setGenAllDone(0)
+  }
+
+  // Start a fresh generate-all-photos job
+  async function handleGenerateAllPhotos() {
+    const locIds = Object.keys(entries).sort()
+    if (locIds.length === 0) return
+    const res = await fetch("/api/casting/bulk-job", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scriptId: script.id, type: "generate_all_location_photos", locIds }),
+    })
+    const { job } = await res.json()
+    locJobIdRef.current = job.id
+    await runGenerateAllLocationPhotos(locIds, [], job.id)
+  }
+
+  // Load locations from DB on mount + resume any active job
   useEffect(() => {
-    fetch(`/api/scripts/${script.id}/locations`)
-      .then(r => r.json())
-      .then(d => {
+    async function loadAndResume() {
+      // 1. Load saved location data from DB
+      try {
+        const r = await fetch(`/api/scripts/${script.id}/locations`)
+        const d = await r.json()
         const saved: LocationEntry[] = d.locations || []
         if (saved.length > 0) {
           setEntries(prev => {
             const next = { ...prev }
-            saved.forEach(loc => {
-              next[loc.name] = { ...next[loc.name], ...loc }
-            })
+            saved.forEach(loc => { next[loc.name] = { ...next[loc.name], ...loc } })
             return next
           })
           setSelectedLoc(prev => prev ?? saved[0]?.name ?? null)
         }
-        isLoadedRef.current = true
-      })
-      .catch(() => { isLoadedRef.current = true })
-  }, [script.id])
+      } catch {}
+      isLoadedRef.current = true
+
+      // 2. Check for an active location photo-generation job to resume
+      try {
+        const res = await fetch(`/api/casting/bulk-job?scriptId=${script.id}&type=generate_all_location_photos`)
+        if (!res.ok) return
+        const { jobs } = await res.json()
+        if (!jobs?.length) return
+        const job = jobs[0]
+        let inputData: { locIds?: string[] } = {}
+        let outputData: { completedLocIds?: string[] } = {}
+        try { inputData = JSON.parse(job.input || "{}") } catch {}
+        try { outputData = JSON.parse(job.output || "{}") } catch {}
+        const locIds = inputData.locIds || []
+        const completedLocIds = outputData.completedLocIds || []
+        if (locIds.length > 0 && completedLocIds.length < locIds.length) {
+          locJobIdRef.current = job.id
+          runGenerateAllLocationPhotos(locIds, completedLocIds, job.id)
+        }
+      } catch {}
+    }
+    loadAndResume()
+  }, [script.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save locations when entries change
   useEffect(() => {
@@ -128,6 +226,7 @@ export function LocationWorkspace({ script }: { script: Script }) {
           body: JSON.stringify({ locations: locationList }),
         })
         setSaveStatus("saved")
+        markClean()
         setTimeout(() => setSaveStatus("idle"), 2000)
       } catch { setSaveStatus("idle") }
     }, 800)
@@ -151,8 +250,9 @@ export function LocationWorkspace({ script }: { script: Script }) {
   }, [scenesForLoc])
 
   const updateEntry = useCallback((loc: string, patch: Partial<LocationEntry>) => {
+    markDirty()
     setEntries(prev => ({ ...prev, [loc]: { ...prev[loc], ...patch } }))
-  }, [])
+  }, [markDirty])
 
   const handleAddLocation = useCallback((name: string) => {
     if (!name || entries[name]) return
@@ -192,6 +292,12 @@ export function LocationWorkspace({ script }: { script: Script }) {
 
   const handleAIExtract = useCallback(async () => {
     setIsAIExtracting(true)
+    setExtractProgress(5)
+    // Animate progress bar from 5% → 85% while API call runs
+    if (extractTimerRef.current) clearInterval(extractTimerRef.current)
+    extractTimerRef.current = setInterval(() => {
+      setExtractProgress(prev => (prev < 85 ? prev + 2 : prev))
+    }, 400)
     try {
       const sceneTexts = scenes.map(buildSceneText).join("\n\n---\n\n")
       const res = await fetch("/api/ai/extract-locations", {
@@ -229,7 +335,9 @@ export function LocationWorkspace({ script }: { script: Script }) {
     } catch {
       alert("AI extraction failed")
     } finally {
-      setIsAIExtracting(false)
+      if (extractTimerRef.current) { clearInterval(extractTimerRef.current); extractTimerRef.current = null }
+      setExtractProgress(100)
+      setTimeout(() => { setExtractProgress(0); setIsAIExtracting(false) }, 600)
     }
   }, [scenes, script.id, selectedLoc])
 
@@ -254,73 +362,77 @@ export function LocationWorkspace({ script }: { script: Script }) {
     }
   }, [scenes, updateEntry])
 
-  const handleGenerateAllPhotos = useCallback(async () => {
-    const locs = Object.keys(entries).sort()
-    if (locs.length === 0) return
-    setIsGeneratingAllPhotos(true)
-    setGenerateAllPhotosProgress(0)
-    for (let i = 0; i < locs.length; i++) {
-      const loc = locs[i]
-      const e = entries[loc]
-      try {
-        const res = await fetch("/api/ai/generate-location-photo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            locName: e?.name || loc,
-            type: e?.type || "INT",
-            description: e?.notes?.trim() || "",
-          }),
-        })
-        const data = await res.json()
-        if (data.url) {
-          setEntries(prev => ({
-            ...prev,
-            [loc]: {
-              ...prev[loc],
-              photos: [...(prev[loc]?.photos || []), { url: data.url, isApproved: false }],
-            },
-          }))
-        }
-      } catch { /* skip failed location */ }
-      setGenerateAllPhotosProgress(Math.round(((i + 1) / locs.length) * 100))
-    }
-    setIsGeneratingAllPhotos(false)
-    setGenerateAllPhotosProgress(0)
-  }, [entries])
-
   const allLocs = Object.keys(entries).sort()
 
   return (
-    <div className="h-full flex" style={{ background: "#E8E8E8" }}>
-      <LocationSidebar
-        allLocs={allLocs}
-        entries={entries}
-        scenes={scenes}
-        selectedLoc={selectedLoc}
-        isRefreshing={isRefreshing}
-        isAIExtracting={isAIExtracting}
-        isGeneratingAllPhotos={isGeneratingAllPhotos}
-        generateAllPhotosProgress={generateAllPhotosProgress}
-        saveStatus={saveStatus}
-        onSelectLoc={setSelectedLoc}
-        onRefresh={handleRefresh}
-        onAIExtract={handleAIExtract}
-        onAddLocation={handleAddLocation}
-        onGenerateAllPhotos={handleGenerateAllPhotos}
-      />
-      <LocationDetail
-        entry={entry}
-        selectedLoc={selectedLoc}
-        allLocs={allLocs}
-        scenes={scenes}
-        scenesForLoc={scenesForLoc}
-        scenesByTime={scenesByTime}
-        isGeneratingDesc={isGeneratingDesc}
-        onUpdateEntry={updateEntry}
-        onAIDescribe={handleAIDescribe}
-        onAIExtract={handleAIExtract}
-      />
+    <div className="h-full flex flex-col" style={{ background: "#E8E8E8" }}>
+      {/* Persistent top action bar */}
+      <div className="flex items-center gap-3 px-4 py-2 flex-shrink-0" style={{ background: "#DCDCDC", borderBottom: "1px solid #C0C0C0" }}>
+        <button
+          onClick={handleGenerateAllPhotos}
+          disabled={isGeneratingAllPhotos || allLocs.length === 0}
+          className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded disabled:opacity-50"
+          style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+        >
+          {isGeneratingAllPhotos
+            ? <><div className="w-2.5 h-2.5 rounded-full border border-indigo-400 border-t-transparent animate-spin inline-block mr-1" />Generating...</>
+            : <>✦ AI Generate All Photos</>}
+        </button>
+        {isGeneratingAllPhotos && genAllTotal > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="w-32 h-1.5 rounded-full overflow-hidden" style={{ background: "#D0D4E8" }}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${Math.round((genAllDone / genAllTotal) * 100)}%`, background: "#4F46E5" }}
+              />
+            </div>
+            <span className="text-[10px]" style={{ color: "#6B7280" }}>
+              {genAllDone}/{genAllTotal} locations
+            </span>
+          </div>
+        )}
+        {/* AI Extract progress bar */}
+        {isAIExtracting && extractProgress > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="w-28 h-1.5 rounded-full overflow-hidden" style={{ background: "#D0D4E8" }}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${extractProgress}%`, background: "#7C3AED" }}
+              />
+            </div>
+            <span className="text-[10px]" style={{ color: "#6B7280" }}>Extracting locations...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Main content: sidebar + detail */}
+      <div className="flex-1 flex min-h-0">
+        <LocationSidebar
+          allLocs={allLocs}
+          entries={entries}
+          scenes={scenes}
+          selectedLoc={selectedLoc}
+          isRefreshing={isRefreshing}
+          isAIExtracting={isAIExtracting}
+          saveStatus={saveStatus}
+          onSelectLoc={setSelectedLoc}
+          onRefresh={handleRefresh}
+          onAIExtract={handleAIExtract}
+          onAddLocation={handleAddLocation}
+        />
+        <LocationDetail
+          entry={entry}
+          selectedLoc={selectedLoc}
+          allLocs={allLocs}
+          scenes={scenes}
+          scenesForLoc={scenesForLoc}
+          scenesByTime={scenesByTime}
+          isGeneratingDesc={isGeneratingDesc}
+          onUpdateEntry={updateEntry}
+          onAIDescribe={handleAIDescribe}
+          onAIExtract={handleAIExtract}
+        />
+      </div>
     </div>
   )
 }

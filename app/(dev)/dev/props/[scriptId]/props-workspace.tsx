@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { PropItem, PropPhoto } from "./components/props-types"
 import { PropsSidebar } from "./components/props-sidebar"
 import { PropDetail } from "./components/prop-detail"
+import { useUnsavedWarning } from "@/lib/use-unsaved-warning"
 
 interface SceneRef {
   id: string
@@ -22,6 +23,7 @@ interface Script {
 }
 
 export function PropsWorkspace({ script }: { script: Script }) {
+  const { markDirty, markClean } = useUnsavedWarning()
   const [props, setProps] = useState<PropItem[]>([])
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null)
   const [isAIExtracting, setIsAIExtracting] = useState(false)
@@ -57,10 +59,11 @@ export function PropsWorkspace({ script }: { script: Script }) {
           body: JSON.stringify({ props }),
         })
         setSaveStatus("saved")
+        markClean()
         setTimeout(() => setSaveStatus("idle"), 2000)
       } catch { setSaveStatus("idle") }
     }, 800)
-  }, [props, script.id])
+  }, [props, script.id, markClean])
 
   const selectedProp = props.find(p => p.id === selectedPropId) ?? null
 
@@ -78,6 +81,7 @@ export function PropsWorkspace({ script }: { script: Script }) {
   }
 
   function updateProp(id: string, patch: Partial<PropItem>) {
+    markDirty()
     setProps(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
   }
 

@@ -314,9 +314,9 @@ export async function POST(req: NextRequest) {
             return finish({ type: "error", error: "No PDF file provided" })
           }
 
-          const MAX_BYTES = 15 * 1024 * 1024
+          const MAX_BYTES = 1 * 1024 * 1024
           if (pdfFile.size > MAX_BYTES) {
-            return finish({ type: "error", error: "PDF file exceeds 15 MB limit" })
+            return finish({ type: "error", error: "PDF file exceeds 1 MB limit" })
           }
 
           filename = pdfFile.name
