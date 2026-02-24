@@ -25,7 +25,6 @@ export default async function MediaPage({ params }: { params: Promise<{ scriptId
         select: {
           id: true, episodeNum: true, segmentIndex: true, sceneNum: true,
           status: true, videoUrl: true, thumbnailUrl: true, seedImageUrl: true, durationSec: true,
-          prompt: true,
         },
         orderBy: [{ episodeNum: "asc" }, { segmentIndex: "asc" }],
       },

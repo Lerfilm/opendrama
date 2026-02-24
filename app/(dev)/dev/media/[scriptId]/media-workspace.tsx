@@ -21,7 +21,6 @@ interface VideoSegment {
   thumbnailUrl?: string | null
   seedImageUrl?: string | null
   durationSec: number
-  prompt: string
 }
 
 interface Script {

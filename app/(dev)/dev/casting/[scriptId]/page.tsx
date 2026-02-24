@@ -11,8 +11,14 @@ export default async function CastingPage({ params }: { params: Promise<{ script
 
   const script = await prisma.script.findFirst({
     where: { id: scriptId, userId: session.user.id as string },
-    include: {
-      roles: { orderBy: { createdAt: "asc" } },
+    select: {
+      id: true,
+      title: true,
+      genre: true,
+      roles: {
+        select: { id: true, name: true, role: true, description: true, voiceType: true, avatarUrl: true, referenceImages: true },
+        orderBy: { createdAt: "asc" },
+      },
       scenes: {
         select: { id: true, episodeNum: true, sceneNum: true, heading: true, location: true, timeOfDay: true },
         orderBy: [{ episodeNum: "asc" }, { sceneNum: "asc" }],

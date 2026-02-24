@@ -145,16 +145,30 @@ export function InspectorPanel({
 
   // === Scene Selected ===
   if (selectedScene) {
-    // Characters from dialogue
+    // Characters from action blocks (new format) or dialogue (legacy)
     let characters: string[] = []
-    try {
-      if (selectedScene.dialogue) {
-        const parsed = JSON.parse(selectedScene.dialogue)
-        if (Array.isArray(parsed)) {
-          characters = [...new Set(parsed.map((d: { character?: string }) => d.character).filter(Boolean))] as string[]
+    const rawAct = selectedScene.action?.trim()
+    if (rawAct?.startsWith("[")) {
+      try {
+        const blocks = JSON.parse(rawAct)
+        if (Array.isArray(blocks)) {
+          const names = blocks
+            .filter((b: { type?: string; character?: string }) => b.type === "dialogue" && b.character)
+            .map((b: { character: string }) => b.character)
+          characters = [...new Set(names)]
         }
-      }
-    } catch { /* not JSON */ }
+      } catch { /* */ }
+    }
+    if (characters.length === 0) {
+      try {
+        if (selectedScene.dialogue) {
+          const parsed = JSON.parse(selectedScene.dialogue)
+          if (Array.isArray(parsed)) {
+            characters = [...new Set(parsed.map((d: { character?: string }) => d.character).filter(Boolean))] as string[]
+          }
+        }
+      } catch { /* not JSON */ }
+    }
 
     return (
       <div className="h-full overflow-y-auto dev-scrollbar px-3 py-3" style={{ background: "#F0F0F0", borderLeft: "1px solid #C8C8C8" }}>
@@ -191,13 +205,28 @@ export function InspectorPanel({
           </>
         )}
 
-        {getSceneValue(selectedScene, "promptHint") && (
+        {/* Location & Time */}
+        {(getSceneValue(selectedScene, "location") || getSceneValue(selectedScene, "timeOfDay")) && (
           <>
-            <SectionHeader>Prompt Hint</SectionHeader>
-            <p className="text-[11px] leading-relaxed" style={{ color: "#888" }}>
-              {getSceneValue(selectedScene, "promptHint")}
-            </p>
+            <SectionHeader>Location</SectionHeader>
+            <div className="flex items-center gap-2 flex-wrap">
+              {getSceneValue(selectedScene, "location") && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#E0E7FF", color: "#3730A3" }}>
+                  📍 {getSceneValue(selectedScene, "location")}
+                </span>
+              )}
+              {getSceneValue(selectedScene, "timeOfDay") && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#FEF3C7", color: "#92400E" }}>
+                  🕐 {getSceneValue(selectedScene, "timeOfDay")}
+                </span>
+              )}
+            </div>
           </>
+        )}
+
+        {/* Duration */}
+        {selectedScene.duration && selectedScene.duration > 0 && (
+          <PropRow label="Duration">{selectedScene.duration}s</PropRow>
         )}
       </div>
     )

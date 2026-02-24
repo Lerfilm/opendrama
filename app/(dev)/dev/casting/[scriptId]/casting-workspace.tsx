@@ -52,11 +52,11 @@ interface CastingWorkspaceProps {
 
 const ROLE_TYPES = ["protagonist", "antagonist", "supporting", "minor"]
 const ROLE_TYPE_LABELS: Record<string, string> = {
-  lead: "主角",        // alias from PDF import AI
-  protagonist: "主角",
-  antagonist: "反派",
-  supporting: "配角",
-  minor: "路人",
+  lead: "Lead",
+  protagonist: "Protagonist",
+  antagonist: "Antagonist",
+  supporting: "Supporting",
+  minor: "Minor",
 }
 const ROLE_TYPE_STYLES: Record<string, { background: string; color: string }> = {
   lead: { background: "#DBEAFE", color: "#1D4ED8" },

@@ -71,6 +71,7 @@ export async function PUT(
         ...(body.title !== undefined && { title: body.title }),
         ...(body.genre !== undefined && { genre: body.genre }),
         ...(body.format !== undefined && { format: body.format }),
+        ...(body.language !== undefined && { language: body.language }),
         ...(body.logline !== undefined && { logline: body.logline }),
         ...(body.synopsis !== undefined && { synopsis: body.synopsis }),
         ...(body.targetEpisodes !== undefined && { targetEpisodes: body.targetEpisodes }),

@@ -33,6 +33,7 @@ interface SceneListPanelProps {
   savingScenes: Set<string>
   editingScenes: Record<string, unknown>
   onAddEpisode: () => void
+  onDeleteEpisode: (ep: number) => void
   onAddScene: () => void
   targetEpisodes: number
 }
@@ -64,7 +65,7 @@ function countSceneChars(scene: Scene): number {
 export function SceneListPanel({
   scenes, episodes, allScenes, segments, selectedEpisode, onSelectEpisode,
   selectedSceneId, onSelectScene, savingScenes, editingScenes,
-  onAddEpisode, onAddScene, targetEpisodes,
+  onAddEpisode, onDeleteEpisode, onAddScene, targetEpisodes,
 }: SceneListPanelProps) {
   const [filterLocation, setFilterLocation] = useState("")
   const [filterMood, setFilterMood] = useState("")
@@ -136,18 +137,27 @@ export function SceneListPanel({
             const hasSegments = epSegments.length > 0
             const isActive = selectedEpisode === ep
             return (
-              <button
-                key={ep}
-                onClick={() => onSelectEpisode(ep)}
-                className="w-full flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-colors"
-                style={{ background: isActive ? "#4F46E5" : "transparent", color: isActive ? "#fff" : "#666" }}
-              >
-                <span>E{ep}</span>
-                <div className="flex gap-0.5 ml-1">
-                  <div className="w-1 h-1 rounded-full" style={{ background: hasScenes ? "#10B981" : isActive ? "rgba(255,255,255,0.3)" : "#CCC" }} />
-                  <div className="w-1 h-1 rounded-full" style={{ background: hasSegments ? "#3B82F6" : isActive ? "rgba(255,255,255,0.3)" : "#CCC" }} />
-                </div>
-              </button>
+              <div key={ep} className="group/ep w-full flex items-center gap-0.5">
+                <button
+                  onClick={() => onSelectEpisode(ep)}
+                  className="flex-1 flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-colors"
+                  style={{ background: isActive ? "#4F46E5" : "transparent", color: isActive ? "#fff" : "#666" }}
+                >
+                  <span>E{ep}</span>
+                  <div className="flex gap-0.5 ml-1">
+                    <div className="w-1 h-1 rounded-full" style={{ background: hasScenes ? "#10B981" : isActive ? "rgba(255,255,255,0.3)" : "#CCC" }} />
+                    <div className="w-1 h-1 rounded-full" style={{ background: hasSegments ? "#3B82F6" : isActive ? "rgba(255,255,255,0.3)" : "#CCC" }} />
+                  </div>
+                </button>
+                <button
+                  onClick={() => onDeleteEpisode(ep)}
+                  className="w-5 h-5 flex items-center justify-center rounded text-[10px] opacity-0 group-hover/ep:opacity-50 hover:!opacity-100 transition-opacity flex-shrink-0"
+                  style={{ color: isActive ? "#EF4444" : "#EF4444" }}
+                  title={`Delete Episode ${ep}`}
+                >
+                  ×
+                </button>
+              </div>
             )
           })}
           {canAddEpisode && (

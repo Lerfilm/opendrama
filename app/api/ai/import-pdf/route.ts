@@ -300,18 +300,28 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let streamClosed = false
+
       function emit(data: object) {
+        if (streamClosed) return
         try {
           controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"))
         } catch {
-          // controller may be closed
+          streamClosed = true
         }
       }
 
       function finish(data: object) {
+        clearInterval(heartbeat)
         emit(data)
+        streamClosed = true
         try { controller.close() } catch { /* already closed */ }
       }
+
+      // Keep-alive: send heartbeat every 15s to prevent Fly.io/Cloudflare idle timeout
+      const heartbeat = setInterval(() => {
+        emit({ type: "heartbeat" })
+      }, 15_000)
 
       // Use a fresh Prisma client for this long-running import
       // to avoid DbHandler exit from idle connection timeouts
@@ -453,11 +463,21 @@ export async function POST(req: NextRequest) {
             }
           }
 
+          // Try to extract title from PDF text immediately (before AI) — so even if
+          // the stream breaks later, we have a correct title instead of the raw filename
+          const earlyTitle = extractTitleFromRawText(text) || filename
+            ?.replace(/\.pdf$/i, "")
+            .replace(/\s*[\[(]?\d+-\d+(?:pages?)?\s*[\])]?\s*$/i, "")
+            .replace(/[_\s]+v\d+[_\s]*\d{4,8}\s*$/i, "")
+            .replace(/[_\s]+\d{4,8}\s*$/i, "")
+            .replace(/^[A-Za-z']+(?:\s+[A-Za-z]+){0,2}[''s]*\s*(?:version|draft|edit|copy|script)[-–_\s]+/i, "")
+            .trim() || "Importing..."
+
           // Create script immediately so user has a scriptId even if we fail
           const script = await db.script.create({
             data: {
               userId: session.user.id,
-              title: filename?.replace(/\.pdf$/i, "") || "Importing...",
+              title: earlyTitle,
               genre: genre || "drama",
               format: format || "series",
               language: language || "en",
@@ -513,7 +533,6 @@ export async function POST(req: NextRequest) {
           let chunkResult: ChunkResult = {}
           try {
             const result = await aiComplete({
-              model: "anthropic/claude-sonnet-4-6",
               messages: [
                 { role: "system", content: PDF_IMPORT_SYSTEM_PROMPT },
                 { role: "user", content: userMsg },
@@ -658,6 +677,7 @@ export async function POST(req: NextRequest) {
         emit({ type: "error", error: "Import failed: " + String(error) })
         try { controller.close() } catch { /* already closed */ }
       } finally {
+        clearInterval(heartbeat)
         await db.$disconnect().catch(() => {})
       }
     },

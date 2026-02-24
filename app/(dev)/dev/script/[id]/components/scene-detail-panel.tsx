@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { SceneHeader } from "./scene-header"
 import { SegmentTimeline } from "./segment-timeline"
-import { AIConfirmModal } from "@/components/dev/ai-confirm-modal"
 
 // ─── Block system ────────────────────────────────────────────────────────────
 export type Block =
@@ -116,74 +115,6 @@ function AddBlockMenu({ onAdd, showHints }: { onAdd: (type: Block["type"]) => vo
   )
 }
 
-// ─── Prompt Hint Field ────────────────────────────────────────────────────────
-function PromptHintField({ sceneId, value, onChange, scriptId }: {
-  sceneId: string; value: string; onChange: (v: string) => void; scriptId: string
-}) {
-  const [isAdapting, setIsAdapting] = useState(false)
-  const [showAdaptConfirm, setShowAdaptConfirm] = useState(false)
-
-  async function handleAIAdapt() {
-    setIsAdapting(true)
-    try {
-      const res = await fetch("/api/ai/adapt-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sceneId, existingHint: value }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.promptHint) onChange(data.promptHint)
-      } else {
-        alert("AI adapt failed")
-      }
-    } finally {
-      setIsAdapting(false)
-    }
-  }
-
-  return (
-    <>
-    <div className="mt-4 pt-3" style={{ borderTop: "1px dashed #E0D8D0", fontFamily: "sans-serif" }}>
-      <div className="flex items-center justify-between gap-1.5 mb-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "#AAA" }}>Prompt Hint</span>
-          <span className="text-[9px]" style={{ color: "#CCC" }}>for video generation</span>
-        </div>
-        <button
-          onClick={() => setShowAdaptConfirm(true)}
-          disabled={isAdapting}
-          className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded disabled:opacity-50 transition-colors"
-          style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
-        >
-          {isAdapting ? (
-            <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Adapting...</>
-          ) : (
-            <>✦ AI Adapt</>
-          )}
-        </button>
-      </div>
-      <textarea
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder="Camera: close-up on her face. Lighting: soft, backlit. Cinematic 16mm grain..."
-        rows={2}
-        className="w-full resize-none focus:outline-none text-[11px] leading-relaxed rounded px-2 py-1.5"
-        style={{ background: "#F0EDE8", color: "#777", border: "1px solid #E0D8D0" }}
-      />
-    </div>
-
-    {showAdaptConfirm && (
-      <AIConfirmModal
-        featureKey="adapt_prompt"
-        featureLabel="AI Adapt Prompt"
-        onConfirm={() => { setShowAdaptConfirm(false); handleAIAdapt() }}
-        onCancel={() => setShowAdaptConfirm(false)}
-      />
-    )}
-    </>
-  )
-}
 
 // ─── Scene nav dropdown ───────────────────────────────────────────────────────
 function SceneNavDropdown({
@@ -548,7 +479,7 @@ export function SceneDetailPanel({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto dev-scrollbar" ref={contentRef}>
+      <div className="flex-1 min-h-0 overflow-y-scroll dev-scrollbar-visible" ref={contentRef}>
         {activeTab === "script-text" ? (
           <div style={{ fontFamily: "'Courier New', Courier, monospace", background: "#F8F6F1" }}>
 
@@ -756,14 +687,6 @@ export function SceneDetailPanel({
                   Delete
                 </button>
               </div>
-
-              {/* ── PROMPT HINT ── */}
-              <PromptHintField
-                sceneId={scene.id}
-                value={getSceneValue(scene, "promptHint")}
-                onChange={v => onUpdateField(scene.id, "promptHint", v)}
-                scriptId={scriptId}
-              />
 
               {/* ── SHORTCUT LEGEND ── */}
               <ShortcutLegend />

@@ -76,8 +76,19 @@ interface Script {
 export function ScriptWorkspace({ script: initial }: { script: Script }) {
   // === State ===
   const [script, setScript] = useState(initial)
-  const [selectedEpisode, setSelectedEpisode] = useState(1)
-  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null)
+  // Default to first episode that has scenes, and its first scene
+  const [selectedEpisode, setSelectedEpisode] = useState(() => {
+    const eps = [...new Set(initial.scenes.map(s => s.episodeNum))].sort((a, b) => a - b)
+    return eps[0] ?? 1
+  })
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(() => {
+    const eps = [...new Set(initial.scenes.map(s => s.episodeNum))].sort((a, b) => a - b)
+    const firstEp = eps[0] ?? 1
+    const firstScenes = initial.scenes
+      .filter(s => s.episodeNum === firstEp)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.sceneNum - b.sceneNum)
+    return firstScenes[0]?.id ?? null
+  })
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"script-text" | "breakdown">("script-text")
   const [editingScenes, setEditingScenes] = useState<Record<string, Partial<Scene>>>({})
@@ -327,6 +338,29 @@ export function ScriptWorkspace({ script: initial }: { script: Script }) {
     } catch { /* silent */ }
   }
 
+  async function handleDeleteEpisode(ep: number) {
+    const epScenes = script.scenes.filter(s => s.episodeNum === ep)
+    if (!confirm(`Delete Episode ${ep} and all ${epScenes.length} scene(s)?`)) return
+    try {
+      await Promise.all(epScenes.map(s =>
+        fetch(`/api/scenes?id=${s.id}`, { method: "DELETE" })
+      ))
+      setScript(prev => ({
+        ...prev,
+        scenes: prev.scenes.filter(s => s.episodeNum !== ep),
+        videoSegments: prev.videoSegments.filter(s => s.episodeNum !== ep),
+      }))
+      // Select another episode
+      const remaining = episodes.filter(e => e !== ep)
+      if (remaining.length > 0) {
+        setSelectedEpisode(remaining[0])
+      }
+      if (selectedSceneId && epScenes.some(s => s.id === selectedSceneId)) {
+        setSelectedSceneId(null)
+      }
+    } catch { /* silent */ }
+  }
+
   async function handleDeleteScene(sceneId: string) {
     if (!confirm("Delete this scene?")) return
     try {
@@ -362,6 +396,7 @@ export function ScriptWorkspace({ script: initial }: { script: Script }) {
         savingScenes={savingScenes}
         editingScenes={editingScenes}
         onAddEpisode={handleAddEpisode}
+        onDeleteEpisode={handleDeleteEpisode}
         onAddScene={() => handleAddScene()}
         targetEpisodes={script.targetEpisodes}
       />
