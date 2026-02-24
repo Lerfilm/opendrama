@@ -185,6 +185,121 @@ function PromptHintField({ sceneId, value, onChange, scriptId }: {
   )
 }
 
+// ─── Scene nav dropdown ───────────────────────────────────────────────────────
+function SceneNavDropdown({
+  scenes, sceneIdx, selectedSceneId, onSelectScene, onNavigateScene,
+}: {
+  scenes: Scene[]
+  sceneIdx: number
+  selectedSceneId: string | null
+  onSelectScene: (id: string | null) => void
+  onNavigateScene: (delta: 1 | -1) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handle)
+    return () => document.removeEventListener("mousedown", handle)
+  }, [open])
+
+  return (
+    <div ref={ref} className="flex items-center gap-0.5 ml-3 relative">
+      {/* ▲ prev */}
+      <button onClick={() => onNavigateScene(-1)} title="Previous scene (⌥↑)"
+        className="w-6 h-6 flex items-center justify-center rounded transition-colors hover:bg-gray-200"
+        style={{ color: "#AAA" }}>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <polyline points="18 15 12 9 6 15" />
+        </svg>
+      </button>
+
+      {/* counter — click to open dropdown */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-0.5 px-1 py-0.5 rounded transition-colors hover:bg-gray-200"
+        style={{ color: "#888" }}
+        title="Jump to scene"
+      >
+        <span className="text-[10px]" style={{ minWidth: 28, textAlign: "center", color: "#CCC" }}>
+          {sceneIdx + 1}/{scenes.length}
+        </span>
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ color: "#CCC" }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {/* ▼ next */}
+      <button onClick={() => onNavigateScene(1)} title="Next scene (⌥↓)"
+        className="w-6 h-6 flex items-center justify-center rounded transition-colors hover:bg-gray-200"
+        style={{ color: "#AAA" }}>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {/* Dropdown list */}
+      {open && (
+        <div
+          className="absolute top-full left-0 z-50 rounded-lg shadow-xl overflow-hidden"
+          style={{
+            marginTop: 4, minWidth: 220, maxHeight: 320,
+            background: "#fff", border: "1px solid #D8D0C0",
+            overflowY: "auto",
+          }}
+        >
+          {/* Group by episode */}
+          {(() => {
+            const episodes = [...new Set(scenes.map(s => s.episodeNum))].sort((a, b) => a - b)
+            return episodes.map(ep => {
+              const epScenes = scenes.filter(s => s.episodeNum === ep)
+              return (
+                <div key={ep}>
+                  <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wider sticky top-0"
+                    style={{ background: "#F5F3EF", color: "#AAA", borderBottom: "1px solid #EEE" }}>
+                    Episode {ep}
+                  </div>
+                  {epScenes.map((s, i) => {
+                    const isSelected = s.id === selectedSceneId
+                    // Short preview of heading
+                    const label = s.heading
+                      ? s.heading.length > 30 ? s.heading.slice(0, 30) + "…" : s.heading
+                      : `Scene ${s.sceneNum}`
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => { onSelectScene(s.id); setOpen(false) }}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-gray-50"
+                        style={{
+                          background: isSelected ? "#EDE9FE" : undefined,
+                          borderLeft: isSelected ? "2px solid #4F46E5" : "2px solid transparent",
+                        }}
+                      >
+                        <span className="text-[9px] font-mono flex-shrink-0"
+                          style={{ color: isSelected ? "#4F46E5" : "#AAA", minWidth: 20 }}>
+                          S{s.sceneNum}
+                        </span>
+                        <span className="text-[11px] truncate" style={{ color: isSelected ? "#4F46E5" : "#555" }}>
+                          {label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })
+          })()}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Shortcut legend ─────────────────────────────────────────────────────────
 function ShortcutLegend() {
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
@@ -231,6 +346,7 @@ export function SceneDetailPanel({
   // Ref to auto-focus newly inserted block
   const pendingFocusIdx = useRef<number | null>(null)
   const blockRefs = useRef<Map<string, HTMLElement>>(new Map())
+  const contentRef = useRef<HTMLDivElement>(null)
 
   // ── Derived scene state (safe to compute even if scene is null) ─────────────
   const rawAction = scene ? getSceneValue(scene, "action") : null
@@ -284,6 +400,15 @@ export function SceneDetailPanel({
       }
     }
   })
+
+  // ── Auto-resize all textareas when scene content changes ──────────────────
+  useEffect(() => {
+    if (!contentRef.current) return
+    contentRef.current.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(el => {
+      el.style.height = "auto"
+      el.style.height = el.scrollHeight + "px"
+    })
+  }, [rawAction, scene?.id])
 
   // ── Block ref registration ─────────────────────────────────────────────────
   function setBlockRef(idx: number, el: HTMLDivElement | null) {
@@ -394,27 +519,15 @@ export function SceneDetailPanel({
           </button>
         ))}
 
-        {/* Scene prev/next nav */}
+        {/* Scene prev/next nav + dropdown */}
         {activeTab === "script-text" && (
-          <div className="flex items-center gap-0.5 ml-3">
-            <button onClick={() => onNavigateScene(-1)} title="Previous scene (⌥↑)"
-              className="w-6 h-6 flex items-center justify-center rounded transition-colors hover:bg-gray-200"
-              style={{ color: "#AAA" }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                <polyline points="18 15 12 9 6 15" />
-              </svg>
-            </button>
-            <span className="text-[10px]" style={{ color: "#CCC", minWidth: 32, textAlign: "center" }}>
-              {sceneIdx + 1}/{scenes.length}
-            </span>
-            <button onClick={() => onNavigateScene(1)} title="Next scene (⌥↓)"
-              className="w-6 h-6 flex items-center justify-center rounded transition-colors hover:bg-gray-200"
-              style={{ color: "#AAA" }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-          </div>
+          <SceneNavDropdown
+            scenes={scenes}
+            sceneIdx={sceneIdx}
+            selectedSceneId={selectedSceneId}
+            onSelectScene={onSelectScene}
+            onNavigateScene={onNavigateScene}
+          />
         )}
 
         <div className="flex-1" />
@@ -435,7 +548,7 @@ export function SceneDetailPanel({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto dev-scrollbar">
+      <div className="flex-1 overflow-y-auto dev-scrollbar" ref={contentRef}>
         {activeTab === "script-text" ? (
           <div style={{ fontFamily: "'Courier New', Courier, monospace", background: "#F8F6F1" }}>
 
@@ -532,9 +645,9 @@ export function SceneDetailPanel({
                         value={block.text}
                         onChange={e => updateBlock(idx, { text: e.target.value })}
                         placeholder="Action. Present tense. What we see and hear..."
-                        rows={3}
+                        rows={1}
                         className="w-full resize-none focus:outline-none text-[13px] leading-[1.9] bg-transparent"
-                        style={{ color: "#222", fontFamily: "inherit" }}
+                        style={{ color: "#222", fontFamily: "inherit", overflow: "hidden" }}
                         onFocus={() => setFocusedBlockIdx(idx)}
                         onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = t.scrollHeight + "px" }}
                       />
@@ -570,9 +683,9 @@ export function SceneDetailPanel({
                         value={block.line}
                         onChange={e => updateBlock(idx, { line: e.target.value })}
                         placeholder="Dialogue text..."
-                        rows={2}
+                        rows={1}
                         className="w-full resize-none focus:outline-none text-[13px] leading-[1.8] bg-transparent"
-                        style={{ paddingLeft: "35%", paddingRight: "20%", color: "#333", fontFamily: "inherit" }}
+                        style={{ paddingLeft: "35%", paddingRight: "20%", color: "#333", fontFamily: "inherit", overflow: "hidden" }}
                         onFocus={() => setFocusedBlockIdx(idx)}
                         onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = t.scrollHeight + "px" }}
                       />
@@ -592,7 +705,7 @@ export function SceneDetailPanel({
                         placeholder="(camera direction, blocking, beat, pause...)"
                         rows={1}
                         className="w-full resize-none focus:outline-none text-[12px] italic leading-relaxed bg-transparent"
-                        style={{ paddingLeft: "20%", paddingRight: "20%", color: "#888", fontFamily: "inherit" }}
+                        style={{ paddingLeft: "20%", paddingRight: "20%", color: "#888", fontFamily: "inherit", overflow: "hidden" }}
                         onFocus={() => setFocusedBlockIdx(idx)}
                         onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = t.scrollHeight + "px" }}
                       />
