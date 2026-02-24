@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { AIConfirmModal } from "@/components/dev/ai-confirm-modal"
 
 interface CostumePhoto {
@@ -167,6 +167,17 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
   const [showGenerateConfirm, setShowGenerateConfirm] = useState<string | null>(null)
   const [isFillingSpecs, setIsFillingSpecs] = useState(false)
   const [generatingCostumeFor, setGeneratingCostumeFor] = useState<string | null>(null) // scene id
+  const [isFillingAllSpecs, setIsFillingAllSpecs] = useState(false)
+  const [fillAllProgress, setFillAllProgress] = useState(0)
+  const [fillAllTotal, setFillAllTotal] = useState(0)
+  const [fillAllDone, setFillAllDone] = useState(0)
+  const [isGeneratingAllPortraits, setIsGeneratingAllPortraits] = useState(false)
+  const [generateAllProgress, setGenerateAllProgress] = useState(0)
+  const [generateAllTotal, setGenerateAllTotal] = useState(0)
+  const [generateAllDone, setGenerateAllDone] = useState(0)
+  // Active job IDs for DB persistence
+  const fillJobIdRef = useRef<string | null>(null)
+  const portraitJobIdRef = useRef<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const costumeFileInputRef = useRef<HTMLInputElement>(null)
@@ -374,6 +385,138 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
     }
   }
 
+  // ── Persistent bulk job helpers ───────────────────────────────────────────
+  async function runFillAllSpecs(roleIds: string[], completedRoleIds: string[], jobId: string) {
+    const remaining = roleIds.filter(id => !completedRoleIds.includes(id))
+    const total = roleIds.length
+    const alreadyDone = completedRoleIds.length
+    setFillAllTotal(total)
+    setFillAllDone(alreadyDone)
+    setFillAllProgress(Math.round((alreadyDone / total) * 100))
+    setIsFillingAllSpecs(true)
+
+    let done = alreadyDone
+    for (const roleId of remaining) {
+      await fillSpecsFromDescription(roleId)
+      done++
+      const pct = Math.round((done / total) * 100)
+      setFillAllDone(done)
+      setFillAllProgress(pct)
+      // Persist progress to DB
+      await fetch("/api/casting/bulk-job", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, completedRoleId: roleId, progress: pct }),
+      })
+    }
+
+    // Mark job complete
+    await fetch(`/api/casting/bulk-job?jobId=${jobId}`, { method: "DELETE" })
+    fillJobIdRef.current = null
+    setIsFillingAllSpecs(false)
+    setFillAllProgress(0)
+    setFillAllDone(0)
+    setFillAllTotal(0)
+  }
+
+  async function fillAllSpecs() {
+    const withDesc = roles.filter(r => r.description)
+    if (withDesc.length === 0) return
+    const roleIds = withDesc.map(r => r.id)
+    // Create DB job
+    const res = await fetch("/api/casting/bulk-job", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scriptId: script.id, type: "fill_all_specs", roleIds }),
+    })
+    const { job } = await res.json()
+    fillJobIdRef.current = job.id
+    await runFillAllSpecs(roleIds, [], job.id)
+  }
+
+  async function runGenerateAllPortraits(roleIds: string[], completedRoleIds: string[], jobId: string) {
+    const remaining = roleIds.filter(id => !completedRoleIds.includes(id))
+    const total = roleIds.length
+    const alreadyDone = completedRoleIds.length
+    setGenerateAllTotal(total)
+    setGenerateAllDone(alreadyDone)
+    setGenerateAllProgress(Math.round((alreadyDone / total) * 100))
+    setIsGeneratingAllPortraits(true)
+
+    let done = alreadyDone
+    for (const roleId of remaining) {
+      await generateCharacterImage(roleId)
+      done++
+      const pct = Math.round((done / total) * 100)
+      setGenerateAllDone(done)
+      setGenerateAllProgress(pct)
+      // Persist progress to DB
+      await fetch("/api/casting/bulk-job", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, completedRoleId: roleId, progress: pct }),
+      })
+    }
+
+    // Mark job complete
+    await fetch(`/api/casting/bulk-job?jobId=${jobId}`, { method: "DELETE" })
+    portraitJobIdRef.current = null
+    setIsGeneratingAllPortraits(false)
+    setGenerateAllProgress(0)
+    setGenerateAllDone(0)
+    setGenerateAllTotal(0)
+  }
+
+  async function generateAllPortraits() {
+    if (roles.length === 0) return
+    const roleIds = roles.map(r => r.id)
+    // Create DB job
+    const res = await fetch("/api/casting/bulk-job", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scriptId: script.id, type: "generate_all_portraits", roleIds }),
+    })
+    const { job } = await res.json()
+    portraitJobIdRef.current = job.id
+    await runGenerateAllPortraits(roleIds, [], job.id)
+  }
+
+  // ── On mount: check for interrupted jobs and auto-resume ──────────────────
+  useEffect(() => {
+    async function resumeActiveJobs() {
+      const res = await fetch(`/api/casting/bulk-job?scriptId=${script.id}`)
+      if (!res.ok) return
+      const { jobs } = await res.json()
+
+      for (const job of jobs) {
+        let inputData: { roleIds: string[] } = { roleIds: [] }
+        let outputData: { completedRoleIds: string[] } = { completedRoleIds: [] }
+        try { inputData = JSON.parse(job.input || "{}") } catch { /* ok */ }
+        try { outputData = JSON.parse(job.output || "{}") } catch { /* ok */ }
+
+        const { roleIds = [] } = inputData
+        const { completedRoleIds = [] } = outputData
+        const remaining = roleIds.filter((id: string) => !completedRoleIds.includes(id))
+
+        if (remaining.length === 0) {
+          // Already done — just mark complete
+          await fetch(`/api/casting/bulk-job?jobId=${job.id}`, { method: "DELETE" })
+          continue
+        }
+
+        if (job.type === "fill_all_specs") {
+          fillJobIdRef.current = job.id
+          runFillAllSpecs(roleIds, completedRoleIds, job.id)
+        } else if (job.type === "generate_all_portraits") {
+          portraitJobIdRef.current = job.id
+          runGenerateAllPortraits(roleIds, completedRoleIds, job.id)
+        }
+      }
+    }
+    resumeActiveJobs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function generateCostumeForScene(roleId: string, scene: SceneRef) {
     const role = roles.find(r => r.id === roleId)
     if (!role) return
@@ -398,8 +541,15 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
       if (url) {
         const newCostume = { url, scene: key, note: scene.heading || "" }
         const newCostumes = [...(role.costumes || []), newCostume]
-        updateLocal(roleId, { costumes: newCostumes })
+        // Also add to reference images so it shows in the portrait grid
+        const newRefImages = [...(role.referenceImages || []), url]
+        updateLocal(roleId, { costumes: newCostumes, referenceImages: newRefImages })
         await saveCostumes(roleId, newCostumes)
+        await fetch("/api/roles", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: roleId, referenceImages: newRefImages }),
+        })
       }
     } finally {
       setGeneratingCostumeFor(null)
@@ -522,19 +672,76 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
             {/* Tab bar */}
             <div className="flex-shrink-0 flex items-center px-6 pt-4 gap-0" style={{ borderBottom: "1px solid #D0D0D0" }}>
               {([
-                { id: "profile" as RightTab, label: "Character Profile" },
-                { id: "costumes" as RightTab, label: "Costumes & 定妆照" },
-                { id: "audition" as RightTab, label: "🎙 Voice Audition" },
+                { id: "profile" as RightTab, label: "Character Profile", disabled: false },
+                { id: "costumes" as RightTab, label: "Costumes", disabled: false },
+                { id: "audition" as RightTab, label: "🎙 Voice Audition", disabled: true },
               ]).map(tab => (
-                <button key={tab.id} onClick={() => setRightTab(tab.id)}
+                <button key={tab.id}
+                  onClick={() => !tab.disabled && setRightTab(tab.id)}
+                  disabled={tab.disabled}
                   className="px-3 py-2 text-[11px] font-medium relative transition-colors"
-                  style={{ color: rightTab === tab.id ? "#1A1A1A" : "#999" }}>
+                  style={{
+                    color: tab.disabled ? "#D0D0D0" : rightTab === tab.id ? "#1A1A1A" : "#999",
+                    cursor: tab.disabled ? "not-allowed" : "pointer",
+                  }}
+                  title={tab.disabled ? "Coming soon · 即将上线" : undefined}
+                >
                   {tab.label}
-                  {rightTab === tab.id && (
+                  {tab.disabled && (
+                    <span className="ml-1 text-[8px] px-1 py-0.5 rounded" style={{ background: "#F0F0F0", color: "#C0C0C0" }}>
+                      未开放
+                    </span>
+                  )}
+                  {!tab.disabled && rightTab === tab.id && (
                     <div className="absolute bottom-0 left-3 right-3 h-[2px] rounded-t" style={{ background: "#4F46E5" }} />
                   )}
                 </button>
               ))}
+
+              {/* Bulk AI actions — far right */}
+              <div className="flex items-center gap-2 ml-auto pb-1">
+                {/* Progress bars */}
+                {isFillingAllSpecs && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px]" style={{ color: "#AAA" }}>
+                      {fillAllTotal > 0 ? `Filling ${fillAllDone}/${fillAllTotal}` : "Resuming..."}
+                    </span>
+                    <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "#E0E0E0" }}>
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${fillAllProgress}%`, background: "#4F46E5" }} />
+                    </div>
+                    <span className="text-[9px]" style={{ color: "#888" }}>{fillAllProgress}%</span>
+                  </div>
+                )}
+                {isGeneratingAllPortraits && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px]" style={{ color: "#AAA" }}>
+                      {generateAllTotal > 0 ? `Generating ${generateAllDone}/${generateAllTotal}` : "Resuming..."}
+                    </span>
+                    <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "#E0E0E0" }}>
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${generateAllProgress}%`, background: "#6D28D9" }} />
+                    </div>
+                    <span className="text-[9px]" style={{ color: "#888" }}>{generateAllProgress}%</span>
+                  </div>
+                )}
+                <button
+                  onClick={fillAllSpecs}
+                  disabled={isFillingAllSpecs || isGeneratingAllPortraits || roles.filter(r => r.description).length === 0}
+                  className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded disabled:opacity-40 transition-colors"
+                  style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+                  title="Auto-fill specs for all characters with descriptions"
+                >
+                  {isFillingAllSpecs ? <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Filling...</> : <>✦ Fill All Specs</>}
+                </button>
+                <button
+                  onClick={generateAllPortraits}
+                  disabled={isGeneratingAllPortraits || isFillingAllSpecs || roles.length === 0}
+                  className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded disabled:opacity-40 transition-colors"
+                  style={{ background: "#EDE9FE", color: "#6D28D9", border: "1px solid #DDD6FE" }}
+                  title="Generate AI portraits for all characters"
+                >
+                  {isGeneratingAllPortraits ? <><div className="w-2 h-2 rounded-full border border-purple-400 border-t-transparent animate-spin" /> Generating...</> : <>✦ Generate All Portraits</>}
+                </button>
+              </div>
             </div>
 
             {/* Tab content */}
@@ -927,9 +1134,9 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                 <div className="max-w-2xl mx-auto p-6">
                   <div className="flex items-center justify-between mb-5">
                     <div>
-                      <h3 className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>定妆照 · Costume by Scene</h3>
+                      <h3 className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>Costume by Scene</h3>
                       <p className="text-[11px] mt-0.5" style={{ color: "#999" }}>
-                        AI generates costume looks for each scene. Click ✦ AI Costume to generate.
+                        AI generates costume looks for each scene.
                       </p>
                     </div>
                     <button
@@ -941,82 +1148,64 @@ export function CastingWorkspace({ script }: CastingWorkspaceProps) {
                     </button>
                   </div>
 
-                  {/* Scene list with AI generate buttons */}
-                  {(script.scenes?.length ?? 0) > 0 && (
-                    <div className="mb-6 space-y-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#888" }}>Scenes in Script</p>
+                  {/* Scene list — each with inline costume photos below */}
+                  {(script.scenes?.length ?? 0) > 0 ? (
+                    <div className="space-y-3">
                       {script.scenes!.map(scene => {
                         const key = `E${scene.episodeNum}S${scene.sceneNum}`
-                        const existing = (selectedRole.costumes || []).filter(c => c.scene === key)
+                        const existing = (selectedRole.costumes || [])
+                          .map((c, idx) => ({ photo: c, idx }))
+                          .filter(({ photo }) => photo.scene === key)
                         const isGenerating = generatingCostumeFor === key
                         return (
-                          <div key={scene.id} className="flex items-center gap-2 px-3 py-2 rounded" style={{ background: "#F5F5F5", border: "1px solid #E8E8E8" }}>
-                            <span className="text-[10px] font-mono font-bold flex-shrink-0" style={{ color: "#4F46E5" }}>{key}</span>
-                            <span className="text-[11px] truncate flex-1" style={{ color: "#555" }}>{scene.heading || scene.location || "Untitled"}</span>
-                            {existing.length > 0 && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "#D1FAE5", color: "#065F46" }}>
-                                {existing.length} look{existing.length !== 1 ? "s" : ""}
+                          <div key={scene.id} className="rounded-lg overflow-hidden" style={{ border: "1px solid #E8E8E8", background: "#F8F8F8" }}>
+                            {/* Scene row */}
+                            <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: existing.length > 0 ? "1px solid #EFEFEF" : undefined }}>
+                              <span className="text-[10px] font-mono font-bold flex-shrink-0" style={{ color: "#4F46E5" }}>{key}</span>
+                              <span className="text-[11px] truncate flex-1" style={{ color: "#555" }}>
+                                {scene.heading || scene.location || "Untitled"}
                               </span>
+                              <button
+                                onClick={() => generateCostumeForScene(selectedRole.id, scene)}
+                                disabled={isGenerating || !!generatingCostumeFor}
+                                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded flex-shrink-0 disabled:opacity-40"
+                                style={{ background: "#EDE9FE", color: "#6D28D9" }}>
+                                {isGenerating ? (
+                                  <><div className="w-2 h-2 rounded-full border border-purple-400 border-t-transparent animate-spin" /> Gen...</>
+                                ) : <>✦ AI</>}
+                              </button>
+                            </div>
+                            {/* Costume photos inline */}
+                            {existing.length > 0 && (
+                              <div className="flex gap-2 p-2 flex-wrap">
+                                {existing.map(({ photo, idx }) => (
+                                  <div key={idx} className="relative group rounded overflow-hidden flex-shrink-0" style={{ width: 72, background: "#E0E0E0" }}>
+                                    <img src={photo.url} alt="" className="w-full aspect-[3/4] object-cover" />
+                                    {photo.note && (
+                                      <div className="px-1 py-0.5 text-[8px] truncate" style={{ background: "#1A1A1A", color: "#DDD" }}>{photo.note}</div>
+                                    )}
+                                    <button onClick={() => removeCostumePhoto(selectedRole.id, idx)}
+                                      className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                      style={{ background: "rgba(0,0,0,0.65)", color: "#fff" }}>
+                                      <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
                             )}
-                            <button
-                              onClick={() => generateCostumeForScene(selectedRole.id, scene)}
-                              disabled={isGenerating || !!generatingCostumeFor}
-                              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded flex-shrink-0 disabled:opacity-40"
-                              style={{ background: "#EDE9FE", color: "#6D28D9" }}>
-                              {isGenerating ? (
-                                <><div className="w-2 h-2 rounded-full border border-purple-400 border-t-transparent animate-spin" /> Gen...</>
-                              ) : <>✦ AI</>}
-                            </button>
                           </div>
                         )
                       })}
                     </div>
-                  )}
-
-                  {/* Costume grid grouped by scene */}
-                  {(selectedRole.costumes?.length ?? 0) === 0 ? (
+                  ) : (
                     <div className="flex flex-col items-center justify-center py-16" style={{ color: "#CCC" }}>
                       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-3 opacity-50">
                         <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z" />
                       </svg>
-                      <p className="text-[11px]">No costume photos yet</p>
+                      <p className="text-[11px]">No scenes in script yet</p>
                     </div>
-                  ) : (
-                    (() => {
-                      // Group costumes by scene
-                      const byScene: Record<string, { photo: CostumePhoto; idx: number }[]> = {}
-                      selectedRole.costumes!.forEach((c, idx) => {
-                        const key = c.scene || "General"
-                        if (!byScene[key]) byScene[key] = []
-                        byScene[key].push({ photo: c, idx })
-                      })
-                      return Object.entries(byScene).map(([scene, items]) => (
-                        <div key={scene} className="mb-6">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[10px] font-mono font-semibold uppercase" style={{ color: "#666" }}>{scene}</span>
-                            <div className="flex-1 h-px" style={{ background: "#E0E0E0" }} />
-                            <span className="text-[9px]" style={{ color: "#CCC" }}>{items.length} look{items.length !== 1 ? "s" : ""}</span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-3">
-                            {items.map(({ photo, idx }) => (
-                              <div key={idx} className="relative group rounded-lg overflow-hidden" style={{ background: "#E8E8E8" }}>
-                                <img src={photo.url} alt="" className="w-full aspect-[3/4] object-cover" />
-                                {photo.note && (
-                                  <div className="px-2 py-1 text-[9px] truncate" style={{ background: "#2A2A2A", color: "#DDD" }}>{photo.note}</div>
-                                )}
-                                <button onClick={() => removeCostumePhoto(selectedRole.id, idx)}
-                                  className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                  style={{ background: "rgba(0,0,0,0.65)", color: "#fff" }}>
-                                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))
-                    })()
                   )}
                 </div>
               )}
