@@ -11,7 +11,9 @@ export default async function FinishingPage({ params }: { params: Promise<{ scri
 
   const script = await prisma.script.findFirst({
     where: { id: scriptId, userId: session.user.id as string },
-    include: {
+    select: {
+      id: true, title: true, genre: true, logline: true, synopsis: true,
+      coverTall: true, targetEpisodes: true, status: true, metadata: true,
       scenes: { orderBy: [{ episodeNum: "asc" }, { sortOrder: "asc" }] },
       roles: true,
       videoSegments: {

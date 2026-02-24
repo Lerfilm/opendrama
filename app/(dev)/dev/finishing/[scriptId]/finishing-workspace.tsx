@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useCallback } from "react"
 
 interface VideoSegment {
   id: string
@@ -32,6 +32,18 @@ interface PublishedScript {
   publishedAt: Date
 }
 
+interface FinishedVideo {
+  url: string
+  filename: string
+  uploadedAt: string
+}
+
+interface FinishingMeta {
+  finishedEpisodes?: Record<string, FinishedVideo>
+  trailer?: FinishedVideo
+  promo?: FinishedVideo
+}
+
 interface Script {
   id: string
   title: string
@@ -41,6 +53,7 @@ interface Script {
   coverTall?: string | null
   targetEpisodes: number
   status: string
+  metadata?: string | null
   scenes: Scene[]
   roles: Role[]
   videoSegments: VideoSegment[]
@@ -68,6 +81,84 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
 
   const totalDone = script.videoSegments.length
   const readyEpisodes = episodes.filter(ep => (epMap.get(ep)?.length ?? 0) > 0)
+
+  // Parse finishing metadata (finished uploaded videos)
+  const parsedMeta: FinishingMeta = (() => {
+    try { return script.metadata ? JSON.parse(script.metadata) : {} } catch { return {} }
+  })()
+
+  const [finishedEps, setFinishedEps] = useState<Record<string, FinishedVideo>>(
+    parsedMeta.finishedEpisodes || {}
+  )
+  const [trailer, setTrailer] = useState<FinishedVideo | null>(parsedMeta.trailer || null)
+  const [promo, setPromo] = useState<FinishedVideo | null>(parsedMeta.promo || null)
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null) // ep number or "trailer"/"promo"
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadTargetRef = useRef<string | null>(null)
+
+  async function saveFinishingMeta(
+    epMap2: Record<string, FinishedVideo>,
+    tr: FinishedVideo | null,
+    pr: FinishedVideo | null
+  ) {
+    // Merge with existing metadata to preserve other fields
+    let existing: Record<string, unknown> = {}
+    try { existing = script.metadata ? JSON.parse(script.metadata) : {} } catch { /* ok */ }
+    const newMeta = JSON.stringify({
+      ...existing,
+      finishedEpisodes: epMap2,
+      ...(tr ? { trailer: tr } : {}),
+      ...(pr ? { promo: pr } : {}),
+    })
+    await fetch(`/api/scripts/${script.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metadata: newMeta }),
+    })
+  }
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    const target = uploadTargetRef.current
+    if (!file || !target) return
+    e.target.value = ""
+
+    setUploadingFor(target)
+    setUploadProgress(10)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      fd.append("bucket", "finished-videos")
+      const res = await fetch("/api/upload/media", { method: "POST", body: fd })
+      setUploadProgress(80)
+      if (!res.ok) { alert("Upload failed"); return }
+      const data = await res.json()
+      const video: FinishedVideo = { url: data.url, filename: file.name, uploadedAt: new Date().toISOString() }
+      setUploadProgress(90)
+
+      if (target === "trailer") {
+        setTrailer(video)
+        await saveFinishingMeta(finishedEps, video, promo)
+      } else if (target === "promo") {
+        setPromo(video)
+        await saveFinishingMeta(finishedEps, trailer, video)
+      } else {
+        const newEps = { ...finishedEps, [target]: video }
+        setFinishedEps(newEps)
+        await saveFinishingMeta(newEps, trailer, promo)
+      }
+      setUploadProgress(100)
+      setTimeout(() => setUploadProgress(0), 600)
+    } finally {
+      setUploadingFor(null)
+    }
+  }, [finishedEps, trailer, promo, script.id])
+
+  function triggerUpload(target: string) {
+    uploadTargetRef.current = target
+    fileInputRef.current?.click()
+  }
 
   const [tags, setTags] = useState<string[]>([script.genre].filter(Boolean))
   const [tagInput, setTagInput] = useState("")
@@ -329,74 +420,216 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
 
       {/* Right: Episode overview */}
       <div className="flex-1 overflow-y-auto dev-scrollbar p-5">
+        {/* Hidden file input for video uploads */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+
         <div className="max-w-3xl mx-auto">
           <h2 className="text-sm font-semibold mb-1" style={{ color: "#1A1A1A" }}>Episode Overview</h2>
           <p className="text-[11px] mb-4" style={{ color: "#888" }}>
-            {readyEpisodes.length} of {script.targetEpisodes} episodes ready to publish
+            {readyEpisodes.length} of {script.targetEpisodes} episodes ready · Upload finished edited videos below
           </p>
 
           <div className="space-y-3">
             {Array.from({ length: script.targetEpisodes }, (_, i) => i + 1).map(ep => {
+              const epKey = String(ep)
               const epSegs = epMap.get(ep) ?? []
               const totalDur = epSegs.reduce((s, x) => s + x.durationSec, 0)
               const hasVideo = epSegs.length > 0
               const thumbnail = epSegs.find(s => s.thumbnailUrl)?.thumbnailUrl
+              const finished = finishedEps[epKey]
+              const isUploading = uploadingFor === epKey
 
               return (
                 <div
                   key={ep}
-                  className="flex items-center gap-4 p-3 rounded-lg"
-                  style={{ background: hasVideo ? "#F5F5F5" : "#EDEDEE", border: `1px solid ${hasVideo ? "#D0D0D0" : "#E0E0E0"}` }}
+                  className="p-3 rounded-lg"
+                  style={{ background: finished ? "#F0F7FF" : hasVideo ? "#F5F5F5" : "#EDEDEE", border: `1px solid ${finished ? "#BDD8F5" : hasVideo ? "#D0D0D0" : "#E0E0E0"}` }}
                 >
-                  {/* Thumbnail */}
-                  <div className="w-20 h-12 rounded flex-shrink-0 overflow-hidden" style={{ background: "#D8D8D8" }}>
-                    {thumbnail ? (
-                      <img src={thumbnail} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} style={{ color: "#BBB" }}>
-                          <polygon points="5 3 19 12 5 21 5 3" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium" style={{ color: "#1A1A1A" }}>Episode {ep}</span>
-                      {hasVideo ? (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#D1FAE5", color: "#065F46" }}>Ready</span>
+                  <div className="flex items-center gap-4">
+                    {/* Thumbnail */}
+                    <div className="w-20 h-12 rounded flex-shrink-0 overflow-hidden" style={{ background: "#D8D8D8" }}>
+                      {thumbnail ? (
+                        <img src={thumbnail} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#F3F4F6", color: "#6B7280" }}>No video</span>
+                        <div className="w-full h-full flex items-center justify-center">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} style={{ color: "#BBB" }}>
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                          </svg>
+                        </div>
                       )}
                     </div>
-                    <p className="text-[10px]" style={{ color: "#AAA" }}>
-                      {epSegs.length} segments · {totalDur}s
-                    </p>
-                    {/* Segment thumbnail strip */}
-                    {epSegs.length > 0 && (
-                      <div className="flex gap-1 mt-1.5">
-                        {epSegs.slice(0, 8).map(seg => (
-                          <div key={seg.id} className="w-8 h-5 rounded overflow-hidden flex-shrink-0" style={{ background: "#D8D8D8" }}>
-                            {seg.thumbnailUrl ? (
-                              <img src={seg.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full" style={{ background: "#E0E0E0" }} />
-                            )}
-                          </div>
-                        ))}
-                        {epSegs.length > 8 && (
-                          <div className="w-8 h-5 rounded flex items-center justify-center text-[8px]" style={{ background: "#D8D8D8", color: "#888" }}>
-                            +{epSegs.length - 8}
-                          </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium" style={{ color: "#1A1A1A" }}>Episode {ep}</span>
+                        {finished ? (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#DBEAFE", color: "#1D4ED8" }}>✓ Finished</span>
+                        ) : hasVideo ? (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#D1FAE5", color: "#065F46" }}>AI Ready</span>
+                        ) : (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#F3F4F6", color: "#6B7280" }}>No video</span>
                         )}
                       </div>
-                    )}
+                      <p className="text-[10px]" style={{ color: "#AAA" }}>
+                        {epSegs.length} AI segments · {totalDur}s
+                      </p>
+                      {/* Segment thumbnail strip */}
+                      {epSegs.length > 0 && (
+                        <div className="flex gap-1 mt-1.5">
+                          {epSegs.slice(0, 8).map(seg => (
+                            <div key={seg.id} className="w-8 h-5 rounded overflow-hidden flex-shrink-0" style={{ background: "#D8D8D8" }}>
+                              {seg.thumbnailUrl ? (
+                                <img src={seg.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full" style={{ background: "#E0E0E0" }} />
+                              )}
+                            </div>
+                          ))}
+                          {epSegs.length > 8 && (
+                            <div className="w-8 h-5 rounded flex items-center justify-center text-[8px]" style={{ background: "#D8D8D8", color: "#888" }}>
+                              +{epSegs.length - 8}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Upload section */}
+                    <div className="flex-shrink-0 text-right">
+                      {finished ? (
+                        <div className="space-y-1">
+                          <p className="text-[9px] truncate max-w-[120px]" style={{ color: "#4B5563" }} title={finished.filename}>
+                            {finished.filename}
+                          </p>
+                          <div className="flex gap-1 justify-end">
+                            <a href={finished.url} target="_blank" rel="noopener noreferrer"
+                              className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#DBEAFE", color: "#1D4ED8" }}>
+                              View
+                            </a>
+                            <button onClick={() => triggerUpload(epKey)}
+                              className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#E5E7EB", color: "#555" }}>
+                              Replace
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => triggerUpload(epKey)}
+                          disabled={isUploading}
+                          className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded transition-colors disabled:opacity-50"
+                          style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+                        >
+                          {isUploading ? (
+                            <><div className="w-2.5 h-2.5 rounded-full border border-indigo-400 border-t-transparent animate-spin" />Uploading...</>
+                          ) : (
+                            <>↑ Upload</>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Upload progress bar */}
+                  {isUploading && uploadProgress > 0 && (
+                    <div className="mt-2 w-full h-1 rounded-full overflow-hidden" style={{ background: "#D0D4E8" }}>
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%`, background: "#4F46E5" }} />
+                    </div>
+                  )}
                 </div>
               )
             })}
+
+            {/* Divider */}
+            <div className="pt-2 pb-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#AAA" }}>Promotional Media</p>
+            </div>
+
+            {/* Trailer slot */}
+            {(() => {
+              const isUploading = uploadingFor === "trailer"
+              return (
+                <div className="p-3 rounded-lg" style={{ background: trailer ? "#F0F7FF" : "#EDEDEE", border: `1px solid ${trailer ? "#BDD8F5" : "#E0E0E0"}` }}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-20 h-12 rounded flex-shrink-0 flex items-center justify-center" style={{ background: "#D8D8D8" }}>
+                      <span className="text-[9px] font-medium" style={{ color: "#888" }}>TRAILER</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium mb-0.5" style={{ color: "#1A1A1A" }}>Trailer</p>
+                      <p className="text-[10px]" style={{ color: "#AAA" }}>Short preview video (30–90 sec)</p>
+                      {trailer && <p className="text-[9px] mt-0.5 truncate max-w-[200px]" style={{ color: "#4B5563" }}>{trailer.filename}</p>}
+                    </div>
+                    <div className="flex-shrink-0">
+                      {trailer ? (
+                        <div className="flex gap-1">
+                          <a href={trailer.url} target="_blank" rel="noopener noreferrer"
+                            className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#DBEAFE", color: "#1D4ED8" }}>View</a>
+                          <button onClick={() => triggerUpload("trailer")}
+                            className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#E5E7EB", color: "#555" }}>Replace</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => triggerUpload("trailer")} disabled={isUploading}
+                          className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded disabled:opacity-50"
+                          style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}>
+                          {isUploading ? <><div className="w-2.5 h-2.5 rounded-full border border-indigo-400 border-t-transparent animate-spin" />Uploading...</> : <>↑ Upload</>}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {isUploading && uploadProgress > 0 && (
+                    <div className="mt-2 w-full h-1 rounded-full overflow-hidden" style={{ background: "#D0D4E8" }}>
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%`, background: "#4F46E5" }} />
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Promo / Clip slot */}
+            {(() => {
+              const isUploading = uploadingFor === "promo"
+              return (
+                <div className="p-3 rounded-lg" style={{ background: promo ? "#F0F7FF" : "#EDEDEE", border: `1px solid ${promo ? "#BDD8F5" : "#E0E0E0"}` }}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-20 h-12 rounded flex-shrink-0 flex items-center justify-center" style={{ background: "#D8D8D8" }}>
+                      <span className="text-[9px] font-medium" style={{ color: "#888" }}>PROMO</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium mb-0.5" style={{ color: "#1A1A1A" }}>切片 Promo Clip</p>
+                      <p className="text-[10px]" style={{ color: "#AAA" }}>Short-form promo clip (15–60 sec)</p>
+                      {promo && <p className="text-[9px] mt-0.5 truncate max-w-[200px]" style={{ color: "#4B5563" }}>{promo.filename}</p>}
+                    </div>
+                    <div className="flex-shrink-0">
+                      {promo ? (
+                        <div className="flex gap-1">
+                          <a href={promo.url} target="_blank" rel="noopener noreferrer"
+                            className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#DBEAFE", color: "#1D4ED8" }}>View</a>
+                          <button onClick={() => triggerUpload("promo")}
+                            className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#E5E7EB", color: "#555" }}>Replace</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => triggerUpload("promo")} disabled={isUploading}
+                          className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded disabled:opacity-50"
+                          style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}>
+                          {isUploading ? <><div className="w-2.5 h-2.5 rounded-full border border-indigo-400 border-t-transparent animate-spin" />Uploading...</> : <>↑ Upload</>}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {isUploading && uploadProgress > 0 && (
+                    <div className="mt-2 w-full h-1 rounded-full overflow-hidden" style={{ background: "#D0D4E8" }}>
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%`, background: "#4F46E5" }} />
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </div>
       </div>

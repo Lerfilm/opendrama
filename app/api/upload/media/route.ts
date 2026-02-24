@@ -13,6 +13,7 @@ const BUCKET_MAP: Record<string, StorageBucket> = {
   "seed-images": "seed-images",
   "covers": "covers",
   "props-images": "props-images",
+  "finished-videos": "finished-videos",
 }
 
 /**
