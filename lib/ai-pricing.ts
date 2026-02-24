@@ -14,6 +14,11 @@ export type AiFeatureKey =
   | "import_pdf"
   | "adapt_prompt"
   | "generate_character"
+  | "generate_costume"
+  | "generate_prop_photo"
+  | "generate_location_photo"
+  | "generate_cover"
+  | "fill_character_specs"
   | "ai_suggest"
   | "ai_stitch"
   | "ai_split"
@@ -28,6 +33,11 @@ export const DEFAULT_AI_PRICES: Record<AiFeatureKey, { label: string; costCoins:
   import_pdf:          { label: "PDF Import",             costCoins: 5,  description: "AI parses full screenplay PDF (per episode)" },
   adapt_prompt:        { label: "Prompt Adapt",           costCoins: 1,  description: "AI adapts video generation prompt" },
   generate_character:  { label: "Character Generate",     costCoins: 3,  description: "AI generates character portrait" },
+  generate_costume:    { label: "Costume Generate",      costCoins: 2,  description: "AI generates costume reference image" },
+  generate_prop_photo: { label: "Prop Photo Generate",   costCoins: 2,  description: "AI generates prop reference photo" },
+  generate_location_photo: { label: "Location Photo",    costCoins: 2,  description: "AI generates location reference photo" },
+  generate_cover:      { label: "Cover Generate",        costCoins: 2,  description: "AI generates episode cover image" },
+  fill_character_specs:{ label: "Character Specs Fill",   costCoins: 1,  description: "AI auto-fills character casting specs" },
   ai_suggest:          { label: "Scene Suggestions",      costCoins: 1,  description: "AI suggests scene improvements" },
   ai_stitch:           { label: "Script Stitch",          costCoins: 1,  description: "AI stitches script sections" },
   ai_split:            { label: "Script Split",           costCoins: 1,  description: "AI splits script into episodes" },
@@ -86,6 +96,22 @@ export async function chargeAiFeature(
   })
 
   return { ok: true, coinsCharged: cost }
+}
+
+/**
+ * Silently charge for an AI feature — deduct if user has balance, skip otherwise.
+ * Does NOT block the request on insufficient balance (fire-and-forget billing).
+ */
+export async function chargeAiFeatureSilent(
+  userId: string,
+  featureKey: AiFeatureKey,
+  metadata?: Record<string, unknown>
+): Promise<void> {
+  try {
+    await chargeAiFeature(userId, featureKey, metadata)
+  } catch {
+    // Billing should never block the feature
+  }
 }
 
 /**

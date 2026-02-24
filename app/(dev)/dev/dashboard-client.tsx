@@ -122,6 +122,13 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
   const [pdfGenre, setPdfGenre] = useState("romance")
   const [pdfFormat, setPdfFormat] = useState("shortdrama")
   const [pdfLanguage, setPdfLanguage] = useState("en")
+  // Auto-generate images options
+  const [pdfGenImages, setPdfGenImages] = useState({
+    characters: true,
+    locations: true,
+    props: true,
+    cover: true,
+  })
   // Resume state
   const [resumeScriptId, setResumeScriptId] = useState<string | null>(null)
   const [resumeScriptTitle, setResumeScriptTitle] = useState<string | null>(null)
@@ -192,6 +199,7 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
     formData.append("format", pdfFormat)
     formData.append("language", pdfLanguage)
     formData.append("targetEpisodes", targetEpisodes)
+    formData.append("genImages", JSON.stringify(pdfGenImages))
     if (resumeScriptId) formData.append("resumeScriptId", resumeScriptId)
 
     let currentScriptId: string | null = resumeScriptId
@@ -201,8 +209,14 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
       const res = await fetch("/api/ai/import-pdf", { method: "POST", body: formData })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error((err as { error?: string }).error || "Import failed")
+        const err = await res.json().catch(() => ({})) as { error?: string; message?: string }
+        if (err.error === "import_in_progress") {
+          throw new Error("You already have an import in progress. Please wait for it to finish.")
+        }
+        if (err.error === "server_busy") {
+          throw new Error("Server is busy with other imports. Please try again in a minute.")
+        }
+        throw new Error(err.message || err.error || "Import failed")
       }
 
       if (!res.body) throw new Error("No response body")
@@ -260,9 +274,35 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
             case "chunk_error":
               setPdfImportStep(`⚠ Episode ${msg.episode} failed, continuing... (${msg.chunk}/${totalChunks})`)
               break
+            case "images_start":
+              setPdfImportProgress(92)
+              setPdfImportStep("Generating character & scene images...")
+              break
+            case "images_progress":
+              setPdfImportStep(msg.step as string)
+              break
+            case "image_done": {
+              const imgCur = msg.current as number
+              const imgTot = msg.total as number
+              setPdfImportStep(`Generated ${msg.kind}: ${msg.label} (${imgCur}/${imgTot})`)
+              setPdfImportProgress(Math.round(92 + (imgCur / imgTot) * 7))
+              break
+            }
+            case "image_error": {
+              const imgCur2 = msg.current as number
+              const imgTot2 = msg.total as number
+              setPdfImportStep(`⚠ ${msg.label} failed, continuing... (${imgCur2}/${imgTot2})`)
+              setPdfImportProgress(Math.round(92 + (imgCur2 / imgTot2) * 7))
+              break
+            }
+            case "images_done":
+              setPdfImportStep(`Generated ${msg.generated}/${msg.total} images`)
+              setPdfImportProgress(99)
+              break
             case "done": {
               setPdfImportProgress(100)
-              setPdfImportStep(`✓ ${msg.scenes} scenes, ${msg.roles} roles imported`)
+              const imgNote = (msg.images as number) > 0 ? `, ${msg.images} images` : ""
+              setPdfImportStep(`✓ ${msg.scenes} scenes, ${msg.roles} roles${imgNote} imported`)
               await new Promise(r => setTimeout(r, 700))
               setShowModal(false)
               resetForm()
@@ -1029,13 +1069,37 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
                   </div>
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider block" style={{ color: "#888" }}>Auto-generate images</label>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                    {([
+                      { key: "characters" as const, label: "Character Portraits" },
+                      { key: "locations" as const,  label: "Location Photos" },
+                      { key: "props" as const,      label: "Prop Photos" },
+                      { key: "cover" as const,      label: "Episode Cover" },
+                    ]).map(opt => (
+                      <label key={opt.key} className="flex items-center gap-1.5 text-[11px] cursor-pointer select-none" style={{ color: "#444" }}>
+                        <input
+                          type="checkbox"
+                          checked={pdfGenImages[opt.key]}
+                          onChange={e => setPdfGenImages(prev => ({ ...prev, [opt.key]: e.target.checked }))}
+                          disabled={creating}
+                          className="rounded accent-indigo-500"
+                          style={{ width: 14, height: 14 }}
+                        />
+                        {opt.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex items-start gap-2 p-3 rounded-lg" style={{ background: "#EEF0F8" }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#4F46E5", flexShrink: 0, marginTop: 1 }}>
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 16v-4M12 8h.01" />
                   </svg>
                   <p className="text-[11px] leading-relaxed" style={{ color: "#4F46E5" }}>
-                    AI will automatically parse the screenplay structure, detect scenes, dialogue, characters, and create the full script. This may take 30–60 seconds.
+                    AI will automatically parse the screenplay structure, detect scenes, dialogue, characters, and create the full script.{(pdfGenImages.characters || pdfGenImages.locations || pdfGenImages.props || pdfGenImages.cover) ? " Images will be generated after parsing. This may take 2–4 minutes." : " This may take 30–60 seconds."}
                   </p>
                 </div>
 

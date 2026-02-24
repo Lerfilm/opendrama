@@ -88,6 +88,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const [isPolling, setIsPolling] = useState(false)
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false)
   const [balance, setBalance] = useState(initialBalance)
+  const [editingPrompts, setEditingPrompts] = useState<Record<string, string>>({})
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
   const epSegments = segments.filter(s => s.episodeNum === selectedEp).sort((a, b) => a.segmentIndex - b.segmentIndex)
@@ -255,6 +256,47 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     }
   }
 
+  // Single-segment regeneration
+  async function handleRegenerate(segmentId: string) {
+    const seg = epSegments.find(s => s.id === segmentId)
+    if (!seg) return
+    const editedPrompt = editingPrompts[segmentId] ?? seg.prompt
+    setIsSubmitting(true)
+    try {
+      // Save edited prompt first if changed
+      if (editingPrompts[segmentId]) {
+        await fetch("/api/segments/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ segments: [{ id: segmentId, prompt: editedPrompt }] }),
+        })
+      }
+      const res = await fetch("/api/video/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "batch",
+          scriptId: script.id,
+          episodeNum: selectedEp,
+          model,
+          resolution,
+          segments: [{ id: seg.id, prompt: editedPrompt, durationSec: seg.durationSec, shotType: seg.shotType, cameraMove: seg.cameraMove }],
+        }),
+      })
+      if (res.status === 402) { alert("Insufficient balance"); return }
+      if (!res.ok) { const err = await res.json(); alert(err.error || "Submit failed"); return }
+      await pollStatus()
+    } finally { setIsSubmitting(false) }
+  }
+
+  // Insert @mention text into prompt
+  function insertAtCursor(segId: string, text: string) {
+    setEditingPrompts(prev => {
+      const current = prev[segId] ?? epSegments.find(s => s.id === segId)?.prompt ?? ""
+      return { ...prev, [segId]: current + " " + text }
+    })
+  }
+
   const currentModel = MODELS.find(m => m.id === model)
 
   // ── Main tab: call sheet or segments ──
@@ -363,7 +405,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     {/* Main content */}
     <div className="flex-1 flex overflow-hidden">
       {/* Left: Episode list + controls */}
-      <div className="w-64 flex flex-col flex-shrink-0" style={{ background: "#EBEBEB", borderRight: "1px solid #C0C0C0" }}>
+      <div className="w-52 flex flex-col flex-shrink-0" style={{ background: "#EBEBEB", borderRight: "1px solid #C0C0C0" }}>
         {/* Header */}
         <div className="px-3 py-2.5" style={{ borderBottom: "1px solid #C8C8C8" }}>
           <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Episodes</span>
@@ -833,7 +875,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
             className="text-[10px] px-3 py-1 rounded font-medium transition-colors disabled:opacity-50"
             style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
           >
-            {isSplitting ? "Splitting..." : epSegments.length > 0 ? "Re-split" : "✦ AI Split"}
+            {isSplitting ? "Splitting..." : epSegments.length > 0 ? "Re-split" : <>Split <span className="text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: "#E0E4F8", color: "#4F46E5" }}>AI</span></>}
           </button>
           <button
             onClick={handleStitch}
@@ -1010,18 +1052,74 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                 )}
               </div>
 
+              {/* Editable Prompt + Re-generate */}
               <div>
-                <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#999" }}>Prompt</label>
-                <p className="text-[11px] leading-relaxed p-2.5 rounded" style={{ background: "#EBEBEB", color: "#555" }}>
-                  {selectedSeg.prompt}
-                </p>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#999" }}>Prompt</label>
+                  <button
+                    onClick={() => handleRegenerate(selectedSeg.id)}
+                    disabled={isSubmitting || ["submitted", "generating", "reserved"].includes(selectedSeg.status)}
+                    className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded font-medium transition-colors disabled:opacity-40"
+                    style={{ background: "#4F46E5", color: "#fff" }}
+                  >
+                    {isSubmitting ? "Submitting..." : "▶ Re-generate"}
+                  </button>
+                </div>
+                <textarea
+                  value={editingPrompts[selectedSeg.id] ?? selectedSeg.prompt}
+                  onChange={e => setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: e.target.value }))}
+                  rows={6}
+                  className="w-full resize-none text-[11px] leading-relaxed p-2.5 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                  style={{ background: "#EBEBEB", color: "#555", border: "1px solid #D0D0D0" }}
+                />
+                {/* Asset chips — click to insert @mention into prompt */}
+                {(() => {
+                  const scene = script.scenes.find(s => s.episodeNum === selectedSeg.episodeNum && s.sceneNum === selectedSeg.sceneNum)
+                  const sceneCharNames = new Set<string>()
+                  if (scene?.action) {
+                    try {
+                      const blocks = JSON.parse(scene.action) as Array<{ type: string; character?: string }>
+                      if (Array.isArray(blocks)) {
+                        for (const b of blocks) {
+                          if (b.type === "dialogue" && b.character) sceneCharNames.add(b.character.trim())
+                        }
+                      }
+                    } catch { /* ok */ }
+                  }
+                  const sceneRoles = script.roles.filter(r =>
+                    sceneCharNames.has(r.name) || sceneCharNames.has(r.name.toUpperCase()) ||
+                    [...sceneCharNames].some(n => n.toUpperCase() === r.name.toUpperCase())
+                  )
+                  if (sceneRoles.length === 0 && !scene?.location) return null
+                  return (
+                    <div className="mt-2 flex flex-wrap gap-1 items-center">
+                      <span className="text-[8px] uppercase tracking-wider mr-0.5" style={{ color: "#CCC" }}>Insert:</span>
+                      {sceneRoles.map(role => (
+                        <button key={role.id} onClick={() => insertAtCursor(selectedSeg.id, `@${role.name}`)}
+                          className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity"
+                          style={{ background: "#DBEAFE", color: "#1D4ED8" }}>
+                          {role.referenceImages?.[0] ? (
+                            <img src={role.referenceImages[0]} alt="" className="w-3 h-3 rounded-full object-cover" />
+                          ) : null}
+                          @{role.name}
+                        </button>
+                      ))}
+                      {scene?.location && (
+                        <button onClick={() => insertAtCursor(selectedSeg.id, `@${scene.location}`)}
+                          className="text-[9px] px-1.5 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity"
+                          style={{ background: "#E0E7FF", color: "#3730A3" }}>
+                          @{scene.location}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
-              {/* Scene Characters */}
+              {/* Scene Characters & Costumes */}
               {(() => {
                 const scene = script.scenes.find(s => s.episodeNum === selectedSeg.episodeNum && s.sceneNum === selectedSeg.sceneNum)
                 if (!scene) return null
-                // Extract character names from scene action blocks
                 const sceneCharNames = new Set<string>()
                 if (scene.action) {
                   try {
@@ -1033,13 +1131,10 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     }
                   } catch { /* ok */ }
                 }
-                // Match to roles
                 const sceneRoles = script.roles.filter(r =>
-                  sceneCharNames.has(r.name) ||
-                  sceneCharNames.has(r.name.toUpperCase()) ||
+                  sceneCharNames.has(r.name) || sceneCharNames.has(r.name.toUpperCase()) ||
                   [...sceneCharNames].some(n => n.toUpperCase() === r.name.toUpperCase())
                 )
-                // Get costumes for scene roles
                 const sceneCostumes = costumeAssets.filter(c => sceneRoles.some(r => r.id === c.role.id))
                 if (sceneRoles.length === 0 && sceneCostumes.length === 0 && !scene.location) return null
                 return (

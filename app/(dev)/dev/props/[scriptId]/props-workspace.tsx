@@ -5,6 +5,7 @@ import { PropItem, PropPhoto } from "./components/props-types"
 import { PropsSidebar } from "./components/props-sidebar"
 import { PropDetail } from "./components/prop-detail"
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning"
+import { useAITasks } from "@/lib/ai-task-context"
 
 interface SceneRef {
   id: string
@@ -27,11 +28,17 @@ export function PropsWorkspace({ script }: { script: Script }) {
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null)
   const [isAIExtracting, setIsAIExtracting] = useState(false)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
-  const [isGeneratingAllPhotos, setIsGeneratingAllPhotos] = useState(false)
-  const [generateAllPhotosProgress, setGenerateAllPhotosProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isLoadedRef = useRef(false)
+  const propsRef = useRef(props)
+  propsRef.current = props
+
+  // ── Global AI Task Context ──────────────────────────────────────────────
+  const aiTasks = useAITasks()
+  const propPhotoTask = aiTasks.tasks.find(t => t.type === "generate_all_prop_photos" && t.scriptId === script.id && t.status === "running")
+  const isGeneratingAllPhotos = !!propPhotoTask
+  const generateAllPhotosProgress = propPhotoTask?.progress ?? 0
 
   // Load props from API on mount
   useEffect(() => {
@@ -92,6 +99,7 @@ export function PropsWorkspace({ script }: { script: Script }) {
 
   async function extractPropsFromScript() {
     setIsAIExtracting(true)
+    const taskId = aiTasks.registerSingleTask("extract_props", "Extracting Props", 10000, script.id)
     try {
       const res = await fetch("/api/ai/extract-props", {
         method: "POST",
@@ -113,43 +121,57 @@ export function PropsWorkspace({ script }: { script: Script }) {
         }))
         setProps(prev => [...prev, ...newProps])
         if (newProps.length > 0) setSelectedPropId(newProps[0].id)
+        aiTasks.completeSingleTask(taskId)
       } else {
+        aiTasks.failSingleTask(taskId, "Extraction failed")
         alert("AI extraction failed")
       }
+    } catch (e: any) {
+      aiTasks.failSingleTask(taskId, e?.message)
     } finally {
       setIsAIExtracting(false)
     }
   }
 
-  async function generateAllPhotos() {
-    if (props.length === 0) return
-    setIsGeneratingAllPhotos(true)
-    setGenerateAllPhotosProgress(0)
-    for (let i = 0; i < props.length; i++) {
-      const prop = props[i]
-      try {
+  function generateAllPhotos() {
+    if (aiTasks.isRunning("generate_all_prop_photos", script.id)) return
+    const currentProps = propsRef.current
+    if (currentProps.length === 0) return
+
+    aiTasks.startBatchTask({
+      type: "generate_all_prop_photos",
+      label: "Generating Prop Photos",
+      scriptId: script.id,
+      items: currentProps.map(p => ({ id: p.id, label: p.name })),
+      estimatedMsPerItem: 12000,
+      executeFn: async (propId, signal) => {
+        const prop = propsRef.current.find(p => p.id === propId)
+        if (!prop) return null
         const res = await fetch("/api/ai/generate-prop-photo", {
-          method: "POST",
+          signal, method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             propName: prop.name,
             category: prop.category,
             description: prop.description?.trim() || "",
+            scriptId: script.id,
+            sceneIds: prop.sceneIds || [],
           }),
         })
+        if (!res.ok) throw new Error(`Prop photo failed: ${res.status}`)
         const data = await res.json()
-        if (data.url) {
+        return { url: data.url, propId }
+      },
+      onItemDone: (_propId, result) => {
+        if (result?.url) {
           setProps(prev => prev.map(p =>
-            p.id === prop.id
-              ? { ...p, photos: [...p.photos, { url: data.url, isApproved: false }] }
+            p.id === result.propId
+              ? { ...p, photos: [...p.photos, { url: result.url, isApproved: false }] }
               : p
           ))
         }
-      } catch { /* skip failed prop */ }
-      setGenerateAllPhotosProgress(Math.round(((i + 1) / props.length) * 100))
-    }
-    setIsGeneratingAllPhotos(false)
-    setGenerateAllPhotosProgress(0)
+      },
+    })
   }
 
   async function uploadPhoto(propId: string, file: File) {

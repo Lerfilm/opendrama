@@ -4,6 +4,7 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 import { LocationSidebar } from "./components/location-sidebar"
 import { LocationDetail } from "./components/location-detail"
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning"
+import { useAITasks } from "@/lib/ai-task-context"
 
 interface SceneRef {
   id: string
@@ -30,6 +31,7 @@ interface TimeSlot {
 }
 
 interface LocationEntry {
+  id?: string
   name: string
   type: string
   address?: string
@@ -90,90 +92,69 @@ export function LocationWorkspace({ script }: { script: Script }) {
   const [isAIExtracting, setIsAIExtracting] = useState(false)
   const [extractProgress, setExtractProgress] = useState(0)
   const extractTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const [isGeneratingAllPhotos, setIsGeneratingAllPhotos] = useState(false)
-  const [genAllTotal, setGenAllTotal] = useState(0)
-  const [genAllDone, setGenAllDone] = useState(0)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isLoadedRef = useRef(false)
-  const locJobIdRef = useRef<string | null>(null)
   // Always-current entries reference for use inside async runners
   const entriesRef = useRef(entries)
 
   // Keep entriesRef in sync with latest entries state
   useEffect(() => { entriesRef.current = entries }, [entries])
 
-  // Runner: generate photos for remaining locations (supports both fresh start and resume)
-  async function runGenerateAllLocationPhotos(locIds: string[], completedLocIds: string[], jobId: string) {
-    const remaining = locIds.filter(id => !completedLocIds.includes(id))
-    setGenAllTotal(locIds.length)
-    setGenAllDone(locIds.length - remaining.length)
-    setIsGeneratingAllPhotos(true)
-    let doneCount = locIds.length - remaining.length
+  // ── Global AI Task Context ──────────────────────────────────────────────
+  const aiTasks = useAITasks()
+  const locPhotoTask = aiTasks.tasks.find(t => t.type === "generate_all_location_photos" && t.scriptId === script.id && t.status === "running")
+  const isGeneratingAllPhotos = !!locPhotoTask
+  const genAllTotal = locPhotoTask?.total ?? 0
+  const genAllDone = locPhotoTask?.done ?? 0
 
-    for (const locId of remaining) {
-      const e = entriesRef.current[locId]
-      try {
+  function handleGenerateAllPhotos() {
+    if (aiTasks.isRunning("generate_all_location_photos", script.id)) return
+    const locIds = Object.keys(entries).sort()
+    if (locIds.length === 0) return
+
+    aiTasks.startBatchTask({
+      type: "generate_all_location_photos",
+      label: "Generating Location Photos",
+      scriptId: script.id,
+      items: locIds.map(id => ({ id, label: entriesRef.current[id]?.name || id })),
+      estimatedMsPerItem: 15000,
+      dbJobType: "generate_all_location_photos",
+      dbJobPayload: { scriptId: script.id, roleIds: locIds },
+      executeFn: async (locId, signal) => {
+        const e = entriesRef.current[locId]
         const res = await fetch("/api/ai/generate-location-photo", {
-          method: "POST",
+          signal, method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             locName: e?.name || locId,
             type: e?.type || "INT",
             description: e?.notes?.trim() || "",
+            scriptId: script.id,
           }),
         })
+        if (!res.ok) throw new Error(`Location photo failed: ${res.status}`)
         const data = await res.json()
-        if (data.url) {
+        return { url: data.url, locId }
+      },
+      onItemDone: (_locId, result) => {
+        if (result?.url) {
           setEntries(prev => ({
             ...prev,
-            [locId]: { ...prev[locId], photos: [...(prev[locId]?.photos || []), { url: data.url, isApproved: false }] },
+            [result.locId]: {
+              ...prev[result.locId],
+              photos: [...(prev[result.locId]?.photos || []), { url: result.url, isApproved: false }],
+            },
           }))
         }
-      } catch { /* skip failed location */ }
-
-      doneCount++
-      setGenAllDone(doneCount)
-
-      // Persist progress to DB job
-      await fetch("/api/casting/bulk-job", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobId,
-          completedLocId: locId,
-          progress: Math.round((doneCount / locIds.length) * 100),
-        }),
-      }).catch(() => {})
-    }
-
-    // Mark job complete
-    await fetch(`/api/casting/bulk-job?jobId=${jobId}`, { method: "DELETE" }).catch(() => {})
-    locJobIdRef.current = null
-    setIsGeneratingAllPhotos(false)
-    setGenAllTotal(0)
-    setGenAllDone(0)
-  }
-
-  // Start a fresh generate-all-photos job
-  async function handleGenerateAllPhotos() {
-    const locIds = Object.keys(entries).sort()
-    if (locIds.length === 0) return
-    const res = await fetch("/api/casting/bulk-job", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scriptId: script.id, type: "generate_all_location_photos", locIds }),
+      },
     })
-    const { job } = await res.json()
-    locJobIdRef.current = job.id
-    await runGenerateAllLocationPhotos(locIds, [], job.id)
   }
 
-  // Load locations from DB on mount + resume any active job
+  // Load locations from DB on mount
   useEffect(() => {
-    async function loadAndResume() {
-      // 1. Load saved location data from DB
+    async function loadLocations() {
       try {
         const r = await fetch(`/api/scripts/${script.id}/locations`)
         const d = await r.json()
@@ -188,27 +169,8 @@ export function LocationWorkspace({ script }: { script: Script }) {
         }
       } catch {}
       isLoadedRef.current = true
-
-      // 2. Check for an active location photo-generation job to resume
-      try {
-        const res = await fetch(`/api/casting/bulk-job?scriptId=${script.id}&type=generate_all_location_photos`)
-        if (!res.ok) return
-        const { jobs } = await res.json()
-        if (!jobs?.length) return
-        const job = jobs[0]
-        let inputData: { locIds?: string[] } = {}
-        let outputData: { completedLocIds?: string[] } = {}
-        try { inputData = JSON.parse(job.input || "{}") } catch {}
-        try { outputData = JSON.parse(job.output || "{}") } catch {}
-        const locIds = inputData.locIds || []
-        const completedLocIds = outputData.completedLocIds || []
-        if (locIds.length > 0 && completedLocIds.length < locIds.length) {
-          locJobIdRef.current = job.id
-          runGenerateAllLocationPhotos(locIds, completedLocIds, job.id)
-        }
-      } catch {}
     }
-    loadAndResume()
+    loadLocations()
   }, [script.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save locations when entries change
@@ -293,11 +255,11 @@ export function LocationWorkspace({ script }: { script: Script }) {
   const handleAIExtract = useCallback(async () => {
     setIsAIExtracting(true)
     setExtractProgress(5)
-    // Animate progress bar from 5% → 85% while API call runs
     if (extractTimerRef.current) clearInterval(extractTimerRef.current)
     extractTimerRef.current = setInterval(() => {
       setExtractProgress(prev => (prev < 85 ? prev + 2 : prev))
     }, 400)
+    const taskId = aiTasks.registerSingleTask("extract_locations", "Extracting Locations", 8000, script.id)
     try {
       const sceneTexts = scenes.map(buildSceneText).join("\n\n---\n\n")
       const res = await fetch("/api/ai/extract-locations", {
@@ -332,17 +294,20 @@ export function LocationWorkspace({ script }: { script: Script }) {
       if (aiLocations.length > 0 && !selectedLoc) {
         setSelectedLoc(aiLocations[0].name)
       }
+      aiTasks.completeSingleTask(taskId)
     } catch {
+      aiTasks.failSingleTask(taskId, "Extraction failed")
       alert("AI extraction failed")
     } finally {
       if (extractTimerRef.current) { clearInterval(extractTimerRef.current); extractTimerRef.current = null }
       setExtractProgress(100)
       setTimeout(() => { setExtractProgress(0); setIsAIExtracting(false) }, 600)
     }
-  }, [scenes, script.id, selectedLoc])
+  }, [scenes, script.id, selectedLoc, aiTasks])
 
   const handleAIDescribe = useCallback(async (locName: string) => {
     setIsGeneratingDesc(true)
+    const taskId = aiTasks.registerSingleTask("describe_location", `Describe: ${locName}`, 6000, script.id)
     try {
       const locScenes = scenes.filter(s => s.location === locName)
       const res = await fetch("/api/ai/describe-location", {
@@ -356,11 +321,16 @@ export function LocationWorkspace({ script }: { script: Script }) {
       if (res.ok) {
         const data = await res.json()
         if (data.description) updateEntry(locName, { notes: data.description })
+        aiTasks.completeSingleTask(taskId)
+      } else {
+        aiTasks.failSingleTask(taskId)
       }
+    } catch (e: any) {
+      aiTasks.failSingleTask(taskId, e?.message)
     } finally {
       setIsGeneratingDesc(false)
     }
-  }, [scenes, updateEntry])
+  }, [scenes, updateEntry, aiTasks, script.id])
 
   const allLocs = Object.keys(entries).sort()
 
@@ -407,6 +377,7 @@ export function LocationWorkspace({ script }: { script: Script }) {
           isGeneratingAllPhotos={isGeneratingAllPhotos}
           genAllDone={genAllDone}
           genAllTotal={genAllTotal}
+          scriptId={script.id}
           onUpdateEntry={updateEntry}
           onAIDescribe={handleAIDescribe}
           onAIExtract={handleAIExtract}

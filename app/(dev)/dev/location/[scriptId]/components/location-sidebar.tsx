@@ -4,6 +4,7 @@ import { useState } from "react"
 import { AIConfirmModal } from "@/components/dev/ai-confirm-modal"
 
 interface LocationEntry {
+  id?: string
   name: string
   type: string
   address?: string

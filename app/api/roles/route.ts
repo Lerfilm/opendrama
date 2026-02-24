@@ -61,8 +61,8 @@ export async function DELETE(req: NextRequest) {
 
 /**
  * PUT /api/roles
- * Update a ScriptRole's referenceImages (and optionally description/name).
- * Body: { id, referenceImages?: string[], description?: string, name?: string }
+ * Update a ScriptRole's fields.
+ * Body: { id, referenceImages?: string[], description?: string, name?: string, role?: string, voiceType?: string }
  */
 export async function PUT(req: NextRequest) {
   const session = await auth()
@@ -72,19 +72,19 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { id, referenceImages, description, name } = body
+    const { id, referenceImages, description, name, role, voiceType } = body
 
     if (!id) {
       return NextResponse.json({ error: "Role id is required" }, { status: 400 })
     }
 
     // Verify ownership via script
-    const role = await prisma.scriptRole.findUnique({
+    const existing = await prisma.scriptRole.findUnique({
       where: { id },
       include: { script: { select: { userId: true } } },
     })
 
-    if (!role || role.script.userId !== session.user.id) {
+    if (!existing || existing.script.userId !== session.user.id) {
       return NextResponse.json({ error: "Role not found" }, { status: 404 })
     }
 
@@ -92,6 +92,20 @@ export async function PUT(req: NextRequest) {
     if (referenceImages !== undefined) data.referenceImages = referenceImages
     if (description !== undefined) data.description = description
     if (name !== undefined) data.name = name
+    if (role !== undefined) data.role = role
+    if (voiceType !== undefined) {
+      data.voiceType = voiceType
+      // Sync castingSpecs from voiceType JSON if it contains spec fields
+      try {
+        if (typeof voiceType === "string" && voiceType.startsWith("{")) {
+          const meta = JSON.parse(voiceType)
+          const { age, gender, height, ethnicity, nationality, physique } = meta
+          if (age || gender || height || ethnicity || nationality || physique) {
+            data.castingSpecs = JSON.stringify({ age, gender, height, ethnicity, nationality, physique })
+          }
+        }
+      } catch { /* ignore malformed JSON */ }
+    }
 
     const updated = await prisma.scriptRole.update({
       where: { id },

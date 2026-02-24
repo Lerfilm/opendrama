@@ -11,7 +11,7 @@ import { t } from "@/lib/i18n"
 export default async function RechargeSuccessPage({
   searchParams,
 }: {
-  searchParams: { session_id?: string }
+  searchParams: Promise<{ session_id?: string }>
 }) {
   const session = await auth()
 
@@ -19,7 +19,8 @@ export default async function RechargeSuccessPage({
     redirect("/auth/signin")
   }
 
-  const sessionId = searchParams.session_id
+  const params = await searchParams
+  const sessionId = params.session_id
 
   let purchase = null
   let user = null

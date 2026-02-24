@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { signOut } from "next-auth/react"
 import { Code } from "@/components/icons"
 import { RechargeModal } from "./recharge-modal"
 
@@ -15,6 +16,18 @@ interface TopBarProps {
 export function TopBar({ user, balance, className }: TopBarProps) {
   const pathname = usePathname()
   const [showRecharge, setShowRecharge] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!showUserMenu) return
+    function handle(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setShowUserMenu(false)
+    }
+    document.addEventListener("mousedown", handle)
+    return () => document.removeEventListener("mousedown", handle)
+  }, [showUserMenu])
 
   // Detect which module we're in and extract scriptId
   const moduleMatch = pathname.match(/^\/dev\/(script|casting|location|props|theater|editing|finishing|media)\/([^/]+)/)
@@ -136,14 +149,81 @@ export function TopBar({ user, balance, className }: TopBarProps) {
 
           <div className="w-px h-4" style={{ background: "#333" }} />
 
-          {/* User avatar */}
-          {user.image ? (
-            <img src={user.image} alt={user.name || ""} className="w-6 h-6 rounded-full" style={{ outline: "1px solid #444" }} />
-          ) : (
-            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px]" style={{ background: "#3A3A3E", color: "#C0C0C0" }}>
-              {user.name?.[0] || "U"}
-            </div>
-          )}
+          {/* User avatar + dropdown */}
+          <div ref={userMenuRef} className="relative">
+            <button onClick={() => setShowUserMenu(o => !o)} className="flex items-center rounded-full transition-opacity hover:opacity-80">
+              {user.image ? (
+                <img src={user.image} alt={user.name || ""} className="w-6 h-6 rounded-full" style={{ outline: "1px solid #444" }} />
+              ) : (
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px]" style={{ background: "#3A3A3E", color: "#C0C0C0" }}>
+                  {user.name?.[0] || "U"}
+                </div>
+              )}
+            </button>
+
+            {/* User dropdown menu */}
+            {showUserMenu && (
+              <div className="absolute right-0 top-full mt-2 z-50 rounded-lg shadow-xl overflow-hidden"
+                style={{ minWidth: 220, background: "#2A2A2E", border: "1px solid #444" }}>
+                {/* User info */}
+                <div className="px-4 py-3" style={{ borderBottom: "1px solid #3A3A3E" }}>
+                  <div className="flex items-center gap-3">
+                    {user.image ? (
+                      <img src={user.image} alt={user.name || ""} className="w-10 h-10 rounded-full flex-shrink-0" style={{ outline: "1px solid #555" }} />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm flex-shrink-0" style={{ background: "#3A3A3E", color: "#C0C0C0" }}>
+                        {user.name?.[0] || "U"}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-medium truncate" style={{ color: "#F0F0F0" }}>
+                        {user.name || "User"}
+                      </div>
+                      <div className="text-[10px] truncate" style={{ color: "#888" }}>
+                        {user.email || ""}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Menu items */}
+                <div className="py-1">
+                  <Link href="/dev" onClick={() => setShowUserMenu(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-[11px] transition-colors hover:bg-white/5"
+                    style={{ color: "#C0C0C0" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="M3 3h7v7H3z" /><path d="M14 3h7v7h-7z" /><path d="M3 14h7v7H3z" /><path d="M14 14h7v7h-7z" />
+                    </svg>
+                    Projects
+                  </Link>
+                  <Link href="/" onClick={() => setShowUserMenu(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-[11px] transition-colors hover:bg-white/5"
+                    style={{ color: "#C0C0C0" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                    Home
+                  </Link>
+                </div>
+
+                {/* Divider + Logout */}
+                <div style={{ borderTop: "1px solid #3A3A3E" }}>
+                  <button
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-[11px] transition-colors hover:bg-white/5"
+                    style={{ color: "#EF4444" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" x2="9" y1="12" y2="12" />
+                    </svg>
+                    Log Out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

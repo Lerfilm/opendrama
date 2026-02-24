@@ -72,7 +72,7 @@ export default async function StudioPage() {
                           </Badge>
                           {script.scenes.length > 0 && (
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
-                              {t("studio.updatedToEpisode", { num: script.scenes.length })}
+                              {t("studio.updatedToEpisode", { num: Math.max(...script.scenes.map(s => s.episodeNum)) })}
                             </Badge>
                           )}
                         </div>

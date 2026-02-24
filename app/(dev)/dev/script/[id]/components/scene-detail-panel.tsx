@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { SceneHeader } from "./scene-header"
 import { SegmentTimeline } from "./segment-timeline"
 
 // ─── Block system ────────────────────────────────────────────────────────────
@@ -65,7 +64,7 @@ interface SceneDetailPanelProps {
   onNavigateScene: (delta: 1 | -1) => void
 }
 
-// ─── Kbd pill ─────────────────────────────────────────────────────────────────
+// ─── Kbd pill (used in block hints) ──────────────────────────────────────────
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
     <kbd className="inline-flex items-center text-[9px] px-1 py-0.5 rounded font-mono"
@@ -231,32 +230,6 @@ function SceneNavDropdown({
   )
 }
 
-// ─── Shortcut legend ─────────────────────────────────────────────────────────
-function ShortcutLegend() {
-  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
-  const mod = isMac ? "⌘" : "Ctrl"
-  return (
-    <div className="flex items-center flex-wrap gap-x-4 gap-y-1.5 mt-4 pt-3 select-none"
-      style={{ borderTop: "1px dashed #E0D8D0", fontFamily: "sans-serif" }}>
-      <span className="text-[9px] uppercase tracking-wider" style={{ color: "#CCC" }}>Shortcuts</span>
-      {[
-        { key: `${mod}+S`, desc: "Save" },
-        { key: "⌥A",       desc: "Add Action" },
-        { key: "⌥D",       desc: "Add Dialogue" },
-        { key: "⌥P",       desc: "Add Direction" },
-        { key: "⌥↑",       desc: "Prev scene" },
-        { key: "⌥↓",       desc: "Next scene" },
-        { key: "⌥⌫",       desc: "Delete block" },
-      ].map(s => (
-        <span key={s.key} className="flex items-center gap-1">
-          <Kbd>{s.key}</Kbd>
-          <span className="text-[9px]" style={{ color: "#BBB" }}>{s.desc}</span>
-        </span>
-      ))}
-    </div>
-  )
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 export function SceneDetailPanel({
   scene, scenes, segments, editingScenes, savingScenes,
@@ -274,6 +247,8 @@ export function SceneDetailPanel({
 
   // Track which block index has focus (for keyboard shortcuts)
   const [focusedBlockIdx, setFocusedBlockIdx] = useState<number>(-1)
+  // Whether the heading is in edit mode (showing Location / TimeOfDay / Mood fields)
+  const [editingHeading, setEditingHeading] = useState(false)
   // Ref to auto-focus newly inserted block
   const pendingFocusIdx = useRef<number | null>(null)
   const blockRefs = useRef<Map<string, HTMLElement>>(new Map())
@@ -318,6 +293,9 @@ export function SceneDetailPanel({
     const next = blocks.map((b, i) => i === index ? { ...b, ...patch } as Block : b)
     updateBlocks(next)
   }, [blocks, updateBlocks])
+
+  // ── Reset heading edit mode when scene changes ──────────────────────────
+  useEffect(() => { setEditingHeading(false) }, [scene?.id])
 
   // ── Auto-focus newly inserted block ───────────────────────────────────────
   useEffect(() => {
@@ -408,12 +386,12 @@ export function SceneDetailPanel({
             <button onClick={() => onGenerate(false)} disabled={isGenerating}
               className="px-4 py-1.5 text-xs rounded disabled:opacity-50"
               style={{ background: "#E0E4F8", color: "#4F46E5", fontFamily: "sans-serif" }}>
-              {isGenerating ? "Generating..." : "AI Generate Episode 1"}
+              {isGenerating ? "Generating..." : <>Write Episode 1 <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold" style={{ background: "#C7D2FE", color: "#3730A3" }}>AI</span></>}
             </button>
             <button onClick={() => onGenerate(true)} disabled={isGenerating}
-              className="px-4 py-1.5 text-xs rounded disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs rounded disabled:opacity-50"
               style={{ background: "#4F46E5", color: "#fff", fontFamily: "sans-serif" }}>
-              {isGenerating ? "Generating..." : "AI Generate All Episodes"}
+              {isGenerating ? "Generating..." : <>Write All Episodes <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold" style={{ background: "rgba(255,255,255,0.2)", color: "#fff" }}>AI</span></>}
             </button>
           </div>
         ) : (
@@ -429,58 +407,54 @@ export function SceneDetailPanel({
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col"
+    <div className="h-full flex flex-col min-h-0"
       style={{ background: "#F8F6F1", borderLeft: "1px solid #D0D0D0", borderRight: "1px solid #D0D0D0" }}
       onKeyDown={handleKeyDown}>
 
-      {/* Scene Header */}
-      <SceneHeader scene={scene} isSaving={isSaving} isEdited={isEdited} />
-
-      {/* Tab Bar */}
-      <div className="flex-shrink-0 flex items-center gap-0 px-4"
+      {/* Toolbar */}
+      <div className="flex-shrink-0 flex items-center gap-0 px-4 py-1.5"
         style={{ borderBottom: "1px solid #D8D0C0", fontFamily: "sans-serif" }}>
-        {(["script-text", "breakdown"] as const).map(tab => (
-          <button key={tab} onClick={() => onSetActiveTab(tab)}
-            className="px-3 py-2 text-[11px] font-medium transition-colors relative"
-            style={{ color: activeTab === tab ? "#1A1A1A" : "#999" }}>
-            {tab === "script-text" ? "Script" : "Breakdown"}
-            {activeTab === tab && (
-              <div className="absolute bottom-0 left-3 right-3 h-[2px] rounded-t" style={{ background: "#4F46E5" }} />
-            )}
-          </button>
-        ))}
-
         {/* Scene prev/next nav + dropdown */}
-        {activeTab === "script-text" && (
-          <SceneNavDropdown
-            scenes={scenes}
-            sceneIdx={sceneIdx}
-            selectedSceneId={selectedSceneId}
-            onSelectScene={onSelectScene}
-            onNavigateScene={onNavigateScene}
-          />
-        )}
+        <SceneNavDropdown
+          scenes={scenes}
+          sceneIdx={sceneIdx}
+          selectedSceneId={selectedSceneId}
+          onSelectScene={onSelectScene}
+          onNavigateScene={onNavigateScene}
+        />
+
+        {/* Scene actions: +Scene / Delete */}
+        <button onClick={() => onAddScene(scene.id)} className="ml-2 text-[10px] px-2 py-1 rounded" style={{ background: "#E8E8E8", color: "#888" }} title="Add scene after this one">
+          + Scene
+        </button>
+        <button onClick={() => onDeleteScene(scene.id)} className="ml-1 text-[10px] px-2 py-1 rounded" style={{ color: "#EF4444" }} title="Delete this scene">
+          Delete
+        </button>
 
         <div className="flex-1" />
-        {hasUnsaved && (
-          <button onClick={onSaveAll} className="text-[10px] px-2 py-1 rounded" style={{ background: "#FEF3C7", color: "#92400E" }}>
-            Save All
-          </button>
+
+        {/* Status indicator */}
+        {isSaving && (
+          <div className="flex items-center gap-1 text-[10px] mr-2" style={{ color: "#AAA" }}>
+            <div className="w-2 h-2 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "#AAA" }} />
+            <span>Saving</span>
+          </div>
         )}
-        <button onClick={onSuggest} disabled={isSuggesting} className="ml-2 text-[10px] px-2 py-1 rounded" style={{ background: "#E8E8E8", color: "#777" }}>
-          {isSuggesting ? "..." : "AI Suggest"}
+        {isEdited && !isSaving && (
+          <span className="text-[10px] mr-2" style={{ color: "#D97706" }}>Unsaved</span>
+        )}
+
+        <button onClick={onSaveAll} className="text-[10px] px-2 py-1 rounded" style={{ background: hasUnsaved ? "#FEF3C7" : "#E8E8E8", color: hasUnsaved ? "#92400E" : "#999" }}>
+          {isSaving ? "Saving..." : hasUnsaved ? "Save" : "Saved"}
         </button>
-        <button onClick={() => onGenerate(false)} disabled={isGenerating} className="ml-2 text-[10px] px-2 py-1 rounded" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
-          {isGenerating ? "Generating..." : "AI Generate"}
-        </button>
-        <button onClick={() => onGenerate(true)} disabled={isGenerating} className="ml-2 text-[10px] px-2 py-1 rounded font-medium" style={{ background: "#4F46E5", color: "#fff" }}>
-          {isGenerating ? "..." : "All"}
+        <button onClick={onSuggest} disabled={isSuggesting} className="ml-2 flex items-center gap-1 text-[10px] px-2 py-1 rounded" style={{ background: "#E8E8E8", color: "#777" }}
+          title="AI analyzes this scene and suggests improvements">
+          {isSuggesting ? "..." : <>Polish <span className="text-[8px] px-1 py-0.5 rounded font-semibold" style={{ background: "#E0E4F8", color: "#4F46E5" }}>AI</span></>}
         </button>
       </div>
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-scroll dev-scrollbar-visible" ref={contentRef}>
-        {activeTab === "script-text" ? (
           <div style={{ fontFamily: "'Courier New', Courier, monospace", background: "#F8F6F1" }}>
 
             {/* Suggestions banner */}
@@ -523,18 +497,103 @@ export function SceneDetailPanel({
             {/* ── SCREENPLAY PAGE ── */}
             <div className="mx-auto py-8 px-6" style={{ maxWidth: 700 }}>
 
-              {/* SCENE HEADING */}
+              {/* SCENE HEADING — click to edit Location / Time / Mood */}
               <div className="mb-6">
-                <textarea
-                  value={getSceneValue(scene, "heading")}
-                  onChange={e => onUpdateField(scene.id, "heading", e.target.value)}
-                  placeholder="INT. LOCATION - DAY"
-                  rows={1}
-                  className="w-full resize-none focus:outline-none text-sm font-bold uppercase leading-snug bg-transparent"
-                  style={{ color: "#1A1A1A", letterSpacing: "0.04em", fontFamily: "inherit", borderBottom: "2px solid #D8D0C0", paddingBottom: 6 }}
-                  onFocus={() => setFocusedBlockIdx(-1)}
-                  onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = t.scrollHeight + "px" }}
-                />
+                {!editingHeading ? (
+                  /* ── View mode: clickable heading ── */
+                  <div
+                    onClick={() => setEditingHeading(true)}
+                    className="cursor-pointer group/heading select-none"
+                    title="Click to edit Location, Time & Mood"
+                  >
+                    <div className="text-sm font-bold uppercase leading-snug flex items-baseline gap-2"
+                      style={{ color: "#1A1A1A", letterSpacing: "0.04em", fontFamily: "inherit", borderBottom: "2px solid #D8D0C0", paddingBottom: 6 }}>
+                      <span>{getSceneValue(scene, "heading") || "INT. LOCATION - DAY"}</span>
+                      <span className="text-[9px] font-normal normal-case opacity-0 group-hover/heading:opacity-50 transition-opacity"
+                        style={{ color: "#999", letterSpacing: "normal" }}>✎ edit</span>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Edit mode: 3 fields + auto-save ── */
+                  <div className="rounded-lg p-3" style={{ background: "#EFEDE8", border: "1px solid #D8D0C0" }}>
+                    {/* Location */}
+                    <div className="flex items-center gap-2 mb-2.5">
+                      {/* INT/EXT toggle */}
+                      {(() => {
+                        const heading = getSceneValue(scene, "heading")
+                        const isInt = heading.toUpperCase().startsWith("INT")
+                        const isExt = heading.toUpperCase().startsWith("EXT")
+                        return (
+                          <button
+                            onClick={() => {
+                              const h = getSceneValue(scene, "heading")
+                              const newH = isInt
+                                ? h.replace(/^INT\.?\s*/i, "EXT. ")
+                                : h.replace(/^EXT\.?\s*/i, "INT. ")
+                              onUpdateField(scene.id, "heading", newH)
+                            }}
+                            className="text-[10px] px-2 py-0.5 rounded font-bold flex-shrink-0"
+                            style={isInt ? { background: "#DBEAFE", color: "#1D4ED8" } : isExt ? { background: "#FFEDD5", color: "#C2410C" } : { background: "#E8E8E8", color: "#999" }}
+                            title="Toggle INT/EXT"
+                          >
+                            {isInt ? "INT" : isExt ? "EXT" : "INT"}
+                          </button>
+                        )
+                      })()}
+                      <span className="text-[9px] font-semibold uppercase tracking-wider flex-shrink-0" style={{ color: "#AAA" }}>Loc</span>
+                      <input type="text"
+                        value={getSceneValue(scene, "location")}
+                        onChange={e => {
+                          onUpdateField(scene.id, "location", e.target.value)
+                          // Auto-rebuild heading
+                          const heading = getSceneValue(scene, "heading")
+                          const prefix = heading.match(/^(INT|EXT|INT\/EXT)\.?\s*/i)?.[0] || "INT. "
+                          const time = getSceneValue(scene, "timeOfDay")
+                          onUpdateField(scene.id, "heading", `${prefix}${e.target.value}${time ? ` - ${time}` : ""}`)
+                        }}
+                        placeholder="LUXURY HOTEL ROOM"
+                        autoFocus
+                        className="flex-1 text-[12px] font-bold uppercase focus:outline-none bg-transparent"
+                        style={{ color: "#1A1A1A", fontFamily: "inherit", letterSpacing: "0.04em", borderBottom: "1px solid #D0C8C0" }}
+                      />
+                    </div>
+                    {/* Time of Day + Mood */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-[9px] font-semibold uppercase tracking-wider flex-shrink-0" style={{ color: "#AAA" }}>Time</span>
+                        <input type="text"
+                          value={getSceneValue(scene, "timeOfDay")}
+                          onChange={e => {
+                            onUpdateField(scene.id, "timeOfDay", e.target.value)
+                            // Auto-rebuild heading
+                            const heading = getSceneValue(scene, "heading")
+                            const prefix = heading.match(/^(INT|EXT|INT\/EXT)\.?\s*/i)?.[0] || "INT. "
+                            const loc = getSceneValue(scene, "location")
+                            onUpdateField(scene.id, "heading", `${prefix}${loc}${e.target.value ? ` - ${e.target.value}` : ""}`)
+                          }}
+                          placeholder="DAY"
+                          className="flex-1 text-[11px] uppercase focus:outline-none bg-transparent"
+                          style={{ color: "#555", fontFamily: "inherit", borderBottom: "1px solid #D0C8C0" }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-[9px] font-semibold uppercase tracking-wider flex-shrink-0" style={{ color: "#AAA" }}>Mood</span>
+                        <input type="text"
+                          value={getSceneValue(scene, "mood")}
+                          onChange={e => onUpdateField(scene.id, "mood", e.target.value)}
+                          placeholder="tense"
+                          className="flex-1 text-[11px] focus:outline-none bg-transparent"
+                          style={{ color: "#555", fontFamily: "inherit", borderBottom: "1px solid #D0C8C0" }}
+                        />
+                      </div>
+                      <button onClick={() => setEditingHeading(false)}
+                        className="text-[9px] px-2.5 py-1 rounded flex-shrink-0"
+                        style={{ background: "#D8D0C0", color: "#666" }}>
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ── INTERLEAVED BLOCKS ── */}
@@ -602,7 +661,7 @@ export function SceneDetailPanel({
                           onFocus={() => setFocusedBlockIdx(idx)}
                         />
                         <input type="text"
-                          value={block.parenthetical}
+                          value={block.parenthetical ?? ""}
                           onChange={e => updateBlock(idx, { parenthetical: e.target.value })}
                           placeholder="(cont'd)"
                           className="text-[11px] italic focus:outline-none bg-transparent w-24 text-right"
@@ -657,52 +716,8 @@ export function SceneDetailPanel({
                 <AddBlockMenu onAdd={type => insertBlock(-1, type)} showHints />
               )}
 
-              {/* ── METADATA ROW ── */}
-              <div className="flex items-center gap-3 pt-4 mt-4 flex-wrap"
-                style={{ borderTop: "1px solid #E0D8D0", fontFamily: "sans-serif" }}>
-                {([
-                  { field: "mood" as keyof Scene, label: "Mood", placeholder: "tense", width: "w-20" },
-                  { field: "location" as keyof Scene, label: "Loc", placeholder: "Office", width: "w-24" },
-                  { field: "timeOfDay" as keyof Scene, label: "Time", placeholder: "Night", width: "w-20" },
-                ] as const).map(({ field, label, placeholder, width }) => (
-                  <div key={field} className="flex items-center gap-1.5">
-                    <span className="text-[9px] uppercase tracking-wider" style={{ color: "#AAA" }}>{label}</span>
-                    <input type="text"
-                      value={getSceneValue(scene, field)}
-                      onChange={e => onUpdateField(scene.id, field, e.target.value)}
-                      placeholder={placeholder}
-                      className={`text-[11px] focus:outline-none bg-transparent ${width}`}
-                      style={{ color: "#555", borderBottom: "1px solid #D0D0D0" }} />
-                  </div>
-                ))}
-                <div className="flex-1" />
-                <button onClick={() => onPolish(scene.id)} disabled={isPolishing === scene.id}
-                  className="text-[10px] px-2 py-1 rounded" style={{ background: "#EDE9FE", color: "#6D28D9" }}>
-                  {isPolishing === scene.id ? "Polishing..." : "AI Polish"}
-                </button>
-                <button onClick={() => onAddScene(scene.id)} className="text-[10px] px-2 py-1 rounded" style={{ background: "#E8E8E8", color: "#666" }}>
-                  + Scene After
-                </button>
-                <button onClick={() => onDeleteScene(scene.id)} className="text-[10px] px-2 py-1 rounded" style={{ color: "#EF4444" }}>
-                  Delete
-                </button>
-              </div>
-
-              {/* ── SHORTCUT LEGEND ── */}
-              <ShortcutLegend />
             </div>
           </div>
-        ) : (
-          <SegmentTimeline
-            segments={segments}
-            selectedSegmentId={selectedSegmentId}
-            onSelectSegment={onSelectSegment}
-            scriptId={scriptId}
-            selectedEpisode={selectedEpisode}
-            roles={roles}
-            onRefreshScript={onRefreshScript}
-          />
-        )}
       </div>
     </div>
   )

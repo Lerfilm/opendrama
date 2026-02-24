@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic"
+export const maxDuration = 60
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
@@ -68,7 +69,30 @@ Return JSON: { "locations": [...] }`
       }>
     }>(result.content)
 
-    return NextResponse.json({ locations: parsed.locations || [] })
+    const locations = parsed.locations || []
+
+    // Persist extracted locations to ScriptLocation (upsert by name)
+    if (locations.length > 0) {
+      await Promise.all(
+        locations.map(loc =>
+          prisma.scriptLocation.upsert({
+            where: { scriptId_name: { scriptId, name: loc.name.trim().toUpperCase() } },
+            create: {
+              scriptId,
+              name: loc.name.trim().toUpperCase(),
+              type: ["INT", "EXT", "INT/EXT"].includes(loc.type) ? loc.type : "INT",
+              description: loc.description || null,
+            },
+            update: {
+              type: ["INT", "EXT", "INT/EXT"].includes(loc.type) ? loc.type : "INT",
+              description: loc.description || undefined,
+            },
+          })
+        )
+      ).catch(err => console.warn("[extract-locations] DB upsert failed:", err))
+    }
+
+    return NextResponse.json({ locations })
   } catch (error) {
     console.error("Extract locations error:", error)
     return NextResponse.json({ error: "Failed" }, { status: 500 })

@@ -390,7 +390,15 @@ export function ScriptWorkspace({ script: initial }: { script: Script }) {
         allScenes={script.scenes}
         segments={script.videoSegments}
         selectedEpisode={selectedEpisode}
-        onSelectEpisode={setSelectedEpisode}
+        onSelectEpisode={(ep) => {
+          setSelectedEpisode(ep)
+          // Auto-select first scene in the new episode
+          const epScenes = script.scenes
+            .filter(s => s.episodeNum === ep)
+            .sort((a, b) => a.sortOrder - b.sortOrder || a.sceneNum - b.sceneNum)
+          if (epScenes.length > 0) setSelectedSceneId(epScenes[0].id)
+          else setSelectedSceneId(null)
+        }}
         selectedSceneId={selectedSceneId}
         onSelectScene={setSelectedSceneId}
         savingScenes={savingScenes}

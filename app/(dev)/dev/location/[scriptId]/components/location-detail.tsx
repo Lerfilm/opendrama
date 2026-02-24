@@ -17,6 +17,7 @@ interface TimeSlot {
 }
 
 interface LocationEntry {
+  id?: string
   name: string
   type: string
   address?: string
@@ -48,6 +49,7 @@ interface LocationDetailProps {
   isGeneratingAllPhotos?: boolean
   genAllDone?: number
   genAllTotal?: number
+  scriptId?: string
   onUpdateEntry: (loc: string, patch: Partial<LocationEntry>) => void
   onAIDescribe: (loc: string) => void
   onAIExtract: () => void
@@ -58,7 +60,7 @@ export function LocationDetail({
   entry, selectedLoc, allLocs, scenes,
   scenesForLoc, scenesByTime,
   isGeneratingDesc,
-  isGeneratingAllPhotos, genAllDone, genAllTotal,
+  isGeneratingAllPhotos, genAllDone, genAllTotal, scriptId,
   onUpdateEntry, onAIDescribe, onAIExtract, onGenerateAllPhotos,
 }: LocationDetailProps) {
   const [showDescribeConfirm, setShowDescribeConfirm] = useState(false)
@@ -107,6 +109,7 @@ export function LocationDetail({
           locName: entry.name || selectedLoc,
           type: entry.type || "INT",
           description: entry.notes?.trim() || "",
+          scriptId,
         }),
       })
       if (!res.ok) return
@@ -153,7 +156,7 @@ export function LocationDetail({
               >
                 {isGeneratingAllPhotos
                   ? <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Generating...</>
-                  : <>✦ AI All Photos</>}
+                  : <>Generate All References <span className="text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: "#E0E4F8", color: "#4F46E5" }}>AI</span></>}
               </button>
             </div>
           )}
@@ -187,7 +190,7 @@ export function LocationDetail({
                 {isGeneratingDesc ? (
                   <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Generating...</>
                 ) : (
-                  <>✦ AI Describe</>
+                  <>Describe <span className="text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: "#E0E4F8", color: "#4F46E5" }}>AI</span></>
                 )}
               </button>
             </div>
@@ -195,7 +198,7 @@ export function LocationDetail({
               value={entry.notes || ""}
               onChange={e => onUpdateEntry(selectedLoc, { notes: e.target.value })}
               rows={4}
-              placeholder={"Lighting conditions, access restrictions, permit required, parking, power availability...\n\nUse ✦ AI Describe to auto-generate from scene content."}
+              placeholder={"Lighting conditions, access restrictions, permit required, parking, power availability...\n\nUse AI Describe to auto-generate from scene content."}
               className="w-full px-2.5 py-2 text-sm rounded focus:outline-none resize-none leading-relaxed"
               style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }}
             />

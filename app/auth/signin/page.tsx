@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { t } from "@/lib/i18n"
 
 export default function SignInPage() {
+  const isDev = process.env.NODE_ENV === "development"
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 px-4">
       <Card className="w-full max-w-md">
@@ -13,7 +15,16 @@ export default function SignInPage() {
             {t("auth.subtitle")}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          {/* Dev-only one-click login */}
+          {isDev && (
+            <a href="/api/dev/auto-login?callbackUrl=/dev">
+              <Button type="button" className="w-full h-12 text-base bg-orange-500 hover:bg-orange-600" size="lg">
+                ⚡ Dev Auto-Login (localhost only)
+              </Button>
+            </a>
+          )}
+
           <form
             action={async () => {
               "use server"

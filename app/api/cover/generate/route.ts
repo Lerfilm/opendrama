@@ -3,12 +3,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { generateCoverPrompt, submitCoverGeneration, pollAndSaveCovers } from "@/lib/cover-generation"
+import { chargeAiFeatureSilent } from "@/lib/ai-pricing"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  chargeAiFeatureSilent(session.user.id, "generate_cover")
 
   const { scriptId, episodeNum } = await req.json()
 

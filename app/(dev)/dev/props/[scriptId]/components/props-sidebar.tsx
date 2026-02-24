@@ -69,7 +69,7 @@ export function PropsSidebar({
             style={{ background: "#E0E4F8", color: "#4F46E5" }}
             title="AI Extract props from script"
           >
-            {isAIExtracting ? "..." : "✦ AI"}
+            {isAIExtracting ? "..." : <>Extract <span className="text-[8px] px-1 py-0.5 rounded font-semibold" style={{ background: "#E0E4F8", color: "#4F46E5" }}>AI</span></>}
           </button>
           <button onClick={() => setIsAddingProp(v => !v)} className="text-[10px]" style={{ color: "#4F46E5" }}>
             + Add
@@ -87,7 +87,7 @@ export function PropsSidebar({
         >
           {isGeneratingAllPhotos
             ? <><div className="w-2 h-2 rounded-full border border-indigo-400 border-t-transparent animate-spin" /> Generating...</>
-            : <>✦ AI Generate All</>}
+            : <>Generate All Photos <span className="text-[8px] px-1 py-0.5 rounded font-semibold" style={{ background: "#E0E4F8", color: "#4F46E5" }}>AI</span></>}
         </button>
         {isGeneratingAllPhotos && (
           <div className="flex-1 flex items-center gap-1.5">

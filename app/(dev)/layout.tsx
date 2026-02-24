@@ -5,6 +5,8 @@ import { isDeveloper, isDevModeActive } from "@/lib/developer"
 import { TopBar } from "@/components/dev/top-bar"
 import { LeftNav } from "@/components/dev/left-nav"
 import prisma from "@/lib/prisma"
+import { AITaskProvider } from "@/lib/ai-task-context"
+import { GlobalTaskPanel } from "@/components/dev/global-task-panel"
 
 export default async function DevLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -13,11 +15,13 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     redirect("/auth/signin")
   }
 
-  if (!isDeveloper(session.user.email)) {
+  const isDev = process.env.NODE_ENV === "development"
+
+  if (!isDev && !isDeveloper(session.user.email)) {
     redirect("/")
   }
 
-  if (!(await isDevModeActive())) {
+  if (!isDev && !(await isDevModeActive())) {
     redirect("/developer")
   }
 
@@ -28,18 +32,21 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   const availableBalance = (balanceRecord?.balance ?? 0) - (balanceRecord?.reserved ?? 0)
 
   return (
-    <div className="h-screen w-screen overflow-hidden grid grid-rows-[40px_1fr] grid-cols-[56px_1fr] text-sm" style={{ background: "#DCDCDC", color: "#1A1A1A" }}>
-      <TopBar
-        user={{
-          name: session.user.name,
-          email: session.user.email,
-          image: session.user.image,
-        }}
-        balance={availableBalance}
-        className="col-span-2"
-      />
-      <LeftNav />
-      <main className="overflow-hidden" style={{ background: "#E8E8E8" }}>{children}</main>
-    </div>
+    <AITaskProvider>
+      <div className="h-screen w-screen overflow-hidden grid grid-rows-[40px_1fr] grid-cols-[56px_1fr] text-sm" style={{ background: "#DCDCDC", color: "#1A1A1A" }}>
+        <TopBar
+          user={{
+            name: session.user.name,
+            email: session.user.email,
+            image: session.user.image,
+          }}
+          balance={availableBalance}
+          className="col-span-2"
+        />
+        <LeftNav />
+        <main className="overflow-hidden" style={{ background: "#E8E8E8" }}>{children}</main>
+      </div>
+      <GlobalTaskPanel />
+    </AITaskProvider>
   )
 }

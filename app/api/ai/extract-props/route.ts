@@ -1,9 +1,10 @@
 export const dynamic = "force-dynamic"
+export const maxDuration = 60
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
-import { aiComplete, extractJSON } from "@/lib/ai"
 import { chargeAiFeature } from "@/lib/ai-pricing"
+import { extractPropsFromScenes } from "@/lib/image-generation"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -26,63 +27,31 @@ export async function POST(req: NextRequest) {
     })
     if (!script) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-    // Fetch scene action data server-side (avoids sending large JSON payloads from client)
+    // Fetch scene action data server-side
     const scenes = await prisma.scriptScene.findMany({
       where: { scriptId },
       select: { episodeNum: true, sceneNum: true, heading: true, action: true },
       orderBy: [{ episodeNum: "asc" }, { sceneNum: "asc" }],
       take: 20,
     })
-    const sceneTexts = scenes.map(s => {
-      let content = s.action || ""
-      try {
-        const blocks = JSON.parse(content) as Array<{ type: string; text?: string; character?: string; line?: string }>
-        if (Array.isArray(blocks)) {
-          content = blocks.map(b =>
-            b.type === "action" ? (b.text || "") :
-            b.type === "dialogue" ? `${b.character}: ${b.line}` : ""
-          ).filter(Boolean).join("\n")
-        }
-      } catch { /* use raw */ }
-      return `[E${s.episodeNum}S${s.sceneNum}] ${s.heading || ""}\n${content.slice(0, 300)}`
-    }).join("\n\n")
 
-    const systemPrompt = `You are a professional props master for film/TV production.
-Extract all physical props mentioned or implied in the screenplay scenes provided.
+    const props = await extractPropsFromScenes({ scenes: scenes.map(s => ({ ...s, action: s.action || "" })) })
 
-For each prop return:
-- name: specific prop name (e.g. "Red leather handbag", "Vintage phone", "Coffee mug")
-- category: one of "furniture" | "wardrobe" | "vehicle" | "food" | "weapon" | "electronic" | "document" | "other"
-- description: brief visual description
-- isKey: true if it's a significant story/character prop
-- scenes: array of scene numbers where it appears
+    // Persist extracted props to ScriptProp (skip duplicates)
+    if (props.length > 0) {
+      await prisma.scriptProp.createMany({
+        data: props.map(p => ({
+          scriptId,
+          name: p.name,
+          category: p.category || "other",
+          description: p.description || null,
+          isKey: p.isKey ?? false,
+        })),
+        skipDuplicates: true,
+      }).catch(err => console.warn("[extract-props] DB save failed:", err))
+    }
 
-Focus on SPECIFIC, IDENTIFIABLE props — not generic backgrounds.
-Prioritize key props that define character or drive plot.
-
-Return JSON: { "props": [...] }`
-
-    const result = await aiComplete({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `Extract props from these scenes:\n\n${sceneTexts}` },
-      ],
-      temperature: 0.3,
-      maxTokens: 3000,
-      responseFormat: "json",
-    })
-
-    const parsed = extractJSON<{
-      props: Array<{
-        name: string
-        category: string
-        description?: string
-        isKey?: boolean
-        scenes?: number[]
-      }>
-    }>(result.content)
-
-    return NextResponse.json({ props: parsed.props || [] })
+    return NextResponse.json({ props })
   } catch (error) {
     console.error("Extract props error:", error)
     return NextResponse.json({ error: "Failed" }, { status: 500 })

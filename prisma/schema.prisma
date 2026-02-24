@@ -319,6 +319,8 @@ model Script {
   videoSegments VideoSegment[]
   published     PublishedScript?
   seriesLink    Series?           @relation("SeriesScript")
+  locations     ScriptLocation[]
+  props         ScriptProp[]
 
   @@index([userId])
   @@index([status])
@@ -328,23 +330,26 @@ model Script {
 
 // 剧本场景/分集
 model ScriptScene {
-  id             String   @id @default(cuid())
-  scriptId       String
-  episodeNum     Int
-  sceneNum       Int      @default(1)
-  heading        String?  // INT. 办公室 - 白天
-  action         String?  @db.Text
-  dialogue       String?  @db.Text // JSON: [{character, line, direction}]
-  stageDirection String?  @db.Text
-  mood           String?  // 场景情绪氛围
-  location       String?  // 拍摄地点
-  timeOfDay      String?  // 时间段
-  promptHint     String?  @db.Text // 给视频生成的镜头提示
-  referenceImage String?  // Auto-generated panoramic reference photo (16:9)
-  duration       Int?
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  scriptId        String
+  episodeNum      Int
+  sceneNum        Int      @default(1)
+  heading         String?  // INT. 办公室 - 白天
+  action          String?  @db.Text
+  dialogue        String?  @db.Text // JSON: [{character, line, direction}]
+  stageDirection  String?  @db.Text
+  mood            String?  // 场景情绪氛围
+  location        String?  // 拍摄地点
+  timeOfDay       String?  // 时间段
+  promptHint      String?  @db.Text // 给视频生成的镜头提示
+  referenceImage  String?  // Auto-generated panoramic reference photo (16:9)
+  duration        Int?
+  sortOrder       Int      @default(0)
+  // Pre-computed during import — eliminates repeated JSON parsing in AI routes
+  characters      String[] // UPPERCASE names with dialogue in this scene
+  actionPlainText String?  @db.Text // plain text extracted from action JSON blocks
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
 
@@ -364,6 +369,9 @@ model ScriptRole {
   avatarUrl       String?
   referenceImages String[] // 角色参考图 URL 数组
   metadata        String?  @db.Text // JSON
+  // Pre-computed during import — eliminates 30-50 scene fetches per AI generation call
+  storyline       String?  @db.Text // JSON: [{key,sceneId,heading,location,timeOfDay,mood,lines[],actions[]}]
+  castingSpecs    String?  @db.Text // JSON: {age,gender,height,ethnicity,nationality,physique}
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -371,6 +379,57 @@ model ScriptRole {
 
   @@index([scriptId])
   @@map("script_roles")
+}
+
+// 拍摄场地（导入时自动预建 + extract-locations 补充）
+model ScriptLocation {
+  id          String   @id @default(cuid())
+  scriptId    String
+  name        String            // 大写标准化，如 "OFFICE"、"COFFEE SHOP"
+  type        String   @default("INT")  // INT | EXT | INT/EXT
+  description String?  @db.Text
+  address     String?
+  contact     String?
+  notes       String?  @db.Text
+  sceneKeys   String[]          // 预计算的场景 key 列表 ["E1S2", "E1S5"]
+  sceneData   String?  @db.Text // JSON: [{key,heading,mood,timeOfDay,actionSummary}]
+  photoUrl    String?           // 生成的场地照片 URL（最新一张，用于重生成一致性）
+  photoPrompt String?  @db.Text // 上次生成时使用的 prompt（用于一致性重生成）
+  photos      String?  @db.Text // JSON: [{url, note?, isApproved?}]
+  timeSlots   String?  @db.Text // JSON: [{timeOfDay, mood?, sceneNums?, setNotes?}]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  @@unique([scriptId, name])
+  @@index([scriptId])
+  @@map("script_locations")
+}
+
+// 道具（extract-props 提取后持久化）
+model ScriptProp {
+  id          String   @id @default(cuid())
+  scriptId    String
+  name        String
+  category    String   @default("other") // furniture|wardrobe|vehicle|food|weapon|electronic|document|other
+  description String?  @db.Text
+  isKey       Boolean  @default(false)   // 是否关键道具（影响剧情）
+  quantity    Int?
+  source      String?                    // rent|buy|make|found
+  notes       String?  @db.Text
+  sceneKeys   String[]                   // 预计算的出现场景 key
+  sceneData   String?  @db.Text          // JSON: [{key,heading,usage}]
+  photoUrl    String?                    // 最新一张照片 URL
+  photoPrompt String?  @db.Text
+  photos      String?  @db.Text          // JSON: [{url, note?, isApproved?}]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  @@index([scriptId])
+  @@map("script_props")
 }
 
 // AI 任务队列

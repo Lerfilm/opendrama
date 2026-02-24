@@ -106,26 +106,10 @@ export function SceneListPanel({
 
   return (
     <div className="h-full flex flex-col" style={{ background: "#EBEBEB", borderRight: "1px solid #C0C0C0" }}>
-      {/* Header */}
+      {/* Episodes Header */}
       <div className="flex-shrink-0 px-3 py-2" style={{ borderBottom: "1px solid #C8C8C8" }}>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Scenes</span>
-            {episodeTotalChars > 0 && (
-              <span className="text-[9px] px-1 py-0.5 rounded font-mono" style={{ background: "#E0E0E0", color: "#888" }}>
-                {episodeTotalChars.toLocaleString()} chars
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onAddScene}
-              className="text-[10px] transition-colors"
-              style={{ color: "#4F46E5" }}
-            >
-              + Add
-            </button>
-          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Episodes</span>
         </div>
 
         {/* Episode Tabs */}
@@ -172,6 +156,23 @@ export function SceneListPanel({
               </svg>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Scenes Header */}
+      <div className="flex-shrink-0 px-3 pt-2 pb-1" style={{ borderBottom: "1px solid #D0D0D0" }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Scenes</span>
+            {episodeTotalChars > 0 && (
+              <span className="text-[9px] px-1 py-0.5 rounded font-mono" style={{ background: "#E0E0E0", color: "#888" }}>
+                {episodeTotalChars.toLocaleString()} chars
+              </span>
+            )}
+          </div>
+          <button onClick={onAddScene} className="text-[10px] transition-colors" style={{ color: "#4F46E5" }}>
+            + Add
+          </button>
         </div>
       </div>
 

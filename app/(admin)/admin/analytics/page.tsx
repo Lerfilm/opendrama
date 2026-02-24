@@ -114,9 +114,10 @@ function formatCents(cents: number): string {
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: { days?: string }
+  searchParams: Promise<{ days?: string }>
 }) {
-  const days = Math.max(1, parseInt(searchParams.days || "30", 10) || 30)
+  const params = await searchParams
+  const days = Math.max(1, parseInt(params.days || "30", 10) || 30)
 
   const [overview, userTrend, topSeries, revenueTrend, funnel] =
     await Promise.all([

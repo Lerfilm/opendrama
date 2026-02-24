@@ -21,6 +21,7 @@ export interface AICompletionOptions {
   temperature?: number
   maxTokens?: number
   responseFormat?: "json" | "text"
+  _retryCount?: number
 }
 
 export interface AICompletionResult {
@@ -33,8 +34,13 @@ export interface AICompletionResult {
   }
 }
 
+const FALLBACK_MODEL = "google/gemini-2.0-flash-001"
+const MAX_RETRIES = 2
+const FETCH_TIMEOUT_MS = 45_000 // 45 seconds
+
 /**
  * 调用 OpenRouter Chat Completion API
+ * Includes automatic retry with reduced context and model fallback.
  */
 export async function aiComplete(options: AICompletionOptions): Promise<AICompletionResult> {
   const apiKey = process.env.OPENROUTER_API_KEY
@@ -42,7 +48,11 @@ export async function aiComplete(options: AICompletionOptions): Promise<AIComple
     throw new Error("Missing OPENROUTER_API_KEY")
   }
 
-  const model = options.model || process.env.OPENROUTER_DEFAULT_MODEL || "minimax/minimax-01"
+  const retryCount = options._retryCount ?? 0
+  // On second retry, fall back to a different model
+  const model = retryCount >= 2
+    ? FALLBACK_MODEL
+    : (options.model || process.env.OPENROUTER_DEFAULT_MODEL || "minimax/minimax-01")
 
   const body: Record<string, unknown> = {
     model,
@@ -54,20 +64,57 @@ export async function aiComplete(options: AICompletionOptions): Promise<AIComple
   // Note: Do NOT set response_format for MiniMax models — they don't support json_object.
   // Instead, instruct JSON output in the system prompt.
 
-  const res = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://opendrama.ai",
-      "X-Title": "OpenDrama AI",
-    },
-    body: JSON.stringify(body),
-  })
+  // AbortController for fetch timeout
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+  let res: Response
+  try {
+    res = await fetch(OPENROUTER_API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://opendrama.ai",
+        "X-Title": "OpenDrama AI",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch (err: unknown) {
+    clearTimeout(timer)
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes("aborted") || msg.includes("abort")) {
+      console.error(`[aiComplete] Fetch timed out after ${FETCH_TIMEOUT_MS}ms (model=${model})`)
+      // Retry with fallback model on timeout
+      if (retryCount < MAX_RETRIES) {
+        console.log(`[aiComplete] Retry ${retryCount + 1}/${MAX_RETRIES}...`)
+        return aiComplete({ ...options, _retryCount: retryCount + 1 })
+      }
+      throw new Error("AI API timeout — model not responding")
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (!res.ok) {
     const error = await res.text()
     console.error("OpenRouter API error:", res.status, error)
+    // Retry on 429 (rate limit) with exponential backoff
+    if (res.status === 429 && retryCount < MAX_RETRIES) {
+      const retryAfter = parseInt(res.headers.get("retry-after") || "0", 10)
+      const backoffMs = retryAfter > 0 ? retryAfter * 1000 : 3000 * Math.pow(2, retryCount)
+      console.log(`[aiComplete] Rate limited (429), waiting ${backoffMs}ms before retry ${retryCount + 1}/${MAX_RETRIES}...`)
+      await new Promise(r => setTimeout(r, backoffMs))
+      return aiComplete({ ...options, _retryCount: retryCount + 1 })
+    }
+    // Retry on 5xx errors
+    if (res.status >= 500 && retryCount < MAX_RETRIES) {
+      console.log(`[aiComplete] Server error ${res.status}, retry ${retryCount + 1}/${MAX_RETRIES}...`)
+      await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)))
+      return aiComplete({ ...options, _retryCount: retryCount + 1 })
+    }
     throw new Error(`AI API error: ${res.status} - ${error}`)
   }
 
@@ -76,6 +123,12 @@ export async function aiComplete(options: AICompletionOptions): Promise<AIComple
   // Log the raw response for debugging
   if (data.error) {
     console.error("OpenRouter returned error in body:", JSON.stringify(data.error))
+    // Retry on rate limit or server errors
+    if (retryCount < MAX_RETRIES) {
+      console.log(`[aiComplete] API error in body, retry ${retryCount + 1}/${MAX_RETRIES}...`)
+      await new Promise(r => setTimeout(r, 1500 * (retryCount + 1)))
+      return aiComplete({ ...options, _retryCount: retryCount + 1 })
+    }
     throw new Error(`AI API error: ${data.error.message || JSON.stringify(data.error)}`)
   }
 
@@ -83,6 +136,15 @@ export async function aiComplete(options: AICompletionOptions): Promise<AIComple
 
   if (!choice?.message?.content) {
     console.error("Empty AI response. Full response:", JSON.stringify(data).slice(0, 500))
+    if (retryCount < MAX_RETRIES) {
+      console.log(`[aiComplete] Empty response, retry ${retryCount + 1}/${MAX_RETRIES} (truncating context)...`)
+      // Reduce context on retry
+      const retryMessages = options.messages.map(m => ({
+        ...m,
+        content: m.content.length > 600 ? m.content.substring(0, 600) + "\n[truncated]" : m.content,
+      }))
+      return aiComplete({ ...options, messages: retryMessages, _retryCount: retryCount + 1 })
+    }
     throw new Error("Empty AI response")
   }
 
@@ -272,16 +334,33 @@ export async function aiGenerateImage(
     image_config: { aspect_ratio: aspectRatio },
   }
 
-  const res = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://opendrama.ai",
-      "X-Title": "OpenDrama AI",
-    },
-    body: JSON.stringify(body),
-  })
+  // Image generation can take longer — 90 second timeout
+  const imgController = new AbortController()
+  const imgTimer = setTimeout(() => imgController.abort(), 90_000)
+
+  let res: Response
+  try {
+    res = await fetch(OPENROUTER_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://opendrama.ai",
+        "X-Title": "OpenDrama AI",
+      },
+      body: JSON.stringify(body),
+      signal: imgController.signal,
+    })
+  } catch (err: unknown) {
+    clearTimeout(imgTimer)
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes("aborted") || msg.includes("abort")) {
+      throw new Error("Image generation timed out (90s)")
+    }
+    throw err
+  } finally {
+    clearTimeout(imgTimer)
+  }
 
   if (!res.ok) {
     const errText = await res.text()
@@ -331,11 +410,23 @@ export async function aiGenerateImage(
     throw new Error("Could not extract image from AI response")
   }
 
-  // Apply 720p max resize to base64 data URLs before returning
-  if (rawResult.startsWith("data:")) {
-    return resizeTo720p(rawResult)
+  // If the model returned an external URL instead of base64 (e.g. signed TOS URL),
+  // fetch it and convert to base64 so callers always get a permanent data URL.
+  if (!rawResult.startsWith("data:")) {
+    try {
+      const imgRes = await fetch(rawResult)
+      if (!imgRes.ok) throw new Error(`Failed to fetch image URL: ${imgRes.status}`)
+      const buffer = Buffer.from(await imgRes.arrayBuffer())
+      const mime = imgRes.headers.get("content-type") || "image/jpeg"
+      rawResult = `data:${mime};base64,${buffer.toString("base64")}`
+    } catch (fetchErr) {
+      console.warn("[aiGenerateImage] Could not fetch external image URL, storing URL as-is:", fetchErr)
+      return rawResult
+    }
   }
-  return rawResult
+
+  // Apply 720p max resize to base64 data URLs before returning
+  return resizeTo720p(rawResult)
 }
 
 
