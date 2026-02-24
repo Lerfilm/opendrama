@@ -2,11 +2,115 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
+import { stripe } from "@/lib/stripe"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CheckCircle, Coins } from "@/components/icons"
 import Link from "next/link"
 import { t } from "@/lib/i18n"
+
+/**
+ * Fallback fulfillment: if webhook hasn't processed the payment yet,
+ * verify with Stripe API and credit coins directly.
+ * Idempotent — won't double-credit because we check for existing purchase.
+ */
+async function fulfillPayment(sessionId: string, userId: string) {
+  // Already processed?
+  const existing = await prisma.purchase.findUnique({
+    where: { stripeSessionId: sessionId },
+  })
+  if (existing) return existing
+
+  // Verify with Stripe
+  let stripeSession
+  try {
+    stripeSession = await stripe.checkout.sessions.retrieve(sessionId)
+  } catch (err) {
+    console.error("[fulfillPayment] Failed to retrieve Stripe session:", err)
+    return null
+  }
+
+  // Only process completed payments
+  if (stripeSession.payment_status !== "paid") return null
+
+  // Verify this session belongs to this user
+  if (stripeSession.metadata?.userId !== userId) return null
+
+  const coins = parseInt(stripeSession.metadata?.coins || "0")
+  const packageId = stripeSession.metadata?.packageId
+  if (!coins) return null
+
+  // Credit coins in a transaction (same logic as webhook)
+  try {
+    const purchase = await prisma.$transaction(async (tx) => {
+      // Double-check inside transaction
+      const check = await tx.purchase.findUnique({
+        where: { stripeSessionId: sessionId },
+      })
+      if (check) return check
+
+      // 1. Create purchase record
+      const p = await tx.purchase.create({
+        data: {
+          userId,
+          stripeSessionId: sessionId,
+          amount: stripeSession.amount_total || 0,
+          coins,
+          status: "completed",
+        },
+      })
+
+      // 2. Update users.coins (legacy field)
+      await tx.user.update({
+        where: { id: userId },
+        data: { coins: { increment: coins } },
+      })
+
+      // 3. Upsert user_balances
+      const currentBalance = await tx.userBalance.findUnique({
+        where: { userId },
+      })
+      const newBalance = (currentBalance?.balance ?? 0) + coins
+      await tx.userBalance.upsert({
+        where: { userId },
+        create: {
+          userId,
+          balance: coins,
+          totalPurchased: coins,
+        },
+        update: {
+          balance: { increment: coins },
+          totalPurchased: { increment: coins },
+        },
+      })
+
+      // 4. Token transaction log
+      await tx.tokenTransaction.create({
+        data: {
+          userId,
+          type: "purchase",
+          amount: coins,
+          balanceAfter: newBalance,
+          description: `Stripe 充值 ${coins} 金币（${sessionId}）`,
+          metadata: {
+            stripeSessionId: sessionId,
+            packageId,
+            amountCents: stripeSession.amount_total,
+            source: "success-page-fallback",
+          },
+        },
+      })
+
+      return p
+    })
+
+    console.log(`[fulfillPayment] Credited ${coins} coins to user ${userId} (fallback)`)
+    return purchase
+  } catch (err) {
+    console.error("[fulfillPayment] Transaction failed:", err)
+    return null
+  }
+}
 
 export default async function RechargeSuccessPage({
   searchParams,
@@ -26,9 +130,8 @@ export default async function RechargeSuccessPage({
   let user = null
 
   if (sessionId) {
-    purchase = await prisma.purchase.findUnique({
-      where: { stripeSessionId: sessionId },
-    })
+    // Try fulfillment (idempotent — safe to call even if webhook already processed)
+    purchase = await fulfillPayment(sessionId, session.user.id)
 
     user = await prisma.user.findUnique({
       where: { id: session.user.id },
