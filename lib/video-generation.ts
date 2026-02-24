@@ -129,11 +129,9 @@ const MODEL_REQ_KEYS: Record<string, string> = {
 }
 
 // ====== Seedance → Ark model ID mapping ======
-// Note: doubao-seedance-2-0-260128 exists but requires separate account activation.
-// seedance_2_0 maps to 1.5-pro as the best currently available model.
 
 const SEEDANCE_MODEL_IDS: Record<string, string> = {
-  seedance_2_0:          "doubao-seedance-1-5-pro-251215", // 2.0 not activated → fallback to 1.5-pro
+  seedance_2_0:          "doubao-seedance-2-0-260128",
   seedance_1_5_pro:      "doubao-seedance-1-5-pro-251215",
   seedance_1_0_pro:      "doubao-seedance-1-0-pro-250528",
   seedance_1_0_pro_fast: "doubao-seedance-1-0-pro-fast-251015",
