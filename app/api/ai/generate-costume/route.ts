@@ -148,7 +148,9 @@ Based on the scene content above, generate a costume reference photo prompt that
       const buffer = Buffer.from(b64, "base64")
       const path = storagePath(session.user.id, "role-images", `costume-${Date.now()}.png`)
       url = await uploadToStorage("role-images", path, buffer, "image/png")
-    } catch { /* keep base64 fallback */ }
+    } catch (err) {
+      console.warn("[generate-costume] R2 upload failed, using base64 fallback:", err)
+    }
   }
 
   return Response.json({ url })

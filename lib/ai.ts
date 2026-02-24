@@ -315,21 +315,95 @@ Requirements:
 IMPORTANT: Output ONLY the raw JSON object. No markdown code blocks, no comments, no other text.`
 }
 
+const IMAGE_GEN_MAX_RETRIES = 2
+
+/**
+ * Sanitize a prompt for retry after content-policy or generation failure.
+ * Removes potentially problematic phrases and simplifies the prompt.
+ */
+function sanitizePromptForRetry(prompt: string, attempt: number): string {
+  let cleaned = prompt
+
+  // Remove words that commonly trigger safety filters
+  const sensitivePatterns = [
+    /\b(sexy|seductive|sensual|provocative|revealing|naked|nude|bare|undressed)\b/gi,
+    /\b(blood|bloody|gore|gory|violent|gruesome|murder|kill|dead body)\b/gi,
+    /\b(gun|rifle|pistol|weapon|knife|sword|blade)\b/gi,
+    /\b(drug|cocaine|heroin|meth|marijuana)\b/gi,
+    /\b(celebrity|real person|famous|A-list)\b/gi,
+    /\b(child|children|kid|minor|baby|infant|toddler)\b/gi,
+  ]
+  for (const pattern of sensitivePatterns) {
+    cleaned = cleaned.replace(pattern, "")
+  }
+
+  // Collapse multiple spaces
+  cleaned = cleaned.replace(/\s{2,}/g, " ").trim()
+
+  // On second retry, simplify even further — keep only the core visual description
+  if (attempt >= 2) {
+    // Take just the first 200 chars and append safe framing
+    cleaned = cleaned.substring(0, 200).trim()
+    cleaned += ". Professional photograph, studio lighting, high quality, photorealistic."
+  }
+
+  return cleaned
+}
+
+/**
+ * Check if an error is retryable (content policy, rate limit, transient server error).
+ * Returns a category string or null if not retryable.
+ */
+function classifyImageError(status: number, errorText: string): "content_policy" | "rate_limit" | "server_error" | null {
+  const lower = errorText.toLowerCase()
+
+  // Content policy / safety filter rejections
+  if (
+    lower.includes("safety") ||
+    lower.includes("content policy") ||
+    lower.includes("blocked") ||
+    lower.includes("prohibited") ||
+    lower.includes("harm") ||
+    lower.includes("responsible ai") ||
+    lower.includes("image_generation_blocked") ||
+    lower.includes("finish_reason") ||
+    lower.includes("recitation") ||
+    status === 400
+  ) {
+    return "content_policy"
+  }
+
+  if (status === 429) return "rate_limit"
+  if (status >= 500) return "server_error"
+
+  return null
+}
+
 /**
  * Generate an image via OpenRouter using Google Gemini (Nano Banana).
  * Model: google/gemini-2.5-flash-image
  * Returns a base64 data URL: "data:image/png;base64,..."
+ *
+ * Includes automatic retry with prompt sanitization on content-policy errors
+ * and exponential backoff on rate-limit / server errors.
  */
 export async function aiGenerateImage(
   prompt: string,
   aspectRatio: "1:1" | "9:16" | "16:9" = "1:1",
+  _retryCount = 0,
 ): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY")
 
+  const currentPrompt = _retryCount > 0 ? sanitizePromptForRetry(prompt, _retryCount) : prompt
+
+  if (_retryCount > 0) {
+    console.log(`[aiGenerateImage] Retry ${_retryCount}/${IMAGE_GEN_MAX_RETRIES}, sanitized prompt: "${currentPrompt.substring(0, 120)}..."`)
+  }
+
   const body: Record<string, unknown> = {
     model: IMAGE_GEN_MODEL,
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content: currentPrompt }],
     modalities: ["image"],
     image_config: { aspect_ratio: aspectRatio },
   }
@@ -355,7 +429,11 @@ export async function aiGenerateImage(
     clearTimeout(imgTimer)
     const msg = err instanceof Error ? err.message : String(err)
     if (msg.includes("aborted") || msg.includes("abort")) {
-      throw new Error("Image generation timed out (90s)")
+      if (_retryCount < IMAGE_GEN_MAX_RETRIES) {
+        console.warn(`[aiGenerateImage] Timeout, retrying ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}...`)
+        return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
+      }
+      throw new Error("Image generation timed out (90s) after retries")
     }
     throw err
   } finally {
@@ -364,17 +442,48 @@ export async function aiGenerateImage(
 
   if (!res.ok) {
     const errText = await res.text()
+    const errCategory = classifyImageError(res.status, errText)
+
+    if (errCategory && _retryCount < IMAGE_GEN_MAX_RETRIES) {
+      const backoffMs = errCategory === "rate_limit"
+        ? 3000 * Math.pow(2, _retryCount)
+        : errCategory === "server_error"
+          ? 2000 * (_retryCount + 1)
+          : 500 // content_policy — retry quickly with sanitized prompt
+      console.warn(`[aiGenerateImage] ${errCategory} error (${res.status}), waiting ${backoffMs}ms before retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}. Error: ${errText.substring(0, 200)}`)
+      await new Promise(r => setTimeout(r, backoffMs))
+      return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
+    }
+
     throw new Error(`Gemini image generation error ${res.status}: ${errText}`)
   }
 
   const data = await res.json()
 
   if (data.error) {
-    throw new Error(`Gemini image error: ${data.error.message || JSON.stringify(data.error)}`)
+    const errMsg = data.error.message || JSON.stringify(data.error)
+    const errCategory = classifyImageError(0, errMsg)
+
+    if (errCategory && _retryCount < IMAGE_GEN_MAX_RETRIES) {
+      console.warn(`[aiGenerateImage] ${errCategory} in response body, retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}. Error: ${errMsg.substring(0, 200)}`)
+      await new Promise(r => setTimeout(r, 500))
+      return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
+    }
+
+    throw new Error(`Gemini image error: ${errMsg}`)
   }
 
   const message = data.choices?.[0]?.message
-  if (!message) throw new Error("Empty response from image generation API")
+
+  // Handle empty response or finish_reason indicating blocked content
+  const finishReason = data.choices?.[0]?.finish_reason || ""
+  if (!message || finishReason === "content_filter" || finishReason === "safety") {
+    if (_retryCount < IMAGE_GEN_MAX_RETRIES) {
+      console.warn(`[aiGenerateImage] Empty/blocked response (finish_reason=${finishReason}), retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}`)
+      return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
+    }
+    throw new Error(`Image generation blocked (finish_reason=${finishReason || "empty"})`)
+  }
 
   // Parse image from response — OpenRouter may return content as array of parts
   // or as a direct data URL string
@@ -407,6 +516,10 @@ export async function aiGenerateImage(
 
   if (!rawResult) {
     console.error("[aiGenerateImage] Unexpected response format:", JSON.stringify(data).slice(0, 500))
+    if (_retryCount < IMAGE_GEN_MAX_RETRIES) {
+      console.warn(`[aiGenerateImage] Unexpected format, retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}`)
+      return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
+    }
     throw new Error("Could not extract image from AI response")
   }
 

@@ -192,7 +192,9 @@ Generate a photorealistic location reference photo prompt:`,
       const buffer = Buffer.from(b64, "base64")
       const path = storagePath(userId, "scene-images", `loc-${locName}.png`)
       url = await uploadToStorage("scene-images", path, buffer, "image/png")
-    } catch { /* base64 fallback */ }
+    } catch (err) {
+      console.warn("[generateLocationPhoto] R2 upload failed, using base64 fallback:", err)
+    }
   }
 
   return { url, prompt }
@@ -260,7 +262,9 @@ Generate a photorealistic prop reference photo prompt:`,
       const buffer = Buffer.from(b64, "base64")
       const path = storagePath(userId, "props-images", `prop-${propName}.png`)
       url = await uploadToStorage("props-images", path, buffer, "image/png")
-    } catch { /* base64 fallback */ }
+    } catch (err) {
+      console.warn("[generatePropPhoto] R2 upload failed, using base64 fallback:", err)
+    }
   }
 
   return { url, prompt }
