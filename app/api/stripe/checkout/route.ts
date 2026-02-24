@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
         packageId: pkg.id,
         coins: pkg.coins.toString(),
       },
-      success_url: `${req.nextUrl.origin}/recharge/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.nextUrl.origin}/recharge`,
+      success_url: `${(process.env.NEXTAUTH_URL ?? req.nextUrl.origin).replace(/\/$/, "")}/recharge/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${(process.env.NEXTAUTH_URL ?? req.nextUrl.origin).replace(/\/$/, "")}/recharge`,
     })
 
     return NextResponse.json({
