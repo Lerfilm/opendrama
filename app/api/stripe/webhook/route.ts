@@ -50,8 +50,9 @@ export async function POST(req: NextRequest) {
       }
 
       // 创建购买记录 + 增加金币（事务）
-      await prisma.$transaction([
-        prisma.purchase.create({
+      await prisma.$transaction(async (tx) => {
+        // 1. 创建购买记录
+        await tx.purchase.create({
           data: {
             userId,
             stripeSessionId: session.id,
@@ -59,16 +60,48 @@ export async function POST(req: NextRequest) {
             coins,
             status: "completed",
           },
-        }),
-        prisma.user.update({
+        })
+
+        // 2. 更新 users.coins（兼容旧字段）
+        await tx.user.update({
           where: { id: userId },
+          data: { coins: { increment: coins } },
+        })
+
+        // 3. Upsert user_balances（余额 API 读取此表）
+        const currentBalance = await tx.userBalance.findUnique({
+          where: { userId },
+        })
+        const newBalance = (currentBalance?.balance ?? 0) + coins
+        await tx.userBalance.upsert({
+          where: { userId },
+          create: {
+            userId,
+            balance: coins,
+            totalPurchased: coins,
+          },
+          update: {
+            balance: { increment: coins },
+            totalPurchased: { increment: coins },
+          },
+        })
+
+        // 4. 写入交易记录
+        await tx.tokenTransaction.create({
           data: {
-            coins: {
-              increment: coins,
+            userId,
+            type: "purchase",
+            amount: coins,
+            balanceAfter: newBalance,
+            description: `Stripe 充值 ${coins} 金币（${session.id}）`,
+            metadata: {
+              stripeSessionId: session.id,
+              packageId,
+              amountCents: session.amount_total,
             },
           },
-        }),
-      ])
+        })
+      })
 
       // Payment processed successfully
     } catch (error) {
