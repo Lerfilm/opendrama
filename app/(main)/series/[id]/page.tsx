@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/lib/auth"
 import { notFound } from "next/navigation"
 import prisma from "@/lib/prisma"
+import { resolveImageUrl } from "@/lib/storage"
 import { Badge } from "@/components/ui/badge"
 import { Eye, Star, User as UserIcon } from "@/components/icons"
 import Image from "next/image"
@@ -140,9 +141,12 @@ export default async function SeriesDetailPage({ params }: Props) {
 
   const avgRating = Math.round((ratingAgg._avg.rating || 0) * 10) / 10
   const totalRatings = ratingAgg._count.rating
-  const heroImage = series.coverWide || series.coverUrl
+  const heroImage = resolveImageUrl(series.coverWide || series.coverUrl)
   const synopsisText = series.synopsis || series.script?.synopsis || series.description || ""
-  const castRoles = series.script?.roles || []
+  const castRoles = (series.script?.roles || []).map(r => ({
+    ...r,
+    avatarUrl: resolveImageUrl(r.avatarUrl),
+  }))
   const createdYear = series.createdAt.getFullYear()
 
   return (

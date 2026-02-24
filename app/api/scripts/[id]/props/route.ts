@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { resolveImageUrl } from "@/lib/storage"
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       category: p.category || "other",
       description: p.description || "",
       sceneIds: p.sceneKeys || [],
-      photos: safeParseJson(p.photos, []),
+      photos: resolvePhotos(safeParseJson(p.photos, [])),
       isKey: p.isKey,
       quantity: p.quantity,
       source: p.source || "",
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       category: p.category || "other",
       description: p.description || "",
       sceneIds: p.sceneKeys || [],
-      photos: safeParseJson(p.photos, []),
+      photos: resolvePhotos(safeParseJson(p.photos, [])),
       isKey: p.isKey,
       quantity: p.quantity,
       source: p.source || "",
@@ -176,4 +177,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 function safeParseJson<T>(val: string | null | undefined, fallback: T): T {
   if (!val) return fallback
   try { return JSON.parse(val) } catch { return fallback }
+}
+
+function resolvePhotos(photos: Array<{ url?: string; [k: string]: unknown }>): typeof photos {
+  return photos.map(p => p.url ? { ...p, url: resolveImageUrl(p.url) } : p)
 }

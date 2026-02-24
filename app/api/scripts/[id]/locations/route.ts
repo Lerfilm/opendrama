@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { resolveImageUrl } from "@/lib/storage"
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       address: loc.address || "",
       contact: loc.contact || "",
       notes: loc.notes || "",
-      photos: safeParseJson(loc.photos, []),
+      photos: resolvePhotos(safeParseJson(loc.photos, [])),
       timeSlots: safeParseJson(loc.timeSlots, []),
     }))
     return NextResponse.json({ locations })
@@ -96,7 +97,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       address: loc.address || "",
       contact: loc.contact || "",
       notes: loc.notes || "",
-      photos: safeParseJson(loc.photos, []),
+      photos: resolvePhotos(safeParseJson(loc.photos, [])),
       timeSlots: safeParseJson(loc.timeSlots, []),
     }))
     return NextResponse.json({ locations })
@@ -153,4 +154,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 function safeParseJson<T>(val: string | null | undefined, fallback: T): T {
   if (!val) return fallback
   try { return JSON.parse(val) } catch { return fallback }
+}
+
+/** Rewrite R2.dev URLs in photos array to proxy paths */
+function resolvePhotos(photos: Array<{ url?: string; [k: string]: unknown }>): typeof photos {
+  return photos.map(p => p.url ? { ...p, url: resolveImageUrl(p.url) } : p)
 }

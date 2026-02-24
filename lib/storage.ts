@@ -126,9 +126,27 @@ export async function mirrorUrlToStorage(
   return uploadToStorage(bucket, path, buffer, contentType)
 }
 
-/** Get the public URL for an asset already in storage */
+/** Get the public URL for an asset already in storage.
+ *  Returns a server-side proxy path (`/api/r2/...`) so that browsers in
+ *  regions where R2.dev is blocked (e.g. mainland China) can still load images. */
 export function getPublicUrl(bucket: StorageBucket, path: string): string {
-  return `${R2_PUBLIC_URL}/${bucket}/${path}`
+  return `/api/r2/${bucket}/${path}`
+}
+
+/** Convert any R2 image URL to the proxy path.
+ *  Handles:
+ *    - Already-proxied paths (`/api/r2/...`) → returned as-is
+ *    - R2.dev absolute URLs → converted to `/api/r2/...`
+ *    - data: URLs and other URLs → returned as-is
+ */
+export function resolveImageUrl(url: string | null | undefined): string {
+  if (!url) return ""
+  if (url.startsWith("/api/r2/")) return url
+  if (url.startsWith("data:")) return url
+  // Match R2.dev public URLs and rewrite to proxy
+  const m = url.match(/r2\.dev\/(.+)$/)
+  if (m) return `/api/r2/${m[1]}`
+  return url
 }
 
 /** Delete an asset from storage */

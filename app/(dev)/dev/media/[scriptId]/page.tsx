@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
+import { resolveImageUrl } from "@/lib/storage"
 import { MediaWorkspace } from "./media-workspace"
 
 export default async function MediaPage({ params }: { params: Promise<{ scriptId: string }> }) {
@@ -33,5 +34,23 @@ export default async function MediaPage({ params }: { params: Promise<{ scriptId
 
   if (!script) redirect("/dev")
 
-  return <MediaWorkspace script={script as Parameters<typeof MediaWorkspace>[0]["script"]} />
+  // Rewrite R2.dev URLs to proxy paths
+  const resolved = {
+    ...script,
+    coverImage: resolveImageUrl(script.coverImage),
+    coverWide: resolveImageUrl(script.coverWide),
+    coverTall: resolveImageUrl(script.coverTall),
+    roles: script.roles.map(r => ({
+      ...r,
+      avatarUrl: resolveImageUrl(r.avatarUrl),
+      referenceImages: r.referenceImages.map(u => resolveImageUrl(u)),
+    })),
+    videoSegments: script.videoSegments.map(s => ({
+      ...s,
+      thumbnailUrl: resolveImageUrl(s.thumbnailUrl),
+      seedImageUrl: resolveImageUrl(s.seedImageUrl),
+    })),
+  }
+
+  return <MediaWorkspace script={resolved as Parameters<typeof MediaWorkspace>[0]["script"]} />
 }

@@ -48,14 +48,13 @@ function buildSceneImagePrompt(scene: SceneForImageGen): string {
     if (actionText.trim()) parts.push(actionText.trim())
   }
 
-  const sceneDesc = parts.filter(Boolean).join(", ")
+  const sceneDesc = parts.filter(Boolean).join(", ").substring(0, 300)
 
-  return (
-    `Ultra-realistic photorealistic establishing wide shot, 8K RAW photo quality. ` +
+  const full =
+    `Ultra-realistic establishing wide shot, 8K photo quality. ` +
     `${sceneDesc}. ` +
-    `Cinematic wide-angle lens, natural real-world lighting, highly detailed environment. ` +
-    `Shot on a cinema camera. Real photography, NOT CGI, NOT illustration, NOT anime, NOT digital art, NOT painting.`
-  )
+    `Cinematic lens, natural lighting. Real photography, NOT CGI, NOT illustration.`
+  return full.substring(0, 500)
 }
 
 /**

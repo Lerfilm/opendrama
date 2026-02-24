@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
+import { resolveImageUrl } from "@/lib/storage"
 import { CastingWorkspace } from "./casting-workspace"
 
 export default async function CastingPage({ params }: { params: Promise<{ scriptId: string }> }) {
@@ -48,5 +49,12 @@ export default async function CastingPage({ params }: { params: Promise<{ script
   // Strip characters[] from scenes passed to client (embedded in characterScenes above)
   const scenesClean = script.scenes.map(({ characters: _c, ...rest }) => rest)
 
-  return <CastingWorkspace script={{ ...script, scenes: scenesClean } as Parameters<typeof CastingWorkspace>[0]["script"]} dialogueStats={dialogueStats} characterScenes={characterScenes} />
+  // Rewrite R2.dev URLs to proxy paths (R2.dev blocked in China)
+  const rolesResolved = script.roles.map(r => ({
+    ...r,
+    avatarUrl: resolveImageUrl(r.avatarUrl),
+    referenceImages: r.referenceImages.map(u => resolveImageUrl(u)),
+  }))
+
+  return <CastingWorkspace script={{ ...script, roles: rolesResolved, scenes: scenesClean } as Parameters<typeof CastingWorkspace>[0]["script"]} dialogueStats={dialogueStats} characterScenes={characterScenes} />
 }

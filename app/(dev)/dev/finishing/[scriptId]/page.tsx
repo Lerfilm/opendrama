@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
+import { resolveImageUrl } from "@/lib/storage"
 import { FinishingWorkspace } from "./finishing-workspace"
 
 export default async function FinishingPage({ params }: { params: Promise<{ scriptId: string }> }) {
@@ -26,6 +27,17 @@ export default async function FinishingPage({ params }: { params: Promise<{ scri
 
   if (!script) redirect("/dev")
 
+  // Rewrite R2.dev URLs to proxy paths
+  const resolved = {
+    ...script,
+    coverTall: resolveImageUrl(script.coverTall),
+    videoSegments: script.videoSegments.map(s => ({
+      ...s,
+      thumbnailUrl: s.thumbnailUrl ? resolveImageUrl(s.thumbnailUrl) : s.thumbnailUrl,
+      videoUrl: s.videoUrl, // keep video URLs as-is (streamed differently)
+    })),
+  }
+
   // Get series if published
   const series = script.published
     ? await prisma.series.findFirst({ where: { scriptId: scriptId } })
@@ -33,7 +45,7 @@ export default async function FinishingPage({ params }: { params: Promise<{ scri
 
   return (
     <FinishingWorkspace
-      script={script as Parameters<typeof FinishingWorkspace>[0]["script"]}
+      script={resolved as Parameters<typeof FinishingWorkspace>[0]["script"]}
       series={series as Parameters<typeof FinishingWorkspace>[0]["series"]}
     />
   )

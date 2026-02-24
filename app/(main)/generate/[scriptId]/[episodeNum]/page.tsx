@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import prisma from "@/lib/prisma"
+import { resolveImageUrl } from "@/lib/storage"
 import { GenerateWorkbench } from "./generate-workbench"
 
 export default async function GenerateEpisodePage({
@@ -38,10 +39,25 @@ export default async function GenerateEpisodePage({
     where: { userId: session.user.id },
   })
 
+  // Rewrite R2.dev URLs to proxy paths
+  const resolved = {
+    ...script,
+    roles: script.roles.map(r => ({
+      ...r,
+      avatarUrl: r.avatarUrl ? resolveImageUrl(r.avatarUrl) : r.avatarUrl,
+      referenceImages: r.referenceImages.map(u => resolveImageUrl(u)),
+    })),
+    videoSegments: script.videoSegments.map(s => ({
+      ...s,
+      thumbnailUrl: s.thumbnailUrl ? resolveImageUrl(s.thumbnailUrl) : s.thumbnailUrl,
+      seedImageUrl: s.seedImageUrl ? resolveImageUrl(s.seedImageUrl) : s.seedImageUrl,
+    })),
+  }
+
   return (
     <div className="p-4 pb-24">
       <GenerateWorkbench
-        script={JSON.parse(JSON.stringify(script))}
+        script={JSON.parse(JSON.stringify(resolved))}
         episodeNum={episodeNum}
         balance={balance ? balance.balance - balance.reserved : 0}
       />

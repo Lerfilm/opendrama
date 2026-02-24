@@ -10,11 +10,23 @@ import { aiComplete, aiGenerateImage, extractJSON } from "@/lib/ai"
 import { uploadToStorage, isStorageConfigured, storagePath } from "@/lib/storage"
 import { buildStorylineContext, StorylineEntry } from "@/lib/character-analysis"
 
+// ── Constants ─────────────────────────────────────────────────────────────
+/** Max characters for the image prompt sent to Gemini (keeps tokens low) */
+const MAX_IMAGE_PROMPT_CHARS = 500
+
 // ── Helper ─────────────────────────────────────────────────────────────────
 function styleDirective(anchor?: string): string {
   return anchor
     ? `- UNIFIED VISUAL STYLE (apply consistently): ${anchor}`
     : ""
+}
+
+/** Truncate a prompt to MAX_IMAGE_PROMPT_CHARS at a word boundary */
+function truncatePrompt(prompt: string): string {
+  if (prompt.length <= MAX_IMAGE_PROMPT_CHARS) return prompt
+  const trimmed = prompt.substring(0, MAX_IMAGE_PROMPT_CHARS)
+  const lastSpace = trimmed.lastIndexOf(" ")
+  return lastSpace > 300 ? trimmed.substring(0, lastSpace) : trimmed
 }
 
 /** Parse action field — may be JSON blocks or plain text */
@@ -107,10 +119,10 @@ ${sceneContext ? `--- SCENE APPEARANCES (use to understand character personality
 Generate a photorealistic portrait prompt:`,
       },
     ],
-    maxTokens: 250,
+    maxTokens: 150,
   })
 
-  const prompt = llmResult.content.trim()
+  const prompt = truncatePrompt(llmResult.content.trim())
   const b64DataUrl = await aiGenerateImage(prompt, "1:1")
 
   let imageUrl: string = b64DataUrl
@@ -179,10 +191,10 @@ ${sceneContext ? `--- SCENES AT THIS LOCATION (read for atmosphere/context) ---\
 Generate a photorealistic location reference photo prompt:`,
       },
     ],
-    maxTokens: 200,
+    maxTokens: 120,
   })
 
-  const prompt = llmResult.content.trim()
+  const prompt = truncatePrompt(llmResult.content.trim())
   const b64DataUrl = await aiGenerateImage(prompt, "16:9")
 
   let url: string = b64DataUrl
@@ -249,10 +261,10 @@ ${sceneContext ? `--- SCENES WHERE THIS PROP APPEARS ---\n${sceneContext}\n---` 
 Generate a photorealistic prop reference photo prompt:`,
       },
     ],
-    maxTokens: 200,
+    maxTokens: 120,
   })
 
-  const prompt = llmResult.content.trim()
+  const prompt = truncatePrompt(llmResult.content.trim())
   const b64DataUrl = await aiGenerateImage(prompt, "1:1")
 
   let url: string = b64DataUrl
@@ -313,10 +325,10 @@ ${sceneSummary}`,
       },
     ],
     temperature: 0.9,
-    maxTokens: 1024,
+    maxTokens: 200,
   })
 
-  const prompt = promptResult.content.trim()
+  const prompt = truncatePrompt(promptResult.content.trim())
   const b64DataUrl = await aiGenerateImage(prompt, "9:16")
 
   let coverUrl: string = b64DataUrl

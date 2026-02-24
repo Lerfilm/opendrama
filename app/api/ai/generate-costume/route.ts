@@ -135,10 +135,10 @@ ${sceneContent ? `--- FULL SCENE CONTENT (read carefully for costume context) --
 Based on the scene content above, generate a costume reference photo prompt that matches what the character would wear in this specific scene:`,
       },
     ],
-    maxTokens: 250,
+    maxTokens: 150,
   })
 
-  const prompt = llmResult.content.trim()
+  const prompt = llmResult.content.trim().substring(0, 500)
   const b64DataUrl = await aiGenerateImage(prompt, "9:16")
 
   let url: string = b64DataUrl

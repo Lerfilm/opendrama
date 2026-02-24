@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
+import { resolveImageUrl } from "@/lib/storage"
 import { TheaterWorkspace } from "./theater-workspace"
 
 export default async function TheaterPage({ params }: { params: Promise<{ scriptId: string }> }) {
@@ -27,6 +28,21 @@ export default async function TheaterPage({ params }: { params: Promise<{ script
 
   if (!script) redirect("/dev")
 
+  // Rewrite R2.dev URLs to proxy paths
+  const resolved = {
+    ...script,
+    roles: script.roles.map(r => ({
+      ...r,
+      avatarUrl: r.avatarUrl ? resolveImageUrl(r.avatarUrl) : r.avatarUrl,
+      referenceImages: r.referenceImages.map(u => resolveImageUrl(u)),
+    })),
+    videoSegments: script.videoSegments.map(s => ({
+      ...s,
+      thumbnailUrl: s.thumbnailUrl ? resolveImageUrl(s.thumbnailUrl) : s.thumbnailUrl,
+      seedImageUrl: s.seedImageUrl ? resolveImageUrl(s.seedImageUrl) : s.seedImageUrl,
+    })),
+  }
+
   // Get user balance
   const balance = await prisma.userBalance.findUnique({
     where: { userId: session.user.id as string },
@@ -34,7 +50,7 @@ export default async function TheaterPage({ params }: { params: Promise<{ script
 
   return (
     <TheaterWorkspace
-      script={script as Parameters<typeof TheaterWorkspace>[0]["script"]}
+      script={resolved as Parameters<typeof TheaterWorkspace>[0]["script"]}
       initialBalance={balance?.balance ?? 0}
     />
   )
