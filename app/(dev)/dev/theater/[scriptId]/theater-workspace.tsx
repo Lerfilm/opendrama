@@ -55,11 +55,7 @@ interface Script {
 }
 
 const MODELS = [
-  { id: "seedance_1_5_pro", name: "Seedance 1.5 Pro", res: ["1080p", "720p"] },
-  { id: "seedance_1_0_pro", name: "Seedance 1.0 Pro", res: ["1080p", "720p"] },
-  { id: "seedance_1_0_pro_fast", name: "Seedance Fast", res: ["1080p", "720p"] },
-  { id: "jimeng_3_0_pro", name: "Jimeng 3.0 Pro", res: ["1080p"] },
-  { id: "jimeng_3_0", name: "Jimeng 3.0", res: ["1080p", "720p"] },
+  { id: "seedance_2_0", name: "Seedance 2.0", res: ["1080p", "720p"] },
 ]
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
@@ -80,7 +76,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const [selectedEp, setSelectedEp] = useState(episodes[0] ?? 1)
   const [segments, setSegments] = useState<VideoSegment[]>(script.videoSegments)
   const [selectedSegId, setSelectedSegId] = useState<string | null>(null)
-  const [model, setModel] = useState("seedance_1_5_pro")
+  const [model, setModel] = useState("seedance_2_0")
   const [resolution, setResolution] = useState("720p")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSplitting, setIsSplitting] = useState(false)
