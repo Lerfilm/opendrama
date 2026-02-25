@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 
 interface VideoSegment {
   id: string
@@ -11,6 +11,7 @@ interface VideoSegment {
   prompt: string
   shotType?: string | null
   cameraMove?: string | null
+  beatType?: string | null
   model?: string | null
   resolution?: string | null
   status: string
@@ -37,123 +38,13 @@ interface Script {
 
 // ── Helpers ──────────────────────────────────────────────
 function getTitleAbbrev(title: string): string {
-  // Generate abbreviation: first letters of each word, max 6 chars, uppercase
   const words = title.trim().split(/\s+/)
-  if (words.length === 1) {
-    // Single word: use up to 4 uppercase chars
-    return words[0].replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "").slice(0, 4).toUpperCase()
-  }
-  // Multi-word: initials of each word
+  if (words.length === 1) return words[0].replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "").slice(0, 4).toUpperCase()
   return words.map(w => w[0] || "").join("").toUpperCase().slice(0, 6)
 }
 
-interface PackageManifestItem {
-  filename: string
-  folder: string
-  segmentIndex: number
-  sceneNum: number
-  durationSec: number
-  resolution: string
-  shotType: string
-  status: string
-  videoUrl: string | null
-  prompt: string
-}
-
-interface PackageManifest {
-  projectTitle: string
-  abbrev: string
-  episode: number
-  generatedAt: string
-  totalDuration: number
-  totalClips: number
-  doneClips: number
-  folderStructure: string[]
-  clips: PackageManifestItem[]
-  edlLines: string[]
-}
-
-function buildManifest(script: Script, episodeNum: number): PackageManifest {
-  const abbrev = getTitleAbbrev(script.title)
-  const epStr = String(episodeNum).padStart(2, "0")
-  const segments = script.videoSegments
-    .filter(s => s.episodeNum === episodeNum)
-    .sort((a, b) => a.segmentIndex - b.segmentIndex)
-
-  const doneSegs = segments.filter(s => s.status === "done")
-  const totalDuration = doneSegs.reduce((a, s) => a + s.durationSec, 0)
-
-  const clips: PackageManifestItem[] = segments.map(seg => {
-    const sceneStr = String(seg.sceneNum).padStart(3, "0")
-    const segStr = String(seg.segmentIndex + 1).padStart(3, "0")
-    // Naming: ABBREV-S01-SC001-SEG001.mp4
-    const filename = `${abbrev}-S${epStr}-SC${sceneStr}-SEG${segStr}.mp4`
-    const folder = seg.status === "done" ? `EP${epStr}/VIDEO` : `EP${epStr}/PENDING`
-    return {
-      filename,
-      folder,
-      segmentIndex: seg.segmentIndex,
-      sceneNum: seg.sceneNum,
-      durationSec: seg.durationSec,
-      resolution: seg.resolution || "1920x1080",
-      shotType: seg.shotType || "—",
-      status: seg.status,
-      videoUrl: seg.videoUrl || null,
-      prompt: seg.prompt.slice(0, 80),
-    }
-  })
-
-  // Generate basic EDL (Edit Decision List) for done segments
-  const edlLines: string[] = [
-    `TITLE: ${script.title} - Episode ${episodeNum}`,
-    `FCM: NON-DROP FRAME`,
-    ``,
-  ]
-  let editNum = 1
-  let timelinePos = 0
-  for (const seg of doneSegs) {
-    const clip = clips.find(c => c.segmentIndex === seg.segmentIndex)
-    if (!clip) continue
-    const inTC = formatEDLTime(0)
-    const outTC = formatEDLTime(seg.durationSec)
-    const recIn = formatEDLTime(timelinePos)
-    const recOut = formatEDLTime(timelinePos + seg.durationSec)
-    edlLines.push(
-      `${String(editNum).padStart(3, "0")}  ${clip.filename.replace(".mp4", "")}  V  C  ${inTC} ${outTC} ${recIn} ${recOut}`,
-      `* FROM CLIP NAME: ${clip.filename}`,
-      `* SCENE ${String(seg.sceneNum).padStart(3, "0")} | ${seg.durationSec}s | ${seg.shotType || "auto"}`,
-      ``
-    )
-    editNum++
-    timelinePos += seg.durationSec
-  }
-
-  const folderStructure = [
-    `${abbrev}-S${epStr}/`,
-    `  EP${epStr}/`,
-    `    VIDEO/          — ${doneSegs.length} video clips`,
-    `    PENDING/        — ${segments.length - doneSegs.length} clips not yet generated`,
-    `    AUDIO/          — (audio exports go here)`,
-    `    GRAPHICS/       — (titles, VFX elements)`,
-    `    DOCUMENTS/      — EDL, manifest CSV`,
-    `  ASSETS/`,
-    `    CHARACTERS/     — character reference images`,
-    `    LOCATIONS/      — location stills`,
-    `    PROPS/          — prop reference images`,
-  ]
-
-  return {
-    projectTitle: script.title,
-    abbrev,
-    episode: episodeNum,
-    generatedAt: new Date().toISOString(),
-    totalDuration,
-    totalClips: segments.length,
-    doneClips: doneSegs.length,
-    folderStructure,
-    clips,
-    edlLines,
-  }
+function getFilename(abbrev: string, epNum: number, sceneNum: number, segIdx: number): string {
+  return `${abbrev}-S${String(epNum).padStart(2, "0")}-SC${String(sceneNum).padStart(3, "0")}-SEG${String(segIdx + 1).padStart(3, "0")}.mp4`
 }
 
 function formatEDLTime(sec: number): string {
@@ -164,758 +55,1028 @@ function formatEDLTime(sec: number): string {
   return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}:${String(f).padStart(2,"0")}`
 }
 
+function formatDuration(sec: number): string {
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return m > 0 ? `${m}m${String(s).padStart(2, "0")}s` : `${s}s`
+}
+
 function downloadTextFile(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url; a.download = filename; a.click()
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click()
   URL.revokeObjectURL(url)
 }
 
-function manifestToCSV(manifest: PackageManifest): string {
-  const header = "Filename,Folder,Scene,Segment,Duration(s),Resolution,ShotType,Status,VideoURL,Prompt"
-  const rows = manifest.clips.map(c =>
-    [c.filename, c.folder, c.sceneNum, c.segmentIndex+1, c.durationSec,
-     c.resolution, c.shotType, c.status, c.videoUrl || "", `"${c.prompt.replace(/"/g, "'")}"`].join(",")
-  )
+function buildEDL(title: string, epNum: number, abbrev: string, segs: VideoSegment[]): string {
+  const done = segs.filter(s => s.status === "done").sort((a, b) => a.segmentIndex - b.segmentIndex)
+  const lines = [
+    `TITLE: ${title} - Episode ${epNum}`,
+    `FCM: NON-DROP FRAME`,
+    ``,
+  ]
+  let editNum = 1
+  let timelinePos = 0
+  for (const seg of done) {
+    const fn = getFilename(abbrev, epNum, seg.sceneNum, seg.segmentIndex).replace(".mp4", "")
+    lines.push(
+      `${String(editNum).padStart(3, "0")}  ${fn}  V  C  ${formatEDLTime(0)} ${formatEDLTime(seg.durationSec)} ${formatEDLTime(timelinePos)} ${formatEDLTime(timelinePos + seg.durationSec)}`,
+      `* FROM CLIP NAME: ${fn}.mp4`,
+      `* SCENE ${String(seg.sceneNum).padStart(3, "0")} | ${seg.durationSec}s | ${seg.shotType || "auto"}`,
+      ``
+    )
+    editNum++
+    timelinePos += seg.durationSec
+  }
+  return lines.join("\n")
+}
+
+function buildCSV(title: string, epNum: number, abbrev: string, segs: VideoSegment[]): string {
+  const header = "Filename,Scene,Segment,Duration(s),ShotType,Camera,Status,VideoURL,Prompt"
+  const rows = segs.sort((a, b) => a.segmentIndex - b.segmentIndex).map(s => {
+    const fn = getFilename(abbrev, epNum, s.sceneNum, s.segmentIndex)
+    return [fn, s.sceneNum, s.segmentIndex + 1, s.durationSec,
+      s.shotType || "", s.cameraMove || "", s.status, s.videoUrl || "",
+      `"${s.prompt.replace(/"/g, "'").slice(0, 120)}"`
+    ].join(",")
+  })
   return [header, ...rows].join("\n")
 }
 
-const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  pending: { bg: "#F3F4F6", color: "#6B7280" },
-  reserved: { bg: "#FEF3C7", color: "#92400E" },
-  submitted: { bg: "#DBEAFE", color: "#1D4ED8" },
-  generating: { bg: "#EDE9FE", color: "#6D28D9" },
-  done: { bg: "#D1FAE5", color: "#065F46" },
-  failed: { bg: "#FEE2E2", color: "#991B1B" },
+const STATUS_MAP: Record<string, { bg: string; color: string; label: string; icon: string }> = {
+  pending:    { bg: "#F3F4F6", color: "#6B7280", label: "Pending",    icon: "○" },
+  reserved:   { bg: "#FEF3C7", color: "#92400E", label: "Reserved",   icon: "◎" },
+  submitted:  { bg: "#DBEAFE", color: "#1D4ED8", label: "Submitted",  icon: "◌" },
+  generating: { bg: "#EDE9FE", color: "#6D28D9", label: "Generating", icon: "◉" },
+  done:       { bg: "#D1FAE5", color: "#065F46", label: "Done",       icon: "✓" },
+  failed:     { bg: "#FEE2E2", color: "#991B1B", label: "Failed",     icon: "✕" },
 }
 
-function formatTime(sec: number) {
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  const fr = Math.floor((sec % 1) * 30)
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}:${String(fr).padStart(2, "0")}`
+// ── Seamless Dual-Buffer Player ──────────────────────────
+// Two <video> elements overlap. While one plays, the other preloads the next
+// segment. On ended, we instantly swap: the preloaded video plays (0ms gap)
+// and the old element loads the next-next segment.
+
+function SeamlessPlayer({
+  segments,
+  currentIdx,
+  isPlaying,
+  videoVolume = 1,
+  onSegmentChange,
+  onEnded,
+  onTimeUpdate,
+}: {
+  segments: VideoSegment[]
+  currentIdx: number
+  isPlaying: boolean
+  videoVolume?: number
+  onSegmentChange: (idx: number) => void
+  onEnded: () => void
+  onTimeUpdate: (currentTime: number, duration: number) => void
+}) {
+  const videoARef = useRef<HTMLVideoElement>(null)
+  const videoBRef = useRef<HTMLVideoElement>(null)
+  // Which buffer is active: 'A' or 'B'
+  const activeBufferRef = useRef<"A" | "B">("A")
+  const [activeBuffer, setActiveBuffer] = useState<"A" | "B">("A")
+  // Track what URL each buffer has loaded to avoid redundant loads
+  const bufferUrlA = useRef<string | null>(null)
+  const bufferUrlB = useRef<string | null>(null)
+  // Preload state for next segment
+  const preloadedIdx = useRef<number>(-1)
+  const prevIdxRef = useRef<number>(-1)
+
+  const getActiveRef = useCallback(() =>
+    activeBufferRef.current === "A" ? videoARef : videoBRef
+  , [])
+  const getInactiveRef = useCallback(() =>
+    activeBufferRef.current === "A" ? videoBRef : videoARef
+  , [])
+  const getActiveUrl = useCallback(() =>
+    activeBufferRef.current === "A" ? bufferUrlA : bufferUrlB
+  , [])
+  const getInactiveUrl = useCallback(() =>
+    activeBufferRef.current === "A" ? bufferUrlB : bufferUrlA
+  , [])
+
+  // Load a URL into a video element (only if not already loaded)
+  const loadIntoBuffer = useCallback((
+    ref: React.RefObject<HTMLVideoElement | null>,
+    urlRef: React.MutableRefObject<string | null>,
+    url: string,
+    autoplay: boolean
+  ) => {
+    if (!ref.current) return
+    if (urlRef.current === url) {
+      // Already loaded — just play if needed
+      if (autoplay) ref.current.play().catch(() => {})
+      return
+    }
+    urlRef.current = url
+    ref.current.src = url
+    if (autoplay) {
+      ref.current.load()
+      ref.current.play().catch(() => {})
+    } else {
+      ref.current.preload = "auto"
+      ref.current.load()
+    }
+  }, [])
+
+  // When currentIdx changes (user clicked a segment or sequential advance)
+  useEffect(() => {
+    if (currentIdx < 0 || currentIdx >= segments.length) return
+    const seg = segments[currentIdx]
+    if (!seg?.videoUrl) return
+
+    // If this is the preloaded segment in the inactive buffer, swap
+    if (preloadedIdx.current === currentIdx && prevIdxRef.current !== currentIdx) {
+      const nextBuf = activeBufferRef.current === "A" ? "B" : "A"
+      activeBufferRef.current = nextBuf
+      setActiveBuffer(nextBuf)
+      const ref = nextBuf === "A" ? videoARef : videoBRef
+      if (isPlaying) ref.current?.play().catch(() => {})
+    } else {
+      // Load into active buffer directly
+      loadIntoBuffer(getActiveRef(), getActiveUrl(), seg.videoUrl, isPlaying)
+    }
+
+    prevIdxRef.current = currentIdx
+
+    // Preload next segment into inactive buffer
+    const nextIdx = currentIdx + 1
+    if (nextIdx < segments.length && segments[nextIdx]?.videoUrl) {
+      preloadedIdx.current = nextIdx
+      loadIntoBuffer(getInactiveRef(), getInactiveUrl(), segments[nextIdx].videoUrl!, false)
+    } else {
+      preloadedIdx.current = -1
+    }
+  }, [currentIdx, segments, isPlaying, loadIntoBuffer, getActiveRef, getInactiveRef, getActiveUrl, getInactiveUrl])
+
+  // Sync video volume to both buffers
+  useEffect(() => {
+    if (videoARef.current) videoARef.current.volume = videoVolume
+    if (videoBRef.current) videoBRef.current.volume = videoVolume
+  }, [videoVolume])
+
+  // Handle ended event on active video → seamless swap
+  const handleVideoEnded = useCallback(() => {
+    const nextIdx = currentIdx + 1
+    if (nextIdx >= segments.length) {
+      onEnded()
+      return
+    }
+    // Advance to next segment — the useEffect above will handle the swap
+    onSegmentChange(nextIdx)
+  }, [currentIdx, segments.length, onEnded, onSegmentChange])
+
+  // Time update forwarding
+  const handleTimeUpdate = useCallback(() => {
+    const ref = activeBufferRef.current === "A" ? videoARef : videoBRef
+    if (ref.current) {
+      onTimeUpdate(ref.current.currentTime, ref.current.duration || 0)
+    }
+  }, [onTimeUpdate])
+
+  return (
+    <div className="relative w-full h-full">
+      <video
+        ref={videoARef}
+        className="absolute inset-0 w-full h-full object-contain"
+        style={{
+          zIndex: activeBuffer === "A" ? 2 : 1,
+          opacity: activeBuffer === "A" ? 1 : 0,
+          pointerEvents: activeBuffer === "A" ? "auto" : "none",
+        }}
+        controls={activeBuffer === "A"}
+        playsInline
+        onEnded={activeBuffer === "A" ? handleVideoEnded : undefined}
+        onTimeUpdate={activeBuffer === "A" ? handleTimeUpdate : undefined}
+      />
+      <video
+        ref={videoBRef}
+        className="absolute inset-0 w-full h-full object-contain"
+        style={{
+          zIndex: activeBuffer === "B" ? 2 : 1,
+          opacity: activeBuffer === "B" ? 1 : 0,
+          pointerEvents: activeBuffer === "B" ? "auto" : "none",
+        }}
+        controls={activeBuffer === "B"}
+        playsInline
+        onEnded={activeBuffer === "B" ? handleVideoEnded : undefined}
+        onTimeUpdate={activeBuffer === "B" ? handleTimeUpdate : undefined}
+      />
+    </div>
+  )
+}
+
+// ── Global Timeline Bar ──────────────────────────────────
+// Shows all segments as blocks, with current position indicator
+function TimelineBar({
+  segments,
+  currentIdx,
+  currentTime,
+  onSeek,
+}: {
+  segments: VideoSegment[]
+  currentIdx: number
+  currentTime: number
+  onSeek: (segIdx: number) => void
+}) {
+  const totalDuration = segments.reduce((a, s) => a + s.durationSec, 0)
+  if (totalDuration === 0) return null
+
+  // Cumulative offsets
+  let elapsed = 0
+  for (let i = 0; i < currentIdx; i++) elapsed += segments[i].durationSec
+  const globalPosition = elapsed + currentTime
+  const progressPct = (globalPosition / totalDuration) * 100
+
+  return (
+    <div className="relative w-full h-6 flex-shrink-0" style={{ background: "#1E1E2E" }}>
+      {/* Segment blocks */}
+      <div className="absolute inset-0 flex">
+        {segments.map((seg, i) => {
+          const widthPct = (seg.durationSec / totalDuration) * 100
+          const isCurrent = i === currentIdx
+          const isPast = i < currentIdx
+          return (
+            <div
+              key={seg.id}
+              className="h-full relative cursor-pointer transition-colors group"
+              style={{
+                width: `${widthPct}%`,
+                background: isCurrent ? "rgba(79,70,229,0.4)" : isPast ? "rgba(79,70,229,0.2)" : "transparent",
+                borderRight: i < segments.length - 1 ? "1px solid rgba(255,255,255,0.1)" : "none",
+              }}
+              onClick={() => onSeek(i)}
+              title={`#${seg.segmentIndex + 1} · SC${String(seg.sceneNum).padStart(2, "0")} · ${seg.durationSec}s`}
+            >
+              {/* Scene change indicator */}
+              {i > 0 && seg.sceneNum !== segments[i - 1].sceneNum && (
+                <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: "#F59E0B" }} />
+              )}
+              {/* Segment number - show for segments wide enough */}
+              {widthPct > 4 && (
+                <span className="absolute inset-0 flex items-center justify-center text-[8px] font-mono opacity-40 group-hover:opacity-80"
+                  style={{ color: "#fff" }}>
+                  {seg.segmentIndex + 1}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {/* Playhead */}
+      <div
+        className="absolute top-0 bottom-0 w-0.5 transition-all"
+        style={{
+          left: `${progressPct}%`,
+          background: "#A5B4FC",
+          boxShadow: "0 0 4px rgba(165,180,252,0.6)",
+          zIndex: 5,
+        }}
+      />
+      {/* Progress fill */}
+      <div
+        className="absolute top-0 bottom-0 left-0"
+        style={{
+          width: `${progressPct}%`,
+          background: "rgba(79,70,229,0.15)",
+          zIndex: 1,
+        }}
+      />
+    </div>
+  )
+}
+
+// ── Main Component ───────────────────────────────────────
+// ── Audio Track Sync Hook ─────────────────────────────────
+// Manages a background <audio> element that plays in sync with video segments.
+// When playing all segments, the audio starts and seeks to match the global
+// timeline position. Users can upload BGM / voiceover to overlay on silent video.
+function useAudioTrack(scriptId: string, episodeNum: number) {
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [audioName, setAudioName] = useState<string>("")
+  const [audioVolume, setAudioVolume] = useState(0.5)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Fetch saved audio track on mount / episode change
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/editing/audio-track?scriptId=${scriptId}&episodeNum=${episodeNum}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return
+        if (data.track) {
+          setAudioUrl(data.track.url)
+          setAudioName(data.track.name)
+        } else {
+          setAudioUrl(null)
+          setAudioName("")
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [scriptId, episodeNum])
+
+  // Create / update audio element
+  useEffect(() => {
+    if (!audioUrl) {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      return
+    }
+    if (!audioRef.current) {
+      audioRef.current = new Audio()
+      audioRef.current.loop = true
+    }
+    audioRef.current.src = audioUrl
+    audioRef.current.volume = audioVolume
+    audioRef.current.load()
+  }, [audioUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Volume sync
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = audioVolume
+  }, [audioVolume])
+
+  const play = useCallback(() => {
+    audioRef.current?.play().catch(() => {})
+  }, [])
+
+  const pause = useCallback(() => {
+    audioRef.current?.pause()
+  }, [])
+
+  const seekTo = useCallback((sec: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = sec
+    }
+  }, [])
+
+  // Upload handler
+  const uploadAudio = useCallback(async (file: File) => {
+    setIsLoading(true)
+    try {
+      // Upload to R2
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("bucket", "audio-tracks")
+      const uploadRes = await fetch("/api/upload/media", { method: "POST", body: formData })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok) throw new Error(uploadData.error || "Upload failed")
+
+      // Save reference
+      await fetch("/api/editing/audio-track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scriptId,
+          episodeNum,
+          audioUrl: uploadData.url,
+          audioName: file.name,
+        }),
+      })
+
+      setAudioUrl(uploadData.url)
+      setAudioName(file.name)
+    } catch (err) {
+      console.error("Audio upload failed:", err)
+      alert("Audio upload failed")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [scriptId, episodeNum])
+
+  // Remove handler
+  const removeAudio = useCallback(async () => {
+    try {
+      await fetch("/api/editing/audio-track", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptId, episodeNum }),
+      })
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      setAudioUrl(null)
+      setAudioName("")
+    } catch (err) {
+      console.error("Audio remove failed:", err)
+    }
+  }, [scriptId, episodeNum])
+
+  return {
+    audioUrl,
+    audioName,
+    audioVolume,
+    setAudioVolume,
+    isLoading,
+    play,
+    pause,
+    seekTo,
+    uploadAudio,
+    removeAudio,
+  }
 }
 
 export function EditingWorkspace({ script }: { script: Script }) {
   const episodes = [...new Set(script.scenes.map(s => s.episodeNum))].sort((a, b) => a - b)
   if (episodes.length === 0) for (let i = 1; i <= script.targetEpisodes; i++) episodes.push(i)
 
+  const abbrev = getTitleAbbrev(script.title)
   const [selectedEp, setSelectedEp] = useState(episodes[0] ?? 1)
-  const [sourceSegId, setSourceSegId] = useState<string | null>(null)   // Source monitor
-  const [programSegId, setProgramSegId] = useState<string | null>(null) // Program monitor (timeline playhead)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [playingAll, setPlayingAll] = useState(false)
-  const [currentPlayIndex, setCurrentPlayIndex] = useState(0)
-  const [zoom, setZoom] = useState(1) // px per second
-  const [playheadX, setPlayheadX] = useState(0)
-  const timelineRef = useRef<HTMLDivElement>(null)
-  const programVideoRef = useRef<HTMLVideoElement>(null)
-  const sourceVideoRef = useRef<HTMLVideoElement>(null)
-  const [showPackage, setShowPackage] = useState(false)
-  const [packageManifest, setPackageManifest] = useState<PackageManifest | null>(null)
+  const [playingSegId, setPlayingSegId] = useState<string | null>(null)
+  const [isSequentialPlay, setIsSequentialPlay] = useState(false)
+  const [currentSegTime, setCurrentSegTime] = useState(0)
+
+  // Audio controls
+  const audio = useAudioTrack(script.id, selectedEp)
+  const audioFileRef = useRef<HTMLInputElement>(null)
+  const [videoVolume, setVideoVolume] = useState(0.8) // video audio: dialogue + SFX
 
   const epSegments = script.videoSegments
     .filter(s => s.episodeNum === selectedEp)
     .sort((a, b) => a.segmentIndex - b.segmentIndex)
 
-  const doneSegments = epSegments.filter(s => s.status === "done" && s.videoUrl)
-  const sourceSeg = epSegments.find(s => s.id === sourceSegId) ?? null
-  const programSeg = epSegments.find(s => s.id === programSegId) ?? null
+  const doneSegs = useMemo(
+    () => epSegments.filter(s => s.status === "done" && s.videoUrl),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedEp, script.videoSegments]
+  )
+  const failedSegs = epSegments.filter(s => s.status === "failed")
+  const activeSegs = epSegments.filter(s => ["submitted", "generating", "reserved"].includes(s.status))
+  const totalDuration = doneSegs.reduce((a, s) => a + s.durationSec, 0)
+  const estTotalDuration = epSegments.reduce((a, s) => a + s.durationSec, 0)
+  const playingSeg = epSegments.find(s => s.id === playingSegId) ?? null
 
-  const totalDuration = doneSegments.reduce((a, s) => a + s.durationSec, 0)
-  const pxPerSec = Math.max(40, 80 * zoom)
+  // Current playing index within doneSegs
+  const currentDoneIdx = useMemo(
+    () => doneSegs.findIndex(s => s.id === playingSegId),
+    [doneSegs, playingSegId]
+  )
 
-  // Build cumulative offsets
-  const segOffsets: Record<string, number> = {}
-  let cumulative = 0
-  for (const seg of doneSegments) {
-    segOffsets[seg.id] = cumulative
-    cumulative += seg.durationSec
-  }
+  const epStr = String(selectedEp).padStart(2, "0")
+  const projectCode = `${abbrev}-S${epStr}`
 
-  // Playhead position → current segment
-  const getSegAtTime = useCallback((t: number) => {
-    for (const seg of doneSegments) {
-      const start = segOffsets[seg.id] ?? 0
-      if (t >= start && t < start + seg.durationSec) return seg
+  // Sequential playback ended (last segment finished)
+  const handleSequenceEnded = useCallback(() => {
+    setIsSequentialPlay(false)
+    audio.pause()
+  }, [audio])
+
+  // Segment change from seamless player
+  const handleSegmentChange = useCallback((newDoneIdx: number) => {
+    if (newDoneIdx >= 0 && newDoneIdx < doneSegs.length) {
+      setPlayingSegId(doneSegs[newDoneIdx].id)
     }
-    return doneSegments[doneSegments.length - 1] ?? null
-  }, [doneSegments, segOffsets])
+  }, [doneSegs])
 
-  // Tick program monitor time
-  useEffect(() => {
-    if (!isPlaying) return
-    const iv = setInterval(() => {
-      setCurrentTime(prev => {
-        const next = prev + 0.1
-        if (next >= totalDuration) { setIsPlaying(false); return totalDuration }
-        setPlayheadX(next * pxPerSec)
-        const seg = getSegAtTime(next)
-        if (seg && seg.id !== programSegId) setProgramSegId(seg.id)
-        return next
-      })
-    }, 100)
-    return () => clearInterval(iv)
-  }, [isPlaying, totalDuration, pxPerSec, programSegId, getSegAtTime])
+  // Time update from player — also sync audio position
+  const handleTimeUpdate = useCallback((time: number) => {
+    setCurrentSegTime(time)
+  }, [])
 
-  function handlePlayPause() {
-    if (currentTime >= totalDuration) { setCurrentTime(0); setPlayheadX(0) }
-    setIsPlaying(p => !p)
-    if (!programSegId && doneSegments.length > 0) setProgramSegId(doneSegments[0].id)
+  // Play all from start — sync audio
+  function handlePlayAll() {
+    if (doneSegs.length === 0) return
+    setPlayingSegId(doneSegs[0].id)
+    setIsSequentialPlay(true)
+    // Start audio from beginning
+    if (audio.audioUrl) {
+      audio.seekTo(0)
+      audio.play()
+    }
   }
 
-  function handleTimelineClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!timelineRef.current) return
-    const rect = timelineRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const t = Math.max(0, Math.min(x / pxPerSec, totalDuration))
-    setCurrentTime(t)
-    setPlayheadX(x)
-    const seg = getSegAtTime(t)
-    if (seg) setProgramSegId(seg.id)
+  // Click on a segment in the list — seek audio to matching position
+  function handleSegmentClick(seg: VideoSegment) {
+    setPlayingSegId(seg.id)
+    setIsSequentialPlay(false)
+    setCurrentSegTime(0)
+    // Seek audio to the cumulative position of this segment
+    if (audio.audioUrl) {
+      const segIdx = doneSegs.findIndex(s => s.id === seg.id)
+      if (segIdx >= 0) {
+        let elapsed = 0
+        for (let i = 0; i < segIdx; i++) elapsed += doneSegs[i].durationSec
+        audio.seekTo(elapsed)
+      }
+    }
   }
 
-  function handleSegClickSource(seg: VideoSegment) {
-    setSourceSegId(seg.id === sourceSegId ? null : seg.id)
+  // Timeline seek — sync audio
+  function handleTimelineSeek(segIdx: number) {
+    if (segIdx >= 0 && segIdx < doneSegs.length) {
+      setPlayingSegId(doneSegs[segIdx].id)
+      setCurrentSegTime(0)
+      // Seek audio to matching position
+      if (audio.audioUrl) {
+        let elapsed = 0
+        for (let i = 0; i < segIdx; i++) elapsed += doneSegs[i].durationSec
+        audio.seekTo(elapsed)
+      }
+    }
   }
 
-  function handleInsertToTimeline(seg: VideoSegment) {
-    // Already in doneSegments list; just jump program monitor to it
-    if (segOffsets[seg.id] !== undefined) {
-      const t = segOffsets[seg.id]
-      setCurrentTime(t)
-      setPlayheadX(t * pxPerSec)
-      setProgramSegId(seg.id)
+  // Download a single clip
+  function downloadClip(seg: VideoSegment) {
+    if (!seg.videoUrl) return
+    const fn = getFilename(abbrev, selectedEp, seg.sceneNum, seg.segmentIndex)
+    const a = document.createElement("a")
+    a.href = seg.videoUrl
+    a.download = fn
+    a.target = "_blank"
+    a.click()
+  }
+
+  // Download all done clips
+  function handleDownloadAll() {
+    for (const seg of doneSegs) {
+      downloadClip(seg)
     }
   }
 
   return (
-    <div className="h-full flex flex-col relative" style={{ background: "#1E1E1E" }}>
+    <div className="h-full flex flex-col" style={{ background: "#F5F5F5" }}>
 
-      {/* ── TOP: Dual Monitors ─────────────────────────────── */}
-      <div className="flex flex-shrink-0" style={{ height: "42%", borderBottom: "2px solid #111" }}>
-
-        {/* Episode Sidebar */}
-        <div className="w-44 flex flex-col flex-shrink-0" style={{ background: "#252525", borderRight: "1px solid #333" }}>
-          <div className="px-3 py-2" style={{ borderBottom: "1px solid #333" }}>
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>Episodes</span>
-          </div>
-          <div className="flex-1 overflow-y-auto dev-scrollbar py-1">
-            {episodes.map(ep => {
-              const segs = script.videoSegments.filter(s => s.episodeNum === ep)
-              const done = segs.filter(s => s.status === "done").length
-              const pct = segs.length > 0 ? Math.round((done / segs.length) * 100) : 0
-              const isActive = ep === selectedEp
-              return (
-                <button
-                  key={ep}
-                  onClick={() => { setSelectedEp(ep); setSourceSegId(null); setProgramSegId(null); setCurrentTime(0); setPlayheadX(0); setIsPlaying(false) }}
-                  className="w-full text-left px-3 py-2 transition-colors"
-                  style={{
-                    background: isActive ? "#2D3250" : "transparent",
-                    borderLeft: isActive ? "2px solid #4F46E5" : "2px solid transparent",
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] font-medium" style={{ color: isActive ? "#E0E0FF" : "#888" }}>Ep {ep}</span>
-                    <span className="text-[9px]" style={{ color: "#555" }}>{pct}%</span>
-                  </div>
-                  <div className="h-0.5 rounded-full" style={{ background: "#333" }}>
-                    <div className="h-0.5 rounded-full" style={{ width: `${pct}%`, background: pct === 100 ? "#10B981" : "#4F46E5" }} />
-                  </div>
-                  <p className="text-[9px] mt-0.5" style={{ color: "#555" }}>{done}/{segs.length}</p>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Source Monitor */}
-        <div className="flex-1 flex flex-col" style={{ borderRight: "1px solid #333" }}>
-          <div className="flex items-center gap-2 px-3 py-1.5" style={{ background: "#252525", borderBottom: "1px solid #333" }}>
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>Source</span>
-            {sourceSeg && (
-              <>
-                <span className="text-[10px]" style={{ color: "#555" }}>·</span>
-                <span className="text-[10px]" style={{ color: "#888" }}>Seg #{sourceSeg.segmentIndex + 1} · {sourceSeg.durationSec}s</span>
-                <div className="flex-1" />
-                <button
-                  onClick={() => sourceSeg && handleInsertToTimeline(sourceSeg)}
-                  className="text-[10px] px-2 py-0.5 rounded"
-                  style={{ background: "#4F46E5", color: "#fff" }}
-                >
-                  → Timeline
-                </button>
-              </>
-            )}
-          </div>
-          <div className="flex-1 relative flex items-center justify-center" style={{ background: "#0A0A0A" }}>
-            {sourceSeg?.videoUrl ? (
-              <video
-                ref={sourceVideoRef}
-                key={sourceSeg.id}
-                src={sourceSeg.videoUrl}
-                controls
-                className="max-w-full max-h-full"
-                style={{ display: "block" }}
-              />
-            ) : sourceSeg?.thumbnailUrl ? (
-              <img src={sourceSeg.thumbnailUrl} className="max-w-full max-h-full object-contain" alt="" />
-            ) : (
-              <div className="flex flex-col items-center" style={{ color: "#333" }}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-2">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M9 3v18" />
-                </svg>
-                <p className="text-[11px]">Click a segment below</p>
-              </div>
-            )}
-            {/* Timecode overlay */}
-            <div className="absolute bottom-2 left-2 font-mono text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.7)", color: "#0F0" }}>
-              {formatTime(sourceSeg ? 0 : 0)}
+      {/* ── Header Bar ── */}
+      <div className="flex items-center gap-4 px-5 py-3 flex-shrink-0" style={{ background: "#1A1A2E", borderBottom: "2px solid #0F0F1E" }}>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: doneSegs.length === epSegments.length && epSegments.length > 0 ? "#10B981" : "#F59E0B" }} />
+            <div>
+              <h1 className="text-[13px] font-bold" style={{ color: "#fff" }}>{script.title}</h1>
+              <p className="text-[10px] font-mono" style={{ color: "#6366F1" }}>{projectCode}</p>
             </div>
           </div>
         </div>
 
-        {/* Program Monitor */}
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center gap-2 px-3 py-1.5" style={{ background: "#252525", borderBottom: "1px solid #333" }}>
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>Program</span>
-            {programSeg && (
-              <>
-                <span className="text-[10px]" style={{ color: "#555" }}>·</span>
-                <span className="text-[10px]" style={{ color: "#888" }}>
-                  Ep {selectedEp} · {doneSegments.length} clips · {totalDuration}s
-                </span>
-              </>
-            )}
+        {/* Episode tabs */}
+        <div className="flex items-center gap-1">
+          {episodes.map(ep => (
+            <button
+              key={ep}
+              onClick={() => { setSelectedEp(ep); setPlayingSegId(null); setIsSequentialPlay(false) }}
+              className="px-3 py-1 rounded text-[11px] font-medium transition-colors"
+              style={{
+                background: ep === selectedEp ? "#4F46E5" : "#2D2D4E",
+                color: ep === selectedEp ? "#fff" : "#888",
+              }}
+            >
+              EP{String(ep).padStart(2, "0")}
+            </button>
+          ))}
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-4 ml-4">
+          <div className="text-right">
+            <p className="text-[10px]" style={{ color: "#666" }}>Clips</p>
+            <p className="text-[12px] font-bold font-mono" style={{ color: doneSegs.length === epSegments.length ? "#10B981" : "#F59E0B" }}>
+              {doneSegs.length}/{epSegments.length}
+            </p>
           </div>
-          <div className="flex-1 relative flex items-center justify-center" style={{ background: "#0A0A0A" }}>
-            {programSeg?.videoUrl ? (
-              <video
-                ref={programVideoRef}
-                key={programSeg.id}
-                src={programSeg.videoUrl}
-                autoPlay={isPlaying}
-                className="max-w-full max-h-full"
-                style={{ display: "block" }}
-                onEnded={() => {
-                  const idx = doneSegments.findIndex(s => s.id === programSeg.id)
-                  if (idx < doneSegments.length - 1) {
-                    const next = doneSegments[idx + 1]
-                    setProgramSegId(next.id)
-                    const t = segOffsets[next.id] ?? 0
-                    setCurrentTime(t)
-                    setPlayheadX(t * pxPerSec)
-                  } else {
-                    setIsPlaying(false)
-                  }
-                }}
+          <div className="text-right">
+            <p className="text-[10px]" style={{ color: "#666" }}>Duration</p>
+            <p className="text-[12px] font-bold font-mono" style={{ color: "#A5B4FC" }}>
+              {formatDuration(totalDuration)}{estTotalDuration !== totalDuration && <span style={{ color: "#555" }}> / {formatDuration(estTotalDuration)}</span>}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main Content ── */}
+      <div className="flex-1 flex min-h-0">
+
+        {/* Left: Video Preview */}
+        <div className="flex flex-col" style={{ width: 400, borderRight: "1px solid #D8D8D8" }}>
+          {/* Video player — dual-buffer seamless playback */}
+          <div className="flex-shrink-0 relative" style={{ background: "#000", aspectRatio: "9/16", maxHeight: "55vh" }}>
+            {currentDoneIdx >= 0 && doneSegs.length > 0 ? (
+              <SeamlessPlayer
+                segments={doneSegs}
+                currentIdx={currentDoneIdx}
+                isPlaying={true}
+                videoVolume={videoVolume}
+                onSegmentChange={handleSegmentChange}
+                onEnded={handleSequenceEnded}
+                onTimeUpdate={handleTimeUpdate}
               />
-            ) : doneSegments.length === 0 ? (
-              <div className="flex flex-col items-center" style={{ color: "#333" }}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-2">
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center" style={{ color: "#444" }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-3 opacity-40">
                   <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
-                <p className="text-[11px]">No clips on timeline</p>
-                <p className="text-[10px] mt-1" style={{ color: "#444" }}>Generate videos in Theater first</p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center" style={{ color: "#333" }}>
-                <p className="text-[11px]">Press Play or click timeline</p>
+                <p className="text-[11px]">{doneSegs.length > 0 ? "Click a clip to preview" : "No clips generated yet"}</p>
               </div>
             )}
-            {/* Timecode overlay */}
-            <div className="absolute bottom-2 right-2 font-mono text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.7)", color: "#0F0" }}>
-              {formatTime(currentTime)} / {formatTime(totalDuration)}
+            {/* Clip info overlay */}
+            {playingSeg && (
+              <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none" style={{ zIndex: 10 }}>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.7)", color: "#A5B4FC" }}>
+                  #{playingSeg.segmentIndex + 1} · SC{String(playingSeg.sceneNum).padStart(2, "0")} · {playingSeg.durationSec}s
+                </span>
+                {isSequentialPlay && (
+                  <span className="text-[9px] px-2 py-0.5 rounded animate-pulse" style={{ background: "rgba(79,70,229,0.8)", color: "#fff" }}>
+                    ▶ Sequential
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Global timeline bar */}
+          {doneSegs.length > 1 && (
+            <TimelineBar
+              segments={doneSegs}
+              currentIdx={currentDoneIdx >= 0 ? currentDoneIdx : 0}
+              currentTime={currentSegTime}
+              onSeek={handleTimelineSeek}
+            />
+          )}
+
+          {/* Audio Mixer Panel */}
+          <div className="px-3 py-1.5 flex items-center gap-3 flex-shrink-0" style={{ background: "#1E1E2E", borderBottom: "1px solid #333" }}>
+            {/* Video audio volume (dialogue + SFX from Seedance) */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[8px] font-semibold uppercase tracking-wider w-8" style={{ color: "#888" }}>
+                VOX
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={videoVolume}
+                onChange={e => setVideoVolume(Number(e.target.value))}
+                className="w-14 h-1 accent-emerald-500"
+                title={`Dialogue/SFX: ${Math.round(videoVolume * 100)}%`}
+              />
+              <span className="text-[8px] font-mono w-6" style={{ color: "#666" }}>
+                {Math.round(videoVolume * 100)}%
+              </span>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* ── MIDDLE: Transport Controls ──────────────────────── */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-1.5" style={{ background: "#222", borderBottom: "1px solid #111" }}>
-        {/* Timecode */}
-        <div className="font-mono text-[11px] px-2 py-0.5 rounded" style={{ background: "#111", color: "#0F0", minWidth: 80, textAlign: "center" }}>
-          {formatTime(currentTime)}
-        </div>
+            <div className="w-px h-4" style={{ background: "#333" }} />
 
-        {/* Transport */}
-        <div className="flex items-center gap-1">
-          {/* Go to start */}
-          <button
-            onClick={() => { setCurrentTime(0); setPlayheadX(0); setIsPlaying(false); if (doneSegments[0]) setProgramSegId(doneSegments[0].id) }}
-            className="w-7 h-7 flex items-center justify-center rounded transition-colors"
-            style={{ background: "#333", color: "#AAA" }}
-            title="Go to Start"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
-          </button>
-          {/* Step back */}
-          <button
-            onClick={() => {
-              const idx = doneSegments.findIndex(s => s.id === programSegId)
-              if (idx > 0) { const s = doneSegments[idx-1]; const t = segOffsets[s.id]??0; setProgramSegId(s.id); setCurrentTime(t); setPlayheadX(t*pxPerSec) }
-            }}
-            className="w-7 h-7 flex items-center justify-center rounded"
-            style={{ background: "#333", color: "#AAA" }}
-            title="Previous Clip"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm13 1L9 12l10 5z"/></svg>
-          </button>
-          {/* Play/Pause */}
-          <button
-            onClick={handlePlayPause}
-            className="w-9 h-9 flex items-center justify-center rounded"
-            style={{ background: isPlaying ? "#4F46E5" : "#4A4A4A", color: "#fff" }}
-            title={isPlaying ? "Pause (Space)" : "Play (Space)"}
-          >
-            {isPlaying ? (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-            ) : (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            )}
-          </button>
-          {/* Step forward */}
-          <button
-            onClick={() => {
-              const idx = doneSegments.findIndex(s => s.id === programSegId)
-              if (idx < doneSegments.length - 1) { const s = doneSegments[idx+1]; const t = segOffsets[s.id]??0; setProgramSegId(s.id); setCurrentTime(t); setPlayheadX(t*pxPerSec) }
-            }}
-            className="w-7 h-7 flex items-center justify-center rounded"
-            style={{ background: "#333", color: "#AAA" }}
-            title="Next Clip"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5l10 7-10 7V5zm13 1h-2v12h2z"/></svg>
-          </button>
-          {/* Go to end */}
-          <button
-            onClick={() => { const t = totalDuration; setCurrentTime(t); setPlayheadX(t*pxPerSec); setIsPlaying(false) }}
-            className="w-7 h-7 flex items-center justify-center rounded"
-            style={{ background: "#333", color: "#AAA" }}
-            title="Go to End"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18V6l8.5 6zm9.5 0V6h2v12z"/></svg>
-          </button>
-        </div>
-
-        <div className="w-px h-5 mx-1" style={{ background: "#333" }} />
-
-        {/* Zoom */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px]" style={{ color: "#555" }}>Zoom</span>
-          <input
-            type="range" min={0.3} max={3} step={0.1}
-            value={zoom}
-            onChange={e => setZoom(Number(e.target.value))}
-            className="w-20 accent-indigo-500"
-          />
-          <span className="text-[10px] font-mono" style={{ color: "#555" }}>{zoom.toFixed(1)}x</span>
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Episode info */}
-        <span className="text-[10px]" style={{ color: "#555" }}>
-          Ep {selectedEp} · {doneSegments.length} clips · {totalDuration}s total
-        </span>
-
-        <div className="w-px h-5" style={{ background: "#333" }} />
-
-        {/* Package button */}
-        <button
-          onClick={() => {
-            const m = buildManifest(script, selectedEp)
-            setPackageManifest(m)
-            setShowPackage(true)
-          }}
-          className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-medium transition-colors"
-          style={{ background: "#1E3A2F", color: "#10B981", border: "1px solid #2A5540" }}
-          title="Package Episode Assets"
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Package Ep {selectedEp}
-        </button>
-      </div>
-
-      {/* ── BOTTOM: Timeline + Clip Bin ─────────────────────── */}
-      <div className="flex flex-1 min-h-0">
-
-        {/* Clip Bin (left) */}
-        <div className="w-52 flex flex-col flex-shrink-0" style={{ background: "#252525", borderRight: "1px solid #333" }}>
-          <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #333" }}>
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#666" }}>Clip Bin</span>
-            <span className="text-[10px]" style={{ color: "#555" }}>{epSegments.length} clips</span>
-          </div>
-          <div className="flex-1 overflow-y-auto dev-scrollbar">
-            {epSegments.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full" style={{ color: "#444" }}>
-                <p className="text-[11px]">No clips</p>
-              </div>
-            ) : (
-              epSegments.map(seg => {
-                const ss = STATUS_STYLE[seg.status] || STATUS_STYLE.pending
-                const isSource = seg.id === sourceSegId
-                return (
-                  <div
-                    key={seg.id}
-                    onClick={() => handleSegClickSource(seg)}
-                    className="flex items-center gap-2 px-2 py-1.5 cursor-pointer transition-colors"
-                    style={{
-                      background: isSource ? "#2D3250" : "transparent",
-                      borderBottom: "1px solid #2A2A2A",
-                      borderLeft: isSource ? "2px solid #4F46E5" : "2px solid transparent",
-                    }}
-                  >
-                    {/* Thumbnail */}
-                    <div className="w-12 h-7 rounded flex-shrink-0 overflow-hidden" style={{ background: "#1A1A1A" }}>
-                      {seg.thumbnailUrl ? (
-                        <img src={seg.thumbnailUrl} className="w-full h-full object-cover" alt="" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} style={{ color: "#444" }}>
-                            <polygon points="5 3 19 12 5 21 5 3" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <span className="text-[9px] font-mono" style={{ color: "#666" }}>#{seg.segmentIndex + 1}</span>
-                        <span className="text-[9px] px-1 py-0 rounded" style={ss}>{seg.status}</span>
-                      </div>
-                      <p className="text-[10px] truncate" style={{ color: "#777" }}>{seg.durationSec}s · {seg.prompt.slice(0, 25)}</p>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Timeline (right) */}
-        <div className="flex-1 flex flex-col min-w-0" style={{ background: "#1A1A1A" }}>
-          {/* Track Headers + Ruler */}
-          <div className="flex-shrink-0" style={{ borderBottom: "1px solid #2A2A2A" }}>
-            {/* Ruler */}
-            <div className="flex overflow-hidden" style={{ height: 20, background: "#222" }}>
-              <div className="w-20 flex-shrink-0" style={{ borderRight: "1px solid #2A2A2A" }} />
-              <div className="flex-1 relative overflow-hidden">
-                <div
-                  className="absolute top-0 left-0 h-full"
-                  style={{ width: Math.max(totalDuration * pxPerSec + 200, 800) }}
-                >
-                  {Array.from({ length: Math.ceil(totalDuration) + 10 }, (_, i) => (
-                    <div
-                      key={i}
-                      className="absolute top-0 flex flex-col items-center"
-                      style={{ left: i * pxPerSec }}
-                    >
-                      <div className="w-px" style={{ height: i % 5 === 0 ? 12 : 6, background: i % 5 === 0 ? "#555" : "#333" }} />
-                      {i % 5 === 0 && (
-                        <span className="text-[8px] font-mono" style={{ color: "#555", marginTop: -2, marginLeft: 2 }}>{formatTime(i)}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Track rows */}
-          <div className="flex-1 overflow-auto dev-scrollbar">
-            {/* V1 track */}
-            <div className="flex" style={{ minHeight: 56, borderBottom: "1px solid #2A2A2A" }}>
-              {/* Track label */}
-              <div className="w-20 flex-shrink-0 flex items-center px-2" style={{ background: "#222", borderRight: "1px solid #2A2A2A" }}>
-                <div>
-                  <p className="text-[10px] font-semibold" style={{ color: "#888" }}>V1</p>
-                  <p className="text-[9px]" style={{ color: "#555" }}>Video</p>
-                </div>
-              </div>
-              {/* Track content */}
-              <div
-                ref={timelineRef}
-                className="flex-1 relative cursor-crosshair"
-                style={{ background: "#1A1A1A", minWidth: Math.max(totalDuration * pxPerSec + 200, 600) }}
-                onClick={handleTimelineClick}
-              >
-                {/* Clips */}
-                {doneSegments.map(seg => {
-                  const left = (segOffsets[seg.id] ?? 0) * pxPerSec
-                  const width = seg.durationSec * pxPerSec
-                  const isProg = seg.id === programSegId
-                  return (
-                    <div
-                      key={seg.id}
-                      onClick={e => { e.stopPropagation(); setProgramSegId(seg.id); const t = segOffsets[seg.id]??0; setCurrentTime(t); setPlayheadX(t*pxPerSec) }}
-                      className="absolute top-1 rounded overflow-hidden cursor-pointer select-none"
-                      style={{
-                        left,
-                        width: Math.max(width - 2, 4),
-                        height: "calc(100% - 8px)",
-                        background: isProg ? "#3730A3" : "#2D3250",
-                        border: isProg ? "1px solid #6366F1" : "1px solid #3A3A60",
-                      }}
-                      title={`Seg #${seg.segmentIndex + 1} · ${seg.durationSec}s`}
-                    >
-                      {seg.thumbnailUrl && (
-                        <img src={seg.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover opacity-30" alt="" />
-                      )}
-                      <div className="relative px-1 pt-0.5">
-                        <p className="text-[9px] font-semibold truncate" style={{ color: "#A5B4FC" }}>
-                          #{seg.segmentIndex + 1}
-                        </p>
-                        {width > 60 && (
-                          <p className="text-[8px] truncate" style={{ color: "#7C8CCC" }}>{seg.durationSec}s</p>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {/* Playhead */}
-                <div
-                  className="absolute top-0 bottom-0 pointer-events-none"
-                  style={{ left: playheadX, zIndex: 10 }}
-                >
-                  <div className="w-px h-full" style={{ background: "#EF4444" }} />
-                  <div className="absolute -top-1 -left-1.5 w-3 h-3"
-                    style={{ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "8px solid #EF4444" }}
+            {/* BGM overlay track */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[8px] font-semibold uppercase tracking-wider w-8" style={{ color: "#888" }}>
+                BGM
+              </span>
+              {audio.audioUrl ? (
+                <>
+                  <span className="text-[9px] truncate max-w-[80px]" style={{ color: "#A5B4FC" }} title={audio.audioName}>
+                    {audio.audioName}
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={audio.audioVolume}
+                    onChange={e => audio.setAudioVolume(Number(e.target.value))}
+                    className="w-14 h-1 accent-indigo-500"
+                    title={`BGM: ${Math.round(audio.audioVolume * 100)}%`}
                   />
-                </div>
+                  <span className="text-[8px] font-mono w-6" style={{ color: "#666" }}>
+                    {Math.round(audio.audioVolume * 100)}%
+                  </span>
+                  <button
+                    onClick={audio.removeAudio}
+                    className="text-[9px] px-1 py-0.5 rounded hover:opacity-80"
+                    style={{ background: "#3A2020", color: "#F87171" }}
+                    title="Remove BGM"
+                  >
+                    ✕
+                  </button>
+                </>
+              ) : (
+                <>
+                  <input
+                    ref={audioFileRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (file) audio.uploadAudio(file)
+                      e.target.value = ""
+                    }}
+                  />
+                  <button
+                    onClick={() => audioFileRef.current?.click()}
+                    disabled={audio.isLoading}
+                    className="text-[9px] px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+                    style={{ background: "#2D2D4E", color: "#A5B4FC" }}
+                  >
+                    {audio.isLoading ? "..." : "+ BGM"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
 
-                {/* Empty state */}
-                {doneSegments.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center" style={{ color: "#333" }}>
-                    <p className="text-[11px]">No done segments · Generate videos in Theater</p>
+          {/* Playback controls */}
+          <div className="px-3 py-2 flex items-center gap-2 flex-shrink-0" style={{ background: "#EBEBEB", borderBottom: "1px solid #D0D0D0" }}>
+            <button
+              onClick={handlePlayAll}
+              disabled={doneSegs.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium transition-colors disabled:opacity-40"
+              style={{ background: "#4F46E5", color: "#fff" }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Play All
+            </button>
+            {/* Prev / Next segment */}
+            {currentDoneIdx >= 0 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleSegmentChange(currentDoneIdx - 1)}
+                  disabled={currentDoneIdx <= 0}
+                  className="text-[10px] px-1.5 py-1 rounded disabled:opacity-30"
+                  style={{ background: "#E0E0E0", color: "#555" }}
+                  title="Previous segment"
+                >◀</button>
+                <span className="text-[10px] font-mono px-1" style={{ color: "#888" }}>
+                  {currentDoneIdx + 1}/{doneSegs.length}
+                </span>
+                <button
+                  onClick={() => handleSegmentChange(currentDoneIdx + 1)}
+                  disabled={currentDoneIdx >= doneSegs.length - 1}
+                  className="text-[10px] px-1.5 py-1 rounded disabled:opacity-30"
+                  style={{ background: "#E0E0E0", color: "#555" }}
+                  title="Next segment"
+                >▶</button>
+              </div>
+            )}
+            {isSequentialPlay && (
+              <button
+                onClick={() => { setIsSequentialPlay(false); audio.pause() }}
+                className="text-[10px] px-2 py-1 rounded"
+                style={{ background: "#E8E8E8", color: "#666" }}
+              >
+                Stop Sequence
+              </button>
+            )}
+            <div className="flex-1" />
+            {playingSeg && (
+              <span className="text-[10px] font-mono" style={{ color: "#888" }}>
+                {getFilename(abbrev, selectedEp, playingSeg.sceneNum, playingSeg.segmentIndex)}
+              </span>
+            )}
+          </div>
+
+          {/* Clip info when selected */}
+          {playingSeg && (
+            <div className="p-3 overflow-y-auto dev-scrollbar flex-1" style={{ background: "#F0F0F0" }}>
+              <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#AAA" }}>Prompt</p>
+              <p className="text-[11px] leading-relaxed" style={{ color: "#555" }}>{playingSeg.prompt}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-[10px]">
+                {playingSeg.shotType && (
+                  <div className="px-2 py-1 rounded" style={{ background: "#E8E8E8" }}>
+                    <span style={{ color: "#AAA" }}>Shot: </span>
+                    <span style={{ color: "#555" }}>{playingSeg.shotType}</span>
+                  </div>
+                )}
+                {playingSeg.cameraMove && (
+                  <div className="px-2 py-1 rounded" style={{ background: "#E8E8E8" }}>
+                    <span style={{ color: "#AAA" }}>Camera: </span>
+                    <span style={{ color: "#555" }}>{playingSeg.cameraMove}</span>
                   </div>
                 )}
               </div>
             </div>
+          )}
+          {!playingSeg && <div className="flex-1" style={{ background: "#F0F0F0" }} />}
+        </div>
 
-            {/* A1 track (audio placeholder) */}
-            <div className="flex" style={{ minHeight: 32, borderBottom: "1px solid #2A2A2A" }}>
-              <div className="w-20 flex-shrink-0 flex items-center px-2" style={{ background: "#222", borderRight: "1px solid #2A2A2A" }}>
-                <div>
-                  <p className="text-[10px] font-semibold" style={{ color: "#888" }}>A1</p>
-                  <p className="text-[9px]" style={{ color: "#555" }}>Audio</p>
-                </div>
+        {/* Right: Clip List + Actions */}
+        <div className="flex-1 flex flex-col min-w-0">
+
+          {/* Action Bar */}
+          <div className="flex items-center gap-2 px-4 py-2.5 flex-shrink-0" style={{ background: "#EBEBEB", borderBottom: "1px solid #D0D0D0" }}>
+            {/* Download All */}
+            <button
+              onClick={handleDownloadAll}
+              disabled={doneSegs.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium transition-colors disabled:opacity-40"
+              style={{ background: "#065F46", color: "#D1FAE5" }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Download All ({doneSegs.length})
+            </button>
+
+            {/* Export EDL */}
+            <button
+              onClick={() => downloadTextFile(
+                `${projectCode}.edl`,
+                buildEDL(script.title, selectedEp, abbrev, epSegments)
+              )}
+              disabled={doneSegs.length === 0}
+              className="flex items-center gap-1 px-3 py-1.5 rounded text-[11px] font-medium transition-colors disabled:opacity-40"
+              style={{ background: "#1E3A5F", color: "#93C5FD" }}
+            >
+              ↓ EDL
+            </button>
+
+            {/* Export CSV */}
+            <button
+              onClick={() => downloadTextFile(
+                `${projectCode}-manifest.csv`,
+                buildCSV(script.title, selectedEp, abbrev, epSegments)
+              )}
+              className="flex items-center gap-1 px-3 py-1.5 rounded text-[11px] font-medium transition-colors"
+              style={{ background: "#3A2E1E", color: "#FCD34D" }}
+            >
+              ↓ CSV
+            </button>
+
+            <div className="flex-1" />
+
+            {/* Status summary */}
+            {activeSegs.length > 0 && (
+              <span className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded animate-pulse"
+                style={{ background: "#EDE9FE", color: "#6D28D9" }}>
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#6D28D9" }} />
+                {activeSegs.length} generating
+              </span>
+            )}
+            {failedSegs.length > 0 && (
+              <span className="text-[10px] px-2 py-1 rounded"
+                style={{ background: "#FEE2E2", color: "#991B1B" }}>
+                {failedSegs.length} failed
+              </span>
+            )}
+          </div>
+
+          {/* Clip List Table */}
+          <div className="flex-1 overflow-y-auto dev-scrollbar">
+            {epSegments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full" style={{ color: "#CCC" }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-3 opacity-30">
+                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                  <line x1="9" x2="9" y1="3" y2="21" />
+                </svg>
+                <p className="text-[12px]">No segments for Episode {selectedEp}</p>
+                <p className="text-[11px] mt-1" style={{ color: "#DDD" }}>Generate segments in Theater first</p>
               </div>
-              <div className="flex-1 relative" style={{ background: "#161616", minWidth: Math.max(totalDuration * pxPerSec + 200, 600) }}>
-                {doneSegments.map(seg => {
-                  const left = (segOffsets[seg.id] ?? 0) * pxPerSec
-                  const width = seg.durationSec * pxPerSec
-                  return (
-                    <div
-                      key={seg.id}
-                      className="absolute top-1 rounded"
-                      style={{
-                        left,
-                        width: Math.max(width - 2, 4),
-                        height: "calc(100% - 8px)",
-                        background: "#1C3A2A",
-                        border: "1px solid #2A5540",
-                      }}
-                    >
-                      {/* Waveform placeholder */}
-                      <div className="w-full h-full flex items-center px-1 gap-px overflow-hidden">
-                        {Array.from({ length: Math.floor(width / 4) }, (_, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              width: 1,
-                              height: `${20 + Math.sin(i * 0.8) * 40}%`,
-                              background: "#10B981",
-                              opacity: 0.4,
-                              flexShrink: 0,
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-                {/* Playhead A1 */}
-                <div className="absolute top-0 bottom-0 w-px pointer-events-none" style={{ left: playheadX, background: "#EF4444", zIndex: 10 }} />
+            ) : (
+              <table className="w-full text-[11px]">
+                <thead className="sticky top-0 z-10">
+                  <tr style={{ background: "#F0F0F0", borderBottom: "1px solid #D8D8D8" }}>
+                    <th className="text-left px-3 py-2 font-semibold w-10" style={{ color: "#AAA" }}>#</th>
+                    <th className="text-left px-2 py-2 font-semibold w-14" style={{ color: "#AAA" }}>Preview</th>
+                    <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Filename</th>
+                    <th className="text-left px-3 py-2 font-semibold w-16" style={{ color: "#AAA" }}>Scene</th>
+                    <th className="text-left px-3 py-2 font-semibold w-14 text-right" style={{ color: "#AAA" }}>Dur</th>
+                    <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>Shot</th>
+                    <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>Status</th>
+                    <th className="text-center px-3 py-2 font-semibold w-16" style={{ color: "#AAA" }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {epSegments.map((seg, i) => {
+                    const st = STATUS_MAP[seg.status] || STATUS_MAP.pending
+                    const fn = getFilename(abbrev, selectedEp, seg.sceneNum, seg.segmentIndex)
+                    const isPlaying = seg.id === playingSegId
+                    const isDone = seg.status === "done"
+                    const scene = script.scenes.find(s => s.episodeNum === selectedEp && s.sceneNum === seg.sceneNum)
+                    return (
+                      <tr
+                        key={seg.id}
+                        onClick={() => { if (isDone) handleSegmentClick(seg) }}
+                        className={`transition-colors ${isDone ? "cursor-pointer hover:bg-indigo-50" : ""}`}
+                        style={{
+                          background: isPlaying ? "#EEF2FF" : i % 2 === 0 ? "#FAFAFA" : "#fff",
+                          borderBottom: "1px solid #F0F0F0",
+                          borderLeft: isPlaying ? "3px solid #4F46E5" : "3px solid transparent",
+                        }}
+                      >
+                        {/* # */}
+                        <td className="px-3 py-2.5 font-mono" style={{ color: isPlaying ? "#4F46E5" : "#CCC" }}>
+                          {seg.segmentIndex + 1}
+                        </td>
+                        {/* Thumbnail */}
+                        <td className="px-2 py-1.5">
+                          <div className="w-10 h-6 rounded overflow-hidden flex-shrink-0" style={{ background: "#E8E8E8" }}>
+                            {seg.thumbnailUrl ? (
+                              <img src={seg.thumbnailUrl} className="w-full h-full object-cover" alt="" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-[8px]" style={{ color: "#CCC" }}>{st.icon}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        {/* Filename */}
+                        <td className="px-3 py-2.5">
+                          <p className="font-mono text-[10px] truncate" style={{ color: isDone ? "#1A1A1A" : "#AAA" }}>
+                            {fn}
+                          </p>
+                          <p className="text-[9px] truncate mt-0.5" style={{ color: "#CCC" }}>
+                            {seg.prompt.slice(0, 50)}
+                          </p>
+                        </td>
+                        {/* Scene */}
+                        <td className="px-3 py-2.5">
+                          <span className="font-mono text-[10px]" style={{ color: "#666" }}>
+                            SC{String(seg.sceneNum).padStart(2, "0")}
+                          </span>
+                          {scene?.heading && (
+                            <p className="text-[8px] truncate max-w-[80px]" style={{ color: "#CCC" }}>
+                              {scene.heading.slice(0, 20)}
+                            </p>
+                          )}
+                        </td>
+                        {/* Duration */}
+                        <td className="px-3 py-2.5 text-right font-mono" style={{ color: "#666" }}>
+                          {seg.durationSec}s
+                        </td>
+                        {/* Shot type */}
+                        <td className="px-3 py-2.5">
+                          <span className="text-[10px]" style={{ color: "#888" }}>
+                            {seg.shotType || "—"}
+                          </span>
+                        </td>
+                        {/* Status */}
+                        <td className="px-3 py-2.5">
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-1"
+                            style={{ background: st.bg, color: st.color }}>
+                            {st.icon} {st.label}
+                          </span>
+                        </td>
+                        {/* Action */}
+                        <td className="px-3 py-2.5 text-center">
+                          {isDone && seg.videoUrl ? (
+                            <button
+                              onClick={e => { e.stopPropagation(); downloadClip(seg) }}
+                              className="text-[10px] px-2 py-0.5 rounded font-medium"
+                              style={{ background: "#D1FAE5", color: "#065F46" }}
+                              title="Download clip"
+                            >↓</button>
+                          ) : (
+                            <span className="text-[10px]" style={{ color: "#DDD" }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Footer Summary */}
+          <div className="flex items-center gap-4 px-4 py-2 flex-shrink-0" style={{ background: "#EBEBEB", borderTop: "1px solid #D0D0D0" }}>
+            <div className="flex items-center gap-4 text-[10px]">
+              <span style={{ color: "#065F46" }}>✓ {doneSegs.length} ready</span>
+              {activeSegs.length > 0 && <span style={{ color: "#6D28D9" }}>◉ {activeSegs.length} active</span>}
+              {failedSegs.length > 0 && <span style={{ color: "#991B1B" }}>✕ {failedSegs.length} failed</span>}
+              {epSegments.filter(s => s.status === "pending").length > 0 && (
+                <span style={{ color: "#6B7280" }}>○ {epSegments.filter(s => s.status === "pending").length} pending</span>
+              )}
+            </div>
+            <div className="flex-1" />
+            <span className="text-[10px] font-mono" style={{ color: "#888" }}>
+              {projectCode} · {formatDuration(totalDuration)} ready / {formatDuration(estTotalDuration)} total
+            </span>
+
+            {/* Folder structure hint */}
+            <div className="relative group">
+              <button className="text-[10px] px-2 py-0.5 rounded" style={{ background: "#E8E8E8", color: "#888" }}>
+                📁 Structure
+              </button>
+              <div className="absolute bottom-full right-0 mb-1 hidden group-hover:block z-20">
+                <pre className="text-[9px] font-mono leading-4 p-3 rounded-lg shadow-lg whitespace-pre"
+                  style={{ background: "#1A1A1A", color: "#888", border: "1px solid #333", minWidth: 220 }}>
+{`${abbrev}-S${epStr}/
+  EP${epStr}/
+    VIDEO/       ${doneSegs.length} clips
+    PENDING/     ${epSegments.length - doneSegs.length} clips
+    AUDIO/       (audio exports)
+    GRAPHICS/    (titles, VFX)
+    DOCUMENTS/   EDL, manifest
+  ASSETS/
+    CHARACTERS/  reference images
+    LOCATIONS/   location stills
+    PROPS/       prop references`}
+                </pre>
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* ── Package Panel Overlay ──────────────────────────── */}
-      {showPackage && packageManifest && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.85)" }}>
-          <div className="flex flex-col rounded-xl overflow-hidden" style={{
-            width: "min(860px, 92vw)", maxHeight: "85vh",
-            background: "#1A1A1A", border: "1px solid #333",
-          }}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ background: "#222", borderBottom: "1px solid #333" }}>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full" style={{ background: "#10B981" }} />
-                <div>
-                  <span className="text-[13px] font-semibold" style={{ color: "#E5E5E5" }}>
-                    Package — {packageManifest.abbrev}-S{String(packageManifest.episode).padStart(2,"0")}
-                  </span>
-                  <span className="ml-3 text-[11px]" style={{ color: "#555" }}>
-                    {packageManifest.doneClips}/{packageManifest.totalClips} clips · {packageManifest.totalDuration}s
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Download EDL */}
-                <button
-                  onClick={() => downloadTextFile(
-                    `${packageManifest.abbrev}-S${String(packageManifest.episode).padStart(2,"0")}.edl`,
-                    packageManifest.edlLines.join("\n")
-                  )}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium"
-                  style={{ background: "#1E3A2F", color: "#10B981", border: "1px solid #2A5540" }}
-                >
-                  ↓ EDL
-                </button>
-                {/* Download CSV manifest */}
-                <button
-                  onClick={() => downloadTextFile(
-                    `${packageManifest.abbrev}-S${String(packageManifest.episode).padStart(2,"0")}-manifest.csv`,
-                    manifestToCSV(packageManifest)
-                  )}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium"
-                  style={{ background: "#1E2A3A", color: "#60A5FA", border: "1px solid #2A4060" }}
-                >
-                  ↓ CSV Manifest
-                </button>
-                <button
-                  onClick={() => setShowPackage(false)}
-                  className="w-7 h-7 flex items-center justify-center rounded"
-                  style={{ background: "#2A2A2A", color: "#888" }}
-                >✕</button>
-              </div>
-            </div>
-
-            <div className="flex flex-1 min-h-0 overflow-hidden">
-              {/* Left: Folder Structure */}
-              <div className="w-56 flex-shrink-0 flex flex-col" style={{ background: "#161616", borderRight: "1px solid #2A2A2A" }}>
-                <div className="px-3 py-2" style={{ borderBottom: "1px solid #2A2A2A" }}>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "#555" }}>Folder Structure</span>
-                </div>
-                <div className="flex-1 overflow-y-auto dev-scrollbar p-3">
-                  <pre className="text-[10px] font-mono leading-5" style={{ color: "#666", whiteSpace: "pre-wrap" }}>
-                    {packageManifest.folderStructure.join("\n")}
-                  </pre>
-                  <div className="mt-4 pt-3" style={{ borderTop: "1px solid #2A2A2A" }}>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#555" }}>Post Rules</p>
-                    {[
-                      "序号从001开始递增",
-                      "完成片段入 VIDEO/",
-                      "待生成片段入 PENDING/",
-                      "音频分离入 AUDIO/",
-                      "参考素材入 ASSETS/",
-                      "EDL + CSV入 DOCUMENTS/",
-                    ].map(r => (
-                      <div key={r} className="flex items-start gap-1.5 mb-1">
-                        <div className="w-1 h-1 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#444" }} />
-                        <span className="text-[9px] leading-4" style={{ color: "#555" }}>{r}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Clip List */}
-              <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex items-center gap-4 px-4 py-2 flex-shrink-0" style={{ background: "#1E1E1E", borderBottom: "1px solid #2A2A2A" }}>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider flex-1" style={{ color: "#555" }}>Filename</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider w-16 text-right" style={{ color: "#555" }}>Scene</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider w-14 text-right" style={{ color: "#555" }}>Dur(s)</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider w-20" style={{ color: "#555" }}>Shot</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider w-16" style={{ color: "#555" }}>Status</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider w-12 text-right" style={{ color: "#555" }}>Action</span>
-                </div>
-                <div className="flex-1 overflow-y-auto dev-scrollbar">
-                  {packageManifest.clips.map((clip, i) => {
-                    const ss = STATUS_STYLE[clip.status] || STATUS_STYLE.pending
-                    const isDone = clip.status === "done"
-                    return (
-                      <div
-                        key={i}
-                        className="flex items-center gap-4 px-4 py-2"
-                        style={{ borderBottom: "1px solid #222", background: isDone ? "transparent" : "rgba(255,80,80,0.03)" }}
-                      >
-                        {/* Filename */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-mono truncate" style={{ color: isDone ? "#A5B4FC" : "#555" }}>
-                            {clip.filename}
-                          </p>
-                          <p className="text-[9px] truncate mt-0.5" style={{ color: "#444" }}>{clip.prompt}</p>
-                        </div>
-                        {/* Scene */}
-                        <span className="text-[10px] font-mono w-16 text-right flex-shrink-0" style={{ color: "#666" }}>
-                          SC{String(clip.sceneNum).padStart(3,"0")}
-                        </span>
-                        {/* Duration */}
-                        <span className="text-[10px] font-mono w-14 text-right flex-shrink-0" style={{ color: "#666" }}>
-                          {clip.durationSec}s
-                        </span>
-                        {/* Shot type */}
-                        <span className="text-[10px] w-20 flex-shrink-0 truncate" style={{ color: "#666" }}>
-                          {clip.shotType}
-                        </span>
-                        {/* Status badge */}
-                        <span className="text-[9px] px-1.5 py-0.5 rounded w-16 flex-shrink-0 text-center" style={ss}>
-                          {clip.status}
-                        </span>
-                        {/* Download link */}
-                        <div className="w-12 flex-shrink-0 flex justify-end">
-                          {clip.videoUrl ? (
-                            <a
-                              href={clip.videoUrl}
-                              download={clip.filename}
-                              className="text-[10px] px-2 py-0.5 rounded"
-                              style={{ background: "#1E3A2F", color: "#10B981" }}
-                              title="Download this clip"
-                            >↓</a>
-                          ) : (
-                            <span className="text-[10px]" style={{ color: "#333" }}>—</span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Summary footer */}
-                <div className="flex items-center gap-4 px-4 py-2 flex-shrink-0" style={{ background: "#161616", borderTop: "1px solid #2A2A2A" }}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ background: "#10B981" }} />
-                    <span className="text-[10px]" style={{ color: "#555" }}>
-                      {packageManifest.doneClips} clips ready
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ background: "#EF4444" }} />
-                    <span className="text-[10px]" style={{ color: "#555" }}>
-                      {packageManifest.totalClips - packageManifest.doneClips} pending
-                    </span>
-                  </div>
-                  <div className="flex-1" />
-                  <span className="text-[10px] font-mono" style={{ color: "#555" }}>
-                    Total: {packageManifest.totalDuration}s · Generated {new Date(packageManifest.generatedAt).toLocaleTimeString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

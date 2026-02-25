@@ -3,7 +3,7 @@
  * Reads from DB (AiFeaturePrice), with hardcoded defaults as fallback.
  */
 import prisma from "@/lib/prisma"
-import { confirmDeduction, getAvailableBalance } from "@/lib/tokens"
+import { directDeduction } from "@/lib/tokens"
 
 /** All known AI feature keys */
 export type AiFeatureKey =
@@ -84,16 +84,19 @@ export async function chargeAiFeature(
   const cost = await getFeatureCost(featureKey)
   if (cost === 0) return { ok: true, coinsCharged: 0 }
 
-  const available = await getAvailableBalance(userId)
-  if (available < cost) {
-    return { ok: false, error: "insufficient_balance", balance: available, required: cost }
-  }
-
-  await confirmDeduction(userId, cost, {
+  // Atomic: check balance and deduct in a single transaction
+  const charged = await directDeduction(userId, cost, {
     type: "ai_feature",
     featureKey,
     ...metadata,
   })
+
+  if (!charged) {
+    // Read balance for error reporting
+    const { getAvailableBalance } = await import("@/lib/tokens")
+    const available = await getAvailableBalance(userId)
+    return { ok: false, error: "insufficient_balance", balance: available, required: cost }
+  }
 
   return { ok: true, coinsCharged: cost }
 }

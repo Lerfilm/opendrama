@@ -64,6 +64,7 @@ export function LocationDetail({
   onUpdateEntry, onAIDescribe, onAIExtract, onGenerateAllPhotos,
 }: LocationDetailProps) {
   const [showDescribeConfirm, setShowDescribeConfirm] = useState(false)
+  const [showPhotoConfirm, setShowPhotoConfirm] = useState(false)
   const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false)
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
 
@@ -89,12 +90,13 @@ export function LocationDetail({
     fd.append("file", file)
     try {
       const res = await fetch("/api/upload/role-image", { method: "POST", body: fd })
-      if (res.ok) {
-        const { url } = await res.json()
-        const newPhotos = [...(entry?.photos || []), { url, isApproved: false }]
-        onUpdateEntry(selectedLoc, { photos: newPhotos })
-      }
-    } catch { /* silent */ }
+      if (!res.ok) { alert(`Upload failed (${res.status}). Please try again.`); return }
+      const { url } = await res.json()
+      const newPhotos = [...(entry?.photos || []), { url, isApproved: false }]
+      onUpdateEntry(selectedLoc, { photos: newPhotos })
+    } catch (err: any) {
+      alert(`Upload failed: ${err?.message || "Network error"}`)
+    }
     e.target.value = ""
   }
 
@@ -112,14 +114,21 @@ export function LocationDetail({
           scriptId,
         }),
       })
-      if (!res.ok) return
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(`AI photo generation failed: ${err.error || `Status ${res.status}`}`)
+        return
+      }
       const data = await res.json()
       if (data.url) {
         const newPhotos = [...(entry.photos || []), { url: data.url, isApproved: false }]
         onUpdateEntry(selectedLoc, { photos: newPhotos })
       }
-    } catch { /* silent */ }
-    finally { setIsGeneratingPhoto(false) }
+    } catch (err: any) {
+      alert(`AI photo generation failed: ${err?.message || "Network error"}`)
+    } finally {
+      setIsGeneratingPhoto(false)
+    }
   }
 
   return (
@@ -287,7 +296,7 @@ export function LocationDetail({
             </label>
             <div className="flex items-center gap-2">
               <button
-                onClick={handleAIGeneratePhoto}
+                onClick={() => setShowPhotoConfirm(true)}
                 disabled={isGeneratingPhoto}
                 className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded disabled:opacity-50 transition-colors"
                 style={{ background: "#EDE9FE", color: "#6D28D9", border: "1px solid #DDD6FE" }}
@@ -405,6 +414,15 @@ export function LocationDetail({
         featureLabel="Location AI Describe"
         onConfirm={() => { setShowDescribeConfirm(false); onAIDescribe(selectedLoc) }}
         onCancel={() => setShowDescribeConfirm(false)}
+      />
+    )}
+
+    {showPhotoConfirm && (
+      <AIConfirmModal
+        featureKey="generate_location_photo"
+        featureLabel="AI Location Photo"
+        onConfirm={() => { setShowPhotoConfirm(false); handleAIGeneratePhoto() }}
+        onCancel={() => setShowPhotoConfirm(false)}
       />
     )}
     </>

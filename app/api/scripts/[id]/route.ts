@@ -77,6 +77,9 @@ export async function PUT(
         ...(body.targetEpisodes !== undefined && { targetEpisodes: body.targetEpisodes }),
         ...(body.status !== undefined && { status: body.status }),
         ...(body.metadata !== undefined && { metadata: body.metadata }),
+        ...(body.coverTall !== undefined && { coverTall: body.coverTall }),
+        ...(body.coverWide !== undefined && { coverWide: body.coverWide }),
+        ...(body.coverImage !== undefined && { coverImage: body.coverImage }),
       },
     })
 

@@ -5,6 +5,7 @@ import { uploadToStorage, storagePath, type StorageBucket } from "@/lib/storage"
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024  // 5 MB
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024 // 200 MB
+const MAX_AUDIO_BYTES = 30 * 1024 * 1024  // 30 MB
 
 const BUCKET_MAP: Record<string, StorageBucket> = {
   "role-images": "role-images",
@@ -14,6 +15,7 @@ const BUCKET_MAP: Record<string, StorageBucket> = {
   "covers": "covers",
   "props-images": "props-images",
   "finished-videos": "finished-videos",
+  "audio-tracks": "audio-tracks",
 }
 
 /**
@@ -49,14 +51,15 @@ export async function POST(req: NextRequest) {
 
     const isImage = file.type.startsWith("image/")
     const isVideo = file.type.startsWith("video/")
+    const isAudio = file.type.startsWith("audio/")
 
-    if (!isImage && !isVideo) {
-      return NextResponse.json({ error: "File must be an image or video" }, { status: 400 })
+    if (!isImage && !isVideo && !isAudio) {
+      return NextResponse.json({ error: "File must be an image, video, or audio" }, { status: 400 })
     }
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES
+    const maxBytes = isVideo ? MAX_VIDEO_BYTES : isAudio ? MAX_AUDIO_BYTES : MAX_IMAGE_BYTES
 
     if (buffer.byteLength > maxBytes) {
       return NextResponse.json(

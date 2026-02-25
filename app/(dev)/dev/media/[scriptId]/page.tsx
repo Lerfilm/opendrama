@@ -22,6 +22,12 @@ export default async function MediaPage({ params }: { params: Promise<{ scriptId
       roles: {
         select: { id: true, name: true, role: true, referenceImages: true, avatarUrl: true },
       },
+      locations: {
+        select: { id: true, name: true, type: true, photoUrl: true, photos: true },
+      },
+      props: {
+        select: { id: true, name: true, category: true, photoUrl: true, photos: true },
+      },
       videoSegments: {
         select: {
           id: true, episodeNum: true, segmentIndex: true, sceneNum: true,
@@ -45,6 +51,28 @@ export default async function MediaPage({ params }: { params: Promise<{ scriptId
       avatarUrl: resolveImageUrl(r.avatarUrl),
       referenceImages: r.referenceImages.map(u => resolveImageUrl(u)),
     })),
+    locations: script.locations.map(l => {
+      let photos: { url: string; note?: string }[] = []
+      if (l.photos) {
+        try { photos = JSON.parse(l.photos) } catch { /* */ }
+      }
+      return {
+        ...l,
+        photoUrl: resolveImageUrl(l.photoUrl),
+        parsedPhotos: photos.map(p => ({ ...p, url: resolveImageUrl(p.url) ?? p.url })),
+      }
+    }),
+    props: script.props.map(p => {
+      let photos: { url: string; note?: string }[] = []
+      if (p.photos) {
+        try { photos = JSON.parse(p.photos) } catch { /* */ }
+      }
+      return {
+        ...p,
+        photoUrl: resolveImageUrl(p.photoUrl),
+        parsedPhotos: photos.map(ph => ({ ...ph, url: resolveImageUrl(ph.url) ?? ph.url })),
+      }
+    }),
     videoSegments: script.videoSegments.map(s => ({
       ...s,
       thumbnailUrl: resolveImageUrl(s.thumbnailUrl),

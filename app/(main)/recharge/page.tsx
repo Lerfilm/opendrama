@@ -16,10 +16,11 @@ export default async function RechargePage() {
     redirect("/auth/signin")
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { coins: true },
+  const userBalance = await prisma.userBalance.findUnique({
+    where: { userId: session.user.id },
+    select: { balance: true, reserved: true },
   })
+  const availableCoins = userBalance ? userBalance.balance - userBalance.reserved : 0
 
   const icons = [Coins, Sparkles, Zap, Crown]
 
@@ -34,14 +35,14 @@ export default async function RechargePage() {
                 <div className="flex items-center gap-2">
                   <Coins className="w-8 h-8" />
                   <span className="text-4xl font-bold">
-                    {user?.coins || 0}
+                    {availableCoins}
                   </span>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-xs opacity-75">{t("recharge.coinPerEpisode")}</p>
                 <p className="text-xs opacity-75 mt-1">{t("recharge.canWatch")}</p>
-                <p className="text-2xl font-bold">{t("home.episodeCount", { count: user?.coins || 0 })}</p>
+                <p className="text-2xl font-bold">{t("home.episodeCount", { count: availableCoins })}</p>
               </div>
             </div>
           </CardContent>

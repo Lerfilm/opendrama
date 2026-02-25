@@ -382,7 +382,7 @@ export function ScriptWorkspace({ script: initial }: { script: Script }) {
 
   return (
     <>
-    <div className="h-full grid grid-rows-[1fr] grid-cols-[280px_1fr_300px]">
+    <div className="h-full grid grid-rows-[1fr] grid-cols-[280px_1fr_210px]">
       {/* Left: Scene List */}
       <SceneListPanel
         scenes={currentScenes}

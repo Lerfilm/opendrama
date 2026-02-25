@@ -473,6 +473,7 @@ model VideoSegment {
   prompt          String    @db.Text
   shotType        String?   // wide | medium | close-up | extreme-close-up
   cameraMove      String?   // static | pan | tilt | dolly | tracking | orbit
+  beatType        String?   // hook | establish | confrontation | escalation | emotional_peak | reaction | reveal | action | breath | cliffhanger
   referenceImages String[]
   referenceVideo  String?
 

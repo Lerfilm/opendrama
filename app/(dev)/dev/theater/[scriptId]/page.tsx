@@ -22,6 +22,9 @@ export default async function TheaterPage({ params }: { params: Promise<{ script
         orderBy: [{ episodeNum: "asc" }, { sortOrder: "asc" }],
       },
       roles: true,
+      locations: {
+        select: { name: true, photoUrl: true, photos: true },
+      },
       videoSegments: { orderBy: [{ episodeNum: "asc" }, { segmentIndex: "asc" }] },
     },
   })
@@ -36,6 +39,15 @@ export default async function TheaterPage({ params }: { params: Promise<{ script
       avatarUrl: r.avatarUrl ? resolveImageUrl(r.avatarUrl) : r.avatarUrl,
       referenceImages: r.referenceImages.map(u => resolveImageUrl(u)),
     })),
+    locations: script.locations.map(l => {
+      let photos: { url: string; note?: string }[] = []
+      try { photos = l.photos ? JSON.parse(l.photos as string) : [] } catch { /* ok */ }
+      return {
+        name: l.name,
+        photoUrl: l.photoUrl ? resolveImageUrl(l.photoUrl) : l.photoUrl,
+        photos: photos.map(p => ({ ...p, url: p.url ? resolveImageUrl(p.url) : p.url })),
+      }
+    }),
     videoSegments: script.videoSegments.map(s => ({
       ...s,
       thumbnailUrl: s.thumbnailUrl ? resolveImageUrl(s.thumbnailUrl) : s.thumbnailUrl,

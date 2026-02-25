@@ -54,6 +54,8 @@ export async function reserveTokens(userId: string, amount: number, description?
 
 /**
  * Confirm deduction after successful generation.
+ * Use this ONLY when tokens were previously reserved via reserveTokens().
+ * For direct charges (AI features), use directDeduction() instead.
  */
 export async function confirmDeduction(
   userId: string,
@@ -80,6 +82,55 @@ export async function confirmDeduction(
         metadata: metadata as any,
       },
     })
+
+    // Sync legacy User.coins field
+    await tx.user.update({
+      where: { id: userId },
+      data: { coins: balance.balance },
+    })
+  })
+}
+
+/**
+ * Direct deduction — charge coins without a prior reservation.
+ * Used for AI features where we check balance and deduct in one atomic step.
+ * Returns true if charged, false if insufficient balance.
+ */
+export async function directDeduction(
+  userId: string,
+  amount: number,
+  metadata?: Record<string, unknown>
+): Promise<boolean> {
+  return await prisma.$transaction(async (tx) => {
+    const current = await tx.userBalance.findUnique({ where: { userId } })
+    if (!current || current.balance - current.reserved < amount) return false
+
+    const updated = await tx.userBalance.update({
+      where: { userId },
+      data: {
+        balance: { decrement: amount },
+        totalConsumed: { increment: amount },
+      },
+    })
+
+    await tx.tokenTransaction.create({
+      data: {
+        userId,
+        type: "consume",
+        amount: -amount,
+        balanceAfter: updated.balance,
+        description: `Consumed ${amount} coins`,
+        metadata: metadata as any,
+      },
+    })
+
+    // Sync legacy User.coins field
+    await tx.user.update({
+      where: { id: userId },
+      data: { coins: updated.balance },
+    })
+
+    return true
   })
 }
 

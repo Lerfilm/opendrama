@@ -133,10 +133,11 @@ export default async function RechargeSuccessPage({
     // Try fulfillment (idempotent — safe to call even if webhook already processed)
     purchase = await fulfillPayment(sessionId, session.user.id)
 
-    user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { coins: true },
+    const userBalance = await prisma.userBalance.findUnique({
+      where: { userId: session.user.id },
+      select: { balance: true, reserved: true },
     })
+    user = { coins: userBalance ? userBalance.balance - userBalance.reserved : 0 }
   }
 
   return (

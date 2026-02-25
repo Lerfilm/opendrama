@@ -28,6 +28,7 @@ export type StorageBucket =
   | "props-images"
   | "scripts"
   | "finished-videos"
+  | "audio-tracks"
 
 export interface UploadedAsset {
   url: string

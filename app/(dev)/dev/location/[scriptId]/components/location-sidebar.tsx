@@ -134,12 +134,20 @@ export function LocationSidebar({
                   borderLeft: isSelected ? "2px solid #4F46E5" : "2px solid transparent",
                 }}
               >
+                {e?.photos?.[0]?.url ? (
+                <img
+                  src={e.photos[0].url}
+                  alt=""
+                  className="w-7 h-7 rounded object-cover flex-shrink-0 mt-0.5"
+                />
+              ) : (
                 <div
                   className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] font-bold"
                   style={{ background: isSelected ? "#4F46E5" : "#D0D0D0", color: isSelected ? "#fff" : "#888" }}
                 >
                   {e?.type?.substring(0, 3) || "INT"}
                 </div>
+              )}
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium truncate" style={{ color: isSelected ? "#1A1A1A" : "#333" }}>{loc}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">

@@ -14,7 +14,7 @@ export default async function FinishingPage({ params }: { params: Promise<{ scri
     where: { id: scriptId, userId: session.user.id as string },
     select: {
       id: true, title: true, genre: true, logline: true, synopsis: true,
-      coverTall: true, targetEpisodes: true, status: true, metadata: true,
+      coverTall: true, coverWide: true, targetEpisodes: true, status: true, metadata: true,
       scenes: { orderBy: [{ episodeNum: "asc" }, { sortOrder: "asc" }] },
       roles: true,
       videoSegments: {
@@ -31,6 +31,7 @@ export default async function FinishingPage({ params }: { params: Promise<{ scri
   const resolved = {
     ...script,
     coverTall: resolveImageUrl(script.coverTall),
+    coverWide: resolveImageUrl(script.coverWide),
     videoSegments: script.videoSegments.map(s => ({
       ...s,
       thumbnailUrl: s.thumbnailUrl ? resolveImageUrl(s.thumbnailUrl) : s.thumbnailUrl,

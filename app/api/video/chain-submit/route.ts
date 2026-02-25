@@ -58,9 +58,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Insufficient balance" }, { status: 402 })
   }
 
-  // Delete any existing pending segments for this episode
+  // Delete ALL existing segments for this episode before re-generating.
+  // Refund any segments that still hold a reservation (reserved/submitted/generating).
+  const existingSegs = await prisma.videoSegment.findMany({
+    where: { scriptId, episodeNum },
+    select: { id: true, status: true, tokenCost: true },
+  })
+  const refundTotal = existingSegs
+    .filter(s => ["reserved", "submitted", "generating"].includes(s.status) && s.tokenCost)
+    .reduce((sum, s) => sum + (s.tokenCost ?? 0), 0)
+  if (refundTotal > 0) {
+    const { refundReservation } = await import("@/lib/tokens")
+    await refundReservation(session.user.id, refundTotal, `Refund: episode ${episodeNum} re-generated (chain)`).catch(() => {})
+  }
   await prisma.videoSegment.deleteMany({
-    where: { scriptId, episodeNum, status: { in: ["pending"] } },
+    where: { scriptId, episodeNum },
   })
 
   // Create all segments with chainMode: true, status: "reserved"

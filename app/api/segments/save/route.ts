@@ -23,15 +23,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Script not found" }, { status: 404 })
   }
 
-  // Transaction: delete existing pending segments + create new ones
+  // Transaction: delete ALL existing segments for episode + create new ones.
+  // When the user runs "AI Plan", they want a fresh set of segments.
   const segments = await prisma.$transaction(async (tx) => {
-    // Delete existing pending segments for this episode
+    // Refund any segments that still hold token reservations
+    const oldSegs = await tx.videoSegment.findMany({
+      where: { scriptId, episodeNum },
+      select: { id: true, status: true, tokenCost: true },
+    })
+    const refundTotal = oldSegs
+      .filter(s => ["reserved", "submitted", "generating"].includes(s.status) && s.tokenCost)
+      .reduce((sum, s) => sum + (s.tokenCost ?? 0), 0)
+    if (refundTotal > 0) {
+      const { refundReservation } = await import("@/lib/tokens")
+      await refundReservation(session.user.id, refundTotal, `Refund: episode ${episodeNum} re-planned`).catch(() => {})
+    }
+
+    // Delete ALL existing segments for this episode
     await tx.videoSegment.deleteMany({
-      where: {
-        scriptId,
-        episodeNum,
-        status: "pending",
-      },
+      where: { scriptId, episodeNum },
     })
 
     // Create new segments with status "pending"
@@ -44,6 +54,7 @@ export async function POST(req: NextRequest) {
           prompt: string
           shotType?: string
           cameraMove?: string
+          beatType?: string
         }, i: number) =>
           tx.videoSegment.create({
             data: {
@@ -55,6 +66,7 @@ export async function POST(req: NextRequest) {
               prompt: seg.prompt,
               shotType: seg.shotType || "medium",
               cameraMove: seg.cameraMove || "static",
+              beatType: seg.beatType || null,
               model,
               resolution,
               status: "pending",

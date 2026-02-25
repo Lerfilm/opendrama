@@ -48,13 +48,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 402 })
     }
 
-    // Delete any existing pending segments for this episode (re-generation)
+    // Delete ALL existing segments for this episode before re-generating.
+    // Refund any segments that still hold a reservation.
+    const existingSegs = await prisma.videoSegment.findMany({
+      where: { scriptId, episodeNum },
+      select: { id: true, status: true, tokenCost: true },
+    })
+    const refundOld = existingSegs
+      .filter(s => ["reserved", "submitted", "generating"].includes(s.status) && s.tokenCost)
+      .reduce((sum, s) => sum + (s.tokenCost ?? 0), 0)
+    if (refundOld > 0) {
+      await refundReservation(session.user.id, refundOld, `Refund: episode ${episodeNum} re-generated (batch)`).catch(() => {})
+    }
     await prisma.videoSegment.deleteMany({
-      where: {
-        scriptId,
-        episodeNum,
-        status: { in: ["pending"] },
-      },
+      where: { scriptId, episodeNum },
     })
 
     // Create all segments in DB
@@ -99,7 +106,7 @@ export async function POST(req: NextRequest) {
   // ──────────────────────────────────────────
   // Single segment submission (retry / individual)
   // ──────────────────────────────────────────
-  const { segmentId } = body
+  const { segmentId, prompt: promptOverride } = body
 
   if (segmentId) {
     const segment = await prisma.videoSegment.findUnique({
@@ -108,12 +115,24 @@ export async function POST(req: NextRequest) {
     if (!segment) {
       return NextResponse.json({ error: "Segment not found" }, { status: 404 })
     }
-    if (!segment.model || !segment.resolution) {
+
+    // Use model/resolution from the segment, or from the body if provided
+    const segModel = body.model || segment.model
+    const segResolution = body.resolution || segment.resolution
+    if (!segModel || !segResolution) {
       return NextResponse.json({ error: "Model and resolution required" }, { status: 400 })
     }
 
+    // Update prompt if a new one was provided
+    if (promptOverride) {
+      await prisma.videoSegment.update({
+        where: { id: segmentId },
+        data: { prompt: promptOverride, model: segModel, resolution: segResolution },
+      })
+    }
+
     // Calculate cost
-    const cost = calculateTokenCost(segment.model, segment.resolution, segment.durationSec)
+    const cost = calculateTokenCost(segModel, segResolution, segment.durationSec)
 
     // Reserve tokens
     const reserved = await reserveTokens(session.user.id, cost, `Video generation: segment ${segmentId}`)
@@ -121,10 +140,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 402 })
     }
 
-    // Update segment status
+    // Update segment status (and clear old video data for re-generation)
     await prisma.videoSegment.update({
       where: { id: segmentId },
-      data: { status: "reserved", tokenCost: cost },
+      data: {
+        status: "reserved",
+        tokenCost: cost,
+        model: segModel,
+        resolution: segResolution,
+        videoUrl: null,
+        providerTaskId: null,
+        errorMessage: null,
+        thumbnailUrl: null,
+      },
     })
 
     try {
@@ -133,8 +161,8 @@ export async function POST(req: NextRequest) {
 
       // Submit to video generation API
       const { taskId } = await submitVideoTask({
-        model: segment.model,
-        resolution: segment.resolution,
+        model: segModel,
+        resolution: segResolution,
         prompt,
         imageUrls,
         referenceVideo: segment.referenceVideo || undefined,

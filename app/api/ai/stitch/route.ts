@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { aiComplete, extractJSON } from "@/lib/ai"
-import { getAvailableBalance, confirmDeduction } from "@/lib/tokens"
+import { getAvailableBalance, directDeduction } from "@/lib/tokens"
 
 /**
  * POST /api/ai/stitch
@@ -156,7 +156,7 @@ Only add bridges where genuinely needed for narrative coherence. Return empty br
 
     // Deduct coins
     const coinsUsed = Math.max(1, Math.ceil(result.usage.totalTokens * 0.0005))
-    await confirmDeduction(session.user.id, coinsUsed, {
+    await directDeduction(session.user.id, coinsUsed, {
       type: "stitch",
       episodeNum,
       totalTokens: result.usage.totalTokens,

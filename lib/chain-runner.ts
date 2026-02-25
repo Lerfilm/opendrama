@@ -99,6 +99,11 @@ async function generateSeedImage(prompt: string): Promise<string> {
 // Poll a single video segment until done or failed
 // ──────────────────────────────────────────────────────────────────────────
 
+interface PollResult {
+  videoUrl: string
+  lastFrameUrl?: string  // returned by API when return_last_frame=true
+}
+
 async function pollSegmentUntilDone(
   segmentId: string,
   model: string,
@@ -106,11 +111,31 @@ async function pollSegmentUntilDone(
   userId: string,
   tokenCost: number,
   durationSec: number
-): Promise<string> {
+): Promise<PollResult> {
+  let consecutiveErrors = 0
+  const MAX_CONSECUTIVE_ERRORS = 5
+
   for (let i = 0; i < VIDEO_MAX_POLLS; i++) {
     await new Promise(r => setTimeout(r, VIDEO_POLL_INTERVAL))
 
-    const result = await queryVideoTask(model, providerTaskId)
+    let result
+    try {
+      result = await queryVideoTask(model, providerTaskId)
+      consecutiveErrors = 0 // reset on success
+    } catch (pollErr) {
+      consecutiveErrors++
+      console.warn(`[Chain] Poll error for ${segmentId} (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, pollErr)
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        // Check if frontend poller already marked it done
+        const seg = await prisma.videoSegment.findUnique({ where: { id: segmentId } })
+        if (seg?.status === "done" && seg.videoUrl) {
+          console.log(`[Chain] Segment ${segmentId} already done (found via DB after poll errors)`)
+          return { videoUrl: seg.videoUrl }
+        }
+        throw new Error(`Segment ${segmentId} poll failed ${MAX_CONSECUTIVE_ERRORS} times: ${pollErr}`)
+      }
+      continue // retry on next poll interval
+    }
 
     if (result.status === "generating") {
       // Update status from "submitted" to "generating" if needed
@@ -129,8 +154,8 @@ async function pollSegmentUntilDone(
       if (count > 0) {
         await confirmDeduction(userId, tokenCost, { segmentId })
       }
-      console.log(`[Chain] Segment ${segmentId} done (poll ${i + 1}): ${result.videoUrl.slice(0, 60)}`)
-      return result.videoUrl
+      console.log(`[Chain] Segment ${segmentId} done (poll ${i + 1}): ${result.videoUrl.slice(0, 60)}${result.lastFrameUrl ? " [+lastFrame]" : ""}`)
+      return { videoUrl: result.videoUrl, lastFrameUrl: result.lastFrameUrl }
     }
 
     if (result.status === "failed") {
@@ -143,7 +168,13 @@ async function pollSegmentUntilDone(
     }
   }
 
-  // Timeout
+  // Timeout — but first check DB in case frontend poller already updated it
+  const seg = await prisma.videoSegment.findUnique({ where: { id: segmentId } })
+  if (seg?.status === "done" && seg.videoUrl) {
+    console.log(`[Chain] Segment ${segmentId} already done (found via DB after timeout)`)
+    return { videoUrl: seg.videoUrl }
+  }
+
   await prisma.videoSegment.update({
     where: { id: segmentId },
     data: { status: "failed", errorMessage: "Chain runner: timed out waiting for video" },
@@ -204,7 +235,14 @@ export async function runChain(
 
         // Use the enriched prompt for seed image (so character descriptions are included)
         const { prompt: enrichedPrompt } = await enrichSegmentWithCharacters(seg.id)
-        currentFrameUrl = await generateSeedImage(enrichedPrompt)
+        try {
+          currentFrameUrl = await generateSeedImage(enrichedPrompt)
+        } catch (seedErr) {
+          // T2I seed image failed (e.g. API not activated, access denied, etc.)
+          // Fall back to text-to-video without a seed image — chain still works
+          console.warn(`[Chain] T2I seed image failed, falling back to T2V:`, seedErr)
+          currentFrameUrl = null
+        }
       }
 
       // ── Step 2: Save seed image URL to this segment ─────────────────────
@@ -228,14 +266,22 @@ export async function runChain(
         })
       }
 
-      // ── Step 3: Submit I2V ───────────────────────────────────────────────
+      // ── Step 3: Submit video task ──────────────────────────────────────
       const { prompt, imageUrls: charImageUrls } = await enrichSegmentWithCharacters(seg.id)
 
-      // Chain image goes FIRST (primary visual anchor), character refs follow
+      // Chain frame (seed or last-frame) goes FIRST as primary visual anchor,
+      // character reference images follow (already filtered to absolute URLs).
       const allImageUrls = [
         ...(currentFrameUrl ? [currentFrameUrl] : []),
         ...charImageUrls,
       ]
+
+      // Determine if this is Seedance 1.5 Pro (supports return_last_frame)
+      const is15Pro = seg.model === "seedance_1_5_pro"
+      const isLastInScene = sceneLastIdx.get(seg.sceneNum) === seg.segmentIndex
+      const needLastFrame = !isLastInScene  // need frame for next clip in same scene
+
+      console.log(`[Chain] Submitting segment ${seg.id}: images=${allImageUrls.length} (chain=${currentFrameUrl ? 1 : 0}, chars=${charImageUrls.length})`)
 
       const { taskId } = await submitVideoTask({
         model: seg.model!,
@@ -244,6 +290,13 @@ export async function runChain(
         imageUrls: allImageUrls,
         aspectRatio: "9:16",
         durationSec: seg.durationSec,
+        // Chain mode optimizations:
+        isChainFrame: !!currentFrameUrl,         // mark image as first_frame role
+        returnLastFrame: is15Pro && needLastFrame, // API returns last frame (no ffmpeg needed)
+        // Keep Seedance audio enabled: the model generates dialogue voiceover and SFX
+        // from the prompt (quoted text → speech). Background music will vary per clip,
+        // but users can overlay a unified BGM track in the Editing workspace.
+        generateAudio: true,
       })
 
       await prisma.videoSegment.update({
@@ -254,7 +307,7 @@ export async function runChain(
       console.log(`[Chain] Segment ${seg.id} submitted: taskId=${taskId}`)
 
       // ── Step 4: Wait for completion ──────────────────────────────────────
-      const videoUrl = await pollSegmentUntilDone(
+      const pollResult = await pollSegmentUntilDone(
         seg.id,
         seg.model!,
         taskId,
@@ -263,12 +316,18 @@ export async function runChain(
         seg.durationSec
       )
 
-      // ── Step 5: Extract last frame for next clip in same scene ───────────
-      const isLastInScene = sceneLastIdx.get(seg.sceneNum) === seg.segmentIndex
-      if (!isLastInScene) {
-        console.log(`[Chain] Extracting last frame from segment ${seg.segmentIndex}...`)
-        currentFrameUrl = await extractLastFrame(videoUrl, seg.durationSec)
-        console.log(`[Chain] Frame extracted (${Math.round(currentFrameUrl.length / 1024)}KB base64)`)
+      // ── Step 5: Get last frame for next clip in same scene ───────────────
+      if (needLastFrame) {
+        // Prefer API-returned last frame (Seedance 1.5 Pro with return_last_frame)
+        if (pollResult.lastFrameUrl) {
+          console.log(`[Chain] Using API-returned last frame for segment ${seg.segmentIndex}`)
+          currentFrameUrl = pollResult.lastFrameUrl
+        } else {
+          // Fallback: extract last frame via ffmpeg (other models or API didn't return it)
+          console.log(`[Chain] Extracting last frame via ffmpeg from segment ${seg.segmentIndex}...`)
+          currentFrameUrl = await extractLastFrame(pollResult.videoUrl, seg.durationSec)
+          console.log(`[Chain] Frame extracted (${Math.round(currentFrameUrl.length / 1024)}KB base64)`)
+        }
       } else {
         // Scene boundary — next segment will generate a new seed image
         currentFrameUrl = null

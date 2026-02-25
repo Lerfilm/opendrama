@@ -198,6 +198,8 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(() => new Set(roles.map(r => r.id)))
   // Costume confirm modal
   const [showCostumeConfirm, setShowCostumeConfirm] = useState(false)
+  // Individual costume scene confirm
+  const [costumeConfirmScene, setCostumeConfirmScene] = useState<SceneRef | null>(null)
 
   // ── Global AI Task Context ──────────────────────────────────────────────
   const aiTasks = useAITasks()
@@ -304,14 +306,17 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
     setDeleteConfirmInput("")
     setDeletingId(id)
     try {
-      await fetch("/api/roles", {
+      const res = await fetch("/api/roles", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       })
+      if (!res.ok) { alert(`Failed to delete character (${res.status})`); return }
       const remaining = roles.filter(r => r.id !== id)
       setRoles(remaining)
       if (selectedRoleId === id) setSelectedRoleId(remaining[0]?.id ?? null)
+    } catch (e: any) {
+      alert(`Failed to delete character: ${e?.message || "Network error"}`)
     } finally {
       setDeletingId(null)
     }
@@ -322,19 +327,28 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
     if (selectedIds.length === 0) return
     const names = roles.filter(r => selectedIds.includes(r.id)).map(r => r.name).join(", ")
     if (!window.confirm(`Delete ${selectedIds.length} character(s)?\n\n${names}\n\nThis cannot be undone.`)) return
+    const deletedIds: string[] = []
     for (const id of selectedIds) {
       setDeletingId(id)
-      await fetch("/api/roles", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      })
+      try {
+        const res = await fetch("/api/roles", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        })
+        if (res.ok) deletedIds.push(id)
+        else console.error(`Delete role ${id} failed: ${res.status}`)
+      } catch (e) {
+        console.error(`Delete role ${id} error:`, e)
+      }
     }
     setDeletingId(null)
-    const remaining = roles.filter(r => !selectedIds.includes(r.id))
+    if (deletedIds.length === 0) { alert("Failed to delete characters. Please try again."); return }
+    if (deletedIds.length < selectedIds.length) alert(`Deleted ${deletedIds.length} of ${selectedIds.length} characters. Some deletions failed.`)
+    const remaining = roles.filter(r => !deletedIds.includes(r.id))
     setRoles(remaining)
-    setSelectedRoleIds(new Set())
-    if (selectedIds.includes(selectedRoleId ?? "")) {
+    setSelectedRoleIds(prev => { const next = new Set(prev); deletedIds.forEach(id => next.delete(id)); return next })
+    if (deletedIds.includes(selectedRoleId ?? "")) {
       setSelectedRoleId(remaining[0]?.id ?? null)
     }
   }
@@ -835,26 +849,36 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
     const role = roles.find(r => r.id === roleId)
     if (!role) return
     const newImages = role.referenceImages.filter(i => i !== imgUrl)
-    await fetch("/api/roles", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: roleId, referenceImages: newImages }),
-    })
-    updateLocal(roleId, { referenceImages: newImages })
-    setBrokenImages(prev => { const s = new Set(prev); s.delete(imgUrl); return s })
-    if (lightboxImg?.url === imgUrl) setLightboxImg(null)
+    try {
+      const res = await fetch("/api/roles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: roleId, referenceImages: newImages }),
+      })
+      if (!res.ok) { alert(`Failed to remove image (${res.status})`); return }
+      updateLocal(roleId, { referenceImages: newImages })
+      setBrokenImages(prev => { const s = new Set(prev); s.delete(imgUrl); return s })
+      if (lightboxImg?.url === imgUrl) setLightboxImg(null)
+    } catch (e: any) {
+      alert(`Failed to remove image: ${e?.message || "Network error"}`)
+    }
   }
 
   async function setAsMainImage(roleId: string, imgUrl: string) {
     const role = roles.find(r => r.id === roleId)
     if (!role) return
     const newImages = [imgUrl, ...role.referenceImages.filter(i => i !== imgUrl)]
-    await fetch("/api/roles", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: roleId, referenceImages: newImages }),
-    })
-    updateLocal(roleId, { referenceImages: newImages })
+    try {
+      const res = await fetch("/api/roles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: roleId, referenceImages: newImages }),
+      })
+      if (!res.ok) { alert(`Failed to set main image (${res.status})`); return }
+      updateLocal(roleId, { referenceImages: newImages })
+    } catch (e: any) {
+      alert(`Failed to set main image: ${e?.message || "Network error"}`)
+    }
   }
 
   return (
@@ -1592,7 +1616,7 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
                                 {scene.heading || scene.location || "Untitled"}
                               </span>
                               <button
-                                onClick={() => generateCostumeForScene(selectedRole.id, scene)}
+                                onClick={() => setCostumeConfirmScene(scene)}
                                 disabled={isGenerating || !!generatingCostumeFor}
                                 className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded flex-shrink-0 disabled:opacity-40"
                                 style={{ background: "#EDE9FE", color: "#6D28D9" }}>
@@ -1831,6 +1855,16 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
           </div>
         )
       })()}
+
+      {/* Individual Costume Generation Confirm */}
+      {costumeConfirmScene && (
+        <AIConfirmModal
+          featureKey="generate_costume"
+          featureLabel="AI Costume"
+          onConfirm={() => { const scene = costumeConfirmScene; setCostumeConfirmScene(null); generateCostumeForScene(selectedRole!.id, scene) }}
+          onCancel={() => setCostumeConfirmScene(null)}
+        />
+      )}
 
       {/* Hidden file inputs */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden"

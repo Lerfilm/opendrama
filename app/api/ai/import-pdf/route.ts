@@ -937,6 +937,8 @@ export async function POST(req: NextRequest) {
           }
 
           // Location photo tasks (top 8 by scene count)
+          // Group similar locations so they share a prompt for visual consistency
+          // e.g. "LUXURY HOTEL ROOM" and "LUXURY HOTEL - ROOM" → same place, different time
           if (genImages.locations) {
             const imgLocations = await db.scriptLocation.findMany({
               where: { scriptId },
@@ -946,23 +948,49 @@ export async function POST(req: NextRequest) {
               .sort((a, b) => (b.sceneKeys?.length || 0) - (a.sceneKeys?.length || 0))
               .slice(0, 8)
 
+            // Normalize name for grouping: lowercase, remove separators/spaces
+            const normalizeName = (n: string) => n.toLowerCase().replace(/[\s\-–—_]+/g, "").replace(/[^a-z0-9]/g, "")
+            // Group locations by similar name
+            const locGroups = new Map<string, typeof topLocs>()
             for (const loc of topLocs) {
+              const key = normalizeName(loc.name)
+              const group = locGroups.get(key) || []
+              group.push(loc)
+              locGroups.set(key, group)
+            }
+
+            // Shared prompt registry + ready signals for location consistency
+            const groupPrompts = new Map<string, string>()
+            const groupReady = new Map<string, { promise: Promise<void>; resolve: () => void }>()
+
+            for (const [groupKey, group] of locGroups) {
+              // Create a ready signal for groups with siblings
+              if (group.length > 1) {
+                let resolveReady!: () => void
+                const promise = new Promise<void>(r => { resolveReady = r })
+                groupReady.set(groupKey, { promise, resolve: resolveReady })
+              }
+
+              // Primary location (most scenes) generates first
+              const primary = group[0]
               imageTasks.push({
                 kind: "location",
-                label: loc.name,
+                label: primary.name,
                 priority: 2,
                 execute: async () => {
                   chargeAiFeatureSilent(session.user.id, "generate_location_photo")
                   const result = await generateLocationPhoto({
                     userId: session.user.id,
-                    locName: loc.name,
-                    type: loc.type,
-                    description: loc.description || undefined,
-                    sceneDataJson: loc.sceneData,
+                    locName: primary.name,
+                    type: primary.type,
+                    description: primary.description || undefined,
+                    sceneDataJson: primary.sceneData,
                     styleAnchor,
                   })
+                  groupPrompts.set(groupKey, result.prompt)
+                  groupReady.get(groupKey)?.resolve() // signal siblings
                   await db.scriptLocation.update({
-                    where: { id: loc.id },
+                    where: { id: primary.id },
                     data: {
                       photoUrl: result.url,
                       photoPrompt: result.prompt,
@@ -971,6 +999,37 @@ export async function POST(req: NextRequest) {
                   })
                 },
               })
+
+              // Sibling locations await primary then reuse prompt for consistency
+              for (const sibling of group.slice(1)) {
+                imageTasks.push({
+                  kind: "location",
+                  label: sibling.name,
+                  priority: 2.1,
+                  execute: async () => {
+                    // Wait for primary to finish so groupPrompts is populated
+                    await groupReady.get(groupKey)?.promise
+                    chargeAiFeatureSilent(session.user.id, "generate_location_photo")
+                    const result = await generateLocationPhoto({
+                      userId: session.user.id,
+                      locName: sibling.name,
+                      type: sibling.type,
+                      description: sibling.description || undefined,
+                      sceneDataJson: sibling.sceneData,
+                      existingPrompt: groupPrompts.get(groupKey),
+                      styleAnchor,
+                    })
+                    await db.scriptLocation.update({
+                      where: { id: sibling.id },
+                      data: {
+                        photoUrl: result.url,
+                        photoPrompt: result.prompt,
+                        photos: JSON.stringify([{ url: result.url, isApproved: false }]),
+                      },
+                    })
+                  },
+                })
+              }
             }
           }
 

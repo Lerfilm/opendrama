@@ -13,6 +13,7 @@ interface VideoSegment {
   prompt: string
   shotType?: string | null
   cameraMove?: string | null
+  beatType?: string | null
   model?: string | null
   resolution?: string | null
   status: string
@@ -45,17 +46,26 @@ interface Role {
   voiceType?: string | null  // stores JSON with costumes
 }
 
+interface LocationData {
+  name: string
+  photoUrl: string | null
+  photos: { url: string; note?: string }[]
+}
+
 interface Script {
   id: string
   title: string
   targetEpisodes: number
   scenes: Scene[]
   roles: Role[]
+  locations: LocationData[]
   videoSegments: VideoSegment[]
 }
 
 const MODELS = [
-  { id: "seedance_2_0", name: "Seedance 2.0", res: ["1080p", "720p"] },
+  { id: "seedance_2_0", name: "Seedance 2.0", res: ["720p", "480p"], maxDur: 15, audio: true },
+  { id: "seedance_1_5_pro", name: "Seedance 1.5 Pro", res: ["1080p", "720p"], maxDur: 12, audio: true },
+  { id: "seedance_1_0_pro", name: "Seedance 1.0 Pro", res: ["1080p", "720p"], maxDur: 12, audio: false },
 ]
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
@@ -80,12 +90,19 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const [resolution, setResolution] = useState("720p")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSplitting, setIsSplitting] = useState(false)
-  const [isStitching, setIsStitching] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false)
   const [balance, setBalance] = useState(initialBalance)
   const [editingPrompts, setEditingPrompts] = useState<Record<string, string>>({})
+  const [useChainMode, setUseChainMode] = useState(true) // chain mode = visual continuity via last-frame extraction
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [assetTab, setAssetTab] = useState<"characters" | "locations" | "materials">("characters")
+  const promptRef = useRef<HTMLTextAreaElement>(null)
+  const [translatedText, setTranslatedText] = useState("")
+  const [isTranslating, setIsTranslating] = useState(false)
+  const [translationLang, setTranslationLang] = useState<"en" | "zh">("en")
+  const translateTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const epSegments = segments.filter(s => s.episodeNum === selectedEp).sort((a, b) => a.segmentIndex - b.segmentIndex)
   const selectedSeg = segments.find(s => s.id === selectedSegId) ?? null
@@ -130,33 +147,45 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
   }, [active, pollStatus])
 
-  // Submit batch generation
+  // Submit generation (chain mode or batch mode)
   async function handleGenerate() {
-    if (epSegments.length === 0) { alert("No segments to generate. Run AI Split in Script module first."); return }
+    if (epSegments.length === 0) { alert("No segments to generate. Run AI Plan first."); return }
     setIsSubmitting(true)
     try {
-      const res = await fetch("/api/video/submit", {
+      const endpoint = useChainMode ? "/api/video/chain-submit" : "/api/video/submit"
+      // Both modes need the same segment data
+      const segData = epSegments.map(s => ({
+        segmentIndex: s.segmentIndex,
+        sceneNum: s.sceneNum,
+        durationSec: s.durationSec,
+        prompt: editingPrompts[s.id] ?? s.prompt,
+        shotType: s.shotType,
+        cameraMove: s.cameraMove,
+        beatType: s.beatType,
+      }))
+
+      const payload = useChainMode
+        ? { scriptId: script.id, episodeNum: selectedEp, model, resolution, segments: segData }
+        : { mode: "batch", scriptId: script.id, episodeNum: selectedEp, model, resolution, segments: segData }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "batch",
-          scriptId: script.id,
-          episodeNum: selectedEp,
-          model,
-          resolution,
-          segments: epSegments.map(s => ({
-            id: s.id,
-            prompt: s.prompt,
-            durationSec: s.durationSec,
-            shotType: s.shotType,
-            cameraMove: s.cameraMove,
-          })),
-        }),
+        body: JSON.stringify(payload),
       })
+      if (res.status === 402) { alert("Insufficient balance"); return }
       if (!res.ok) {
         const err = await res.json()
         alert(err.error || "Failed to submit")
         return
+      }
+      const data = await res.json()
+      // Both modes return new segments with new IDs — update state
+      if (data.segments) {
+        setSegments(prev => {
+          const filtered = prev.filter(s => s.episodeNum !== selectedEp)
+          return [...filtered, ...data.segments].sort((a, b) => a.episodeNum - b.episodeNum || a.segmentIndex - b.segmentIndex)
+        })
       }
       await pollStatus()
     } finally {
@@ -187,9 +216,9 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     setSelectedSegId(null)
   }
 
-  // AI Split for episode
-  async function handleAISplit() {
-    if (!confirm(`AI Split Episode ${selectedEp} into video segments? This will replace any existing segments for this episode.`)) return
+  // AI Plan: Enhanced split that includes transition analysis + Seedance 2.0 optimized prompts
+  async function handleAIPlan() {
+    if (!confirm(`AI Plan Episode ${selectedEp}? This analyzes scenes, adds transitions, and generates Seedance-optimized video segments. Replaces existing segments.`)) return
     setIsSplitting(true)
     try {
       const res = await fetch("/api/ai/split", {
@@ -202,7 +231,15 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           resolution,
         }),
       })
-      if (!res.ok) throw new Error("Split failed")
+      if (!res.ok) {
+        const err = await res.json()
+        if (err.error === "insufficient_balance") {
+          alert(`Insufficient balance. Need ${err.required} coins, have ${err.balance}.`)
+        } else {
+          alert(err.error || "AI Plan failed")
+        }
+        return
+      }
       const data = await res.json()
 
       // Save segments
@@ -225,30 +262,9 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
         })
       }
     } catch {
-      alert("AI Split failed")
+      alert("AI Plan failed")
     } finally {
       setIsSplitting(false)
-    }
-  }
-
-  // AI Stitch: add bridging scenes between existing scenes for narrative flow
-  async function handleStitch() {
-    const epSceneCount = script.scenes.filter(s => s.episodeNum === selectedEp).length
-    if (epSceneCount < 2) { alert("Need at least 2 scenes in this episode to stitch."); return }
-    setIsStitching(true)
-    try {
-      const res = await fetch("/api/ai/stitch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptId: script.id, episodeNum: selectedEp }),
-      })
-      const data = await res.json()
-      if (!res.ok) { alert(data.error || "Stitch failed"); return }
-      alert(data.message || `Stitch complete`)
-    } catch {
-      alert("Stitch failed")
-    } finally {
-      setIsStitching(false)
     }
   }
 
@@ -259,39 +275,78 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     const editedPrompt = editingPrompts[segmentId] ?? seg.prompt
     setIsSubmitting(true)
     try {
-      // Save edited prompt first if changed
-      if (editingPrompts[segmentId]) {
-        await fetch("/api/segments/save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ segments: [{ id: segmentId, prompt: editedPrompt }] }),
-        })
-      }
+      // Submit single segment with optional prompt override + model/resolution
       const res = await fetch("/api/video/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode: "batch",
-          scriptId: script.id,
-          episodeNum: selectedEp,
+          segmentId,
+          prompt: editedPrompt !== seg.prompt ? editedPrompt : undefined,
           model,
           resolution,
-          segments: [{ id: seg.id, prompt: editedPrompt, durationSec: seg.durationSec, shotType: seg.shotType, cameraMove: seg.cameraMove }],
         }),
       })
       if (res.status === 402) { alert("Insufficient balance"); return }
       if (!res.ok) { const err = await res.json(); alert(err.error || "Submit failed"); return }
+      const data = await res.json()
+      if (data.segment) {
+        setSegments(prev => prev.map(s => s.id === segmentId ? data.segment : s))
+      }
       await pollStatus()
     } finally { setIsSubmitting(false) }
   }
 
-  // Insert @mention text into prompt
+  // Insert @mention text into prompt at cursor position (or append)
   function insertAtCursor(segId: string, text: string) {
-    setEditingPrompts(prev => {
-      const current = prev[segId] ?? epSegments.find(s => s.id === segId)?.prompt ?? ""
-      return { ...prev, [segId]: current + " " + text }
-    })
+    const textarea = promptRef.current
+    if (textarea && document.activeElement === textarea) {
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const current = editingPrompts[segId] ?? epSegments.find(s => s.id === segId)?.prompt ?? ""
+      const before = current.substring(0, start)
+      const after = current.substring(end)
+      const newText = before + text + " " + after
+      setEditingPrompts(prev => ({ ...prev, [segId]: newText }))
+      setTimeout(() => {
+        if (promptRef.current) {
+          const pos = start + text.length + 1
+          promptRef.current.selectionStart = pos
+          promptRef.current.selectionEnd = pos
+          promptRef.current.focus()
+        }
+      }, 0)
+    } else {
+      setEditingPrompts(prev => {
+        const current = prev[segId] ?? epSegments.find(s => s.id === segId)?.prompt ?? ""
+        return { ...prev, [segId]: current + " " + text }
+      })
+    }
   }
+
+  // Auto-translate prompt (debounced 1s)
+  useEffect(() => {
+    if (!selectedSegId) return
+    const promptText = editingPrompts[selectedSegId] ?? segments.find(s => s.id === selectedSegId)?.prompt ?? ""
+    if (promptText.trim().length < 5) { setTranslatedText(""); return }
+    if (translateTimerRef.current) clearTimeout(translateTimerRef.current)
+    translateTimerRef.current = setTimeout(async () => {
+      setIsTranslating(true)
+      try {
+        const res = await fetch("/api/ai/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: promptText }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setTranslatedText(data.translation || "")
+          setTranslationLang(data.targetLang === "en" ? "en" : "zh")
+        }
+      } catch { /* ok */ }
+      finally { setIsTranslating(false) }
+    }, 1000)
+    return () => { if (translateTimerRef.current) clearTimeout(translateTimerRef.current) }
+  }, [selectedSegId, editingPrompts, segments])
 
   const currentModel = MODELS.find(m => m.id === model)
 
@@ -352,6 +407,16 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     ),
     [script.roles, mentionedInEp, epScenes]
   )
+
+  // Location photo lookup
+  const locPhotoMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const l of script.locations) {
+      const url = l.photos?.[0]?.url || l.photoUrl
+      if (url) map.set(l.name, url)
+    }
+    return map
+  }, [script.locations])
 
   // Unique locations in this episode
   const epLocations = useMemo(() => {
@@ -454,17 +519,36 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               {MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
-          <div>
-            <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>Resolution</label>
-            <select
-              value={resolution}
-              onChange={e => setResolution(e.target.value)}
-              className="w-full text-[11px] rounded px-2 py-1 focus:outline-none"
-              style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#444" }}
-            >
-              {(currentModel?.res || ["720p"]).map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>Resolution</label>
+              <select
+                value={resolution}
+                onChange={e => setResolution(e.target.value)}
+                className="w-full text-[11px] rounded px-2 py-1 focus:outline-none"
+                style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#444" }}
+              >
+                {(currentModel?.res || ["720p"]).map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>Max</label>
+              <div className="text-[11px] px-2 py-1 rounded" style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#444" }}>
+                {currentModel?.maxDur ?? 12}s
+              </div>
+            </div>
           </div>
+          {/* Audio badge */}
+          {currentModel?.audio && (
+            <div className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded" style={{ background: "#F0FDF4", color: "#166534", border: "1px solid #BBF7D0" }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              </svg>
+              Sound ON
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-[10px]" style={{ color: "#AAA" }}>Balance: {balance} coins</span>
           </div>
@@ -742,32 +826,34 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               ) : (
                 <div className="grid grid-cols-3 gap-3 p-4">
                   {epLocations.map(loc => (
-                    <div key={loc.loc} className="rounded-lg p-3 flex flex-col gap-1.5"
+                    <div key={loc.loc} className="rounded-lg overflow-hidden flex flex-col"
                       style={{ background: "#FFF5F5", border: "1px solid #FFE4E4" }}>
-                      <div className="flex items-start gap-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      {locPhotoMap.get(loc.loc) ? (
+                        <img src={locPhotoMap.get(loc.loc)} alt="" className="w-full h-24 object-cover" />
+                      ) : (
+                        <div className="w-full h-24 flex items-center justify-center"
                           style={{ background: "#FEE2E2" }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth={2}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth={2}>
                             <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
                             <circle cx="12" cy="10" r="3"/>
                           </svg>
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-[11px] truncate" style={{ color: "#1A1A1A" }}>{loc.loc}</p>
+                      )}
+                      <div className="px-2.5 py-2 flex flex-col gap-1">
+                        <p className="font-semibold text-[10px] truncate" style={{ color: "#1A1A1A" }}>{loc.loc}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {loc.timeOfDay && (
-                            <p className="text-[9px]" style={{ color: "#F97316" }}>{loc.timeOfDay}</p>
+                            <span className="text-[8px]" style={{ color: "#F97316" }}>{loc.timeOfDay}</span>
                           )}
+                          {loc.scenes.map(n => (
+                            <span key={n} className="text-[8px] px-1 rounded font-mono"
+                              style={{ background: "#FFE4E4", color: "#B91C1C" }}>
+                              SC{String(n).padStart(2,"0")}
+                            </span>
+                          ))}
+                          {loc.mood && <span className="text-[8px]" style={{ color: "#AAA" }}>{loc.mood}</span>}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {loc.scenes.map(n => (
-                          <span key={n} className="text-[9px] px-1 rounded font-mono"
-                            style={{ background: "#FFE4E4", color: "#B91C1C" }}>
-                            SC{String(n).padStart(2,"0")}
-                          </span>
-                        ))}
-                      </div>
-                      {loc.mood && <p className="text-[9px]" style={{ color: "#AAA" }}>{loc.mood}</p>}
                     </div>
                   ))}
                 </div>
@@ -845,64 +931,86 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
       {mainTab === "segments" && <>
       {/* Center: Segment list */}
       <div className="flex flex-col" style={{ width: 380, borderRight: "1px solid #C0C0C0", background: "#F0F0F0" }}>
-        {/* Toolbar */}
-        <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: "1px solid #C8C8C8", background: "#EBEBEB" }}>
-          <div className="flex-1">
-            <span className="text-[11px] font-semibold" style={{ color: "#333" }}>Episode {selectedEp}</span>
+        {/* Toolbar — clean two-row layout */}
+        <div className="px-3 py-2 space-y-1.5" style={{ borderBottom: "1px solid #C8C8C8", background: "#EBEBEB" }}>
+          {/* Row 1: Episode info + Generate button */}
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] font-semibold" style={{ color: "#333" }}>Ep {selectedEp}</span>
             {epSegments.length > 0 && (
-              <span className="text-[10px] ml-2" style={{ color: "#AAA" }}>
+              <span className="text-[10px]" style={{ color: "#AAA" }}>
                 {done}/{epSegments.length} · {totalDuration}s
               </span>
             )}
-          </div>
-          {active > 0 && (
-            <button onClick={pollStatus} className="text-[10px] px-2 py-1 rounded transition-colors" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
-              {isPolling ? "..." : "↻ Refresh"}
-            </button>
-          )}
-          {epSegments.length > 0 && (
-            <button onClick={handleResetAll} className="text-[10px] px-2 py-1 rounded transition-colors" style={{ color: "#EF4444" }}>
-              Reset All
-            </button>
-          )}
-          <button
-            onClick={handleAISplit}
-            disabled={isSplitting}
-            className="text-[10px] px-3 py-1 rounded font-medium transition-colors disabled:opacity-50"
-            style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
-          >
-            {isSplitting ? "Splitting..." : epSegments.length > 0 ? "Re-split" : <>Split <span className="text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: "#E0E4F8", color: "#4F46E5" }}>AI</span></>}
-          </button>
-          <button
-            onClick={handleStitch}
-            disabled={isStitching}
-            className="flex items-center gap-1 text-[10px] px-3 py-1 rounded font-medium transition-colors disabled:opacity-50"
-            style={{ background: "#F0FDF4", color: "#16A34A", border: "1px solid #BBF7D0" }}
-            title="AI Stitch: add bridging scenes for narrative flow"
-          >
-            {isStitching ? (
-              <div className="w-2 h-2 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "#16A34A" }} />
-            ) : (
+            {active > 0 && (
+              <button onClick={pollStatus} className="text-[9px] px-1.5 py-0.5 rounded transition-colors" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
+                {isPolling ? "..." : "↻"}
+              </button>
+            )}
+            <div className="flex-1" />
+            {/* Chain/Batch toggle — compact icon-only */}
+            <button
+              onClick={() => setUseChainMode(c => !c)}
+              className="flex items-center gap-1 text-[9px] px-1.5 py-1 rounded transition-colors"
+              style={{
+                background: useChainMode ? "#FDF4FF" : "#F5F5F5",
+                color: useChainMode ? "#9333EA" : "#999",
+                border: `1px solid ${useChainMode ? "#E9D5FF" : "#DDD"}`,
+              }}
+              title={useChainMode
+                ? "Chain Mode ON: Visual continuity via last-frame"
+                : "Batch Mode: Independent generation (faster)"
+              }
+            >
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
               </svg>
-            )}
-            {isStitching ? "Stitching..." : "Stitch"}
-          </button>
-          {estimatedCost > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#FEF3C7", color: "#92400E" }}>
-              ~{estimatedCost} coins
-            </span>
+              {useChainMode ? "Chain" : "Batch"}
+            </button>
+            {/* Main Generate button with cost inline */}
+            <button
+              onClick={() => setShowGenerateConfirm(true)}
+              disabled={isSubmitting || epSegments.length === 0}
+              className="flex items-center gap-1.5 text-[10px] px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-40"
+              style={{ background: "#4F46E5", color: "#fff" }}
+            >
+              {isSubmitting ? (
+                <div className="w-2.5 h-2.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              ) : (
+                <span>▶</span>
+              )}
+              {isSubmitting ? "..." : done === epSegments.length && done > 0 ? "Re-generate" : "Generate"}
+              {estimatedCost > 0 && !isSubmitting && (
+                <span className="text-[8px] opacity-70">{estimatedCost}🪙</span>
+              )}
+            </button>
+          </div>
+          {/* Row 2: Secondary actions — only when segments exist */}
+          {epSegments.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleAIPlan}
+                disabled={isSplitting}
+                className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+                style={{ color: "#4F46E5" }}
+              >
+                {isSplitting ? (
+                  <div className="w-2 h-2 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "#4F46E5" }} />
+                ) : (
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                  </svg>
+                )}
+                {isSplitting ? "Planning..." : "Re-plan"}
+              </button>
+              <span style={{ color: "#DDD" }}>·</span>
+              <button onClick={handleResetAll} className="text-[9px] px-2 py-0.5 rounded transition-colors" style={{ color: "#999" }}>
+                Reset All
+              </button>
+            </div>
           )}
-          <button
-            onClick={() => setShowGenerateConfirm(true)}
-            disabled={isSubmitting || epSegments.length === 0}
-            className="text-[10px] px-3 py-1 rounded font-medium transition-colors disabled:opacity-50"
-            style={{ background: "#4F46E5", color: "#fff" }}
-          >
-            {isSubmitting ? "Submitting..." : done === epSegments.length && done > 0 ? "Re-generate" : "▶ Generate"}
-          </button>
         </div>
 
         {/* Segment list */}
@@ -993,64 +1101,30 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               </div>
             )}
 
-            {/* Segment info */}
+            {/* Segment info — compact single row */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold" style={{ color: "#1A1A1A" }}>Segment #{selectedSeg.segmentIndex + 1}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={STATUS_STYLE[selectedSeg.status] || STATUS_STYLE.pending}>
-                    {STATUS_STYLE[selectedSeg.status]?.label || selectedSeg.status}
-                  </span>
+              <div className="flex items-center gap-2 flex-wrap px-1 py-1.5 rounded-lg text-[10px]" style={{ background: "#EBEBEB" }}>
+                <span className="font-semibold" style={{ color: "#1A1A1A" }}>#{selectedSeg.segmentIndex + 1}</span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-medium" style={STATUS_STYLE[selectedSeg.status] || STATUS_STYLE.pending}>
+                  {STATUS_STYLE[selectedSeg.status]?.label || selectedSeg.status}
+                </span>
+                <span style={{ color: "#888" }}>{selectedSeg.durationSec}s</span>
+                <span style={{ color: "#CCC" }}>·</span>
+                <span style={{ color: "#888" }}>Sc{selectedSeg.sceneNum}</span>
+                {selectedSeg.shotType && <><span style={{ color: "#CCC" }}>·</span><span style={{ color: "#888" }}>{selectedSeg.shotType}</span></>}
+                {selectedSeg.cameraMove && selectedSeg.cameraMove !== "static" && <><span style={{ color: "#CCC" }}>·</span><span style={{ color: "#888" }}>{selectedSeg.cameraMove}</span></>}
+                {selectedSeg.tokenCost && <><span style={{ color: "#CCC" }}>·</span><span style={{ color: "#888" }}>{selectedSeg.tokenCost}🪙</span></>}
+                <div className="ml-auto flex items-center gap-1.5">
+                  {(selectedSeg.status === "failed" || selectedSeg.status === "done") && (
+                    <button onClick={() => handleReset(selectedSeg.id)} className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#E0E0E0", color: "#888" }}>Reset</button>
+                  )}
                 </div>
-                {(selectedSeg.status === "failed" || selectedSeg.status === "done") && (
-                  <button
-                    onClick={() => handleReset(selectedSeg.id)}
-                    className="text-[10px] px-2 py-1 rounded transition-colors"
-                    style={{ background: "#E8E8E8", color: "#666" }}
-                  >
-                    Reset
-                  </button>
-                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
-                  <span style={{ color: "#AAA" }}>Duration</span>
-                  <p className="font-medium" style={{ color: "#333" }}>{selectedSeg.durationSec}s</p>
-                </div>
-                <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
-                  <span style={{ color: "#AAA" }}>Scene</span>
-                  <p className="font-medium" style={{ color: "#333" }}>#{selectedSeg.sceneNum}</p>
-                </div>
-                {selectedSeg.shotType && (
-                  <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
-                    <span style={{ color: "#AAA" }}>Shot</span>
-                    <p className="font-medium" style={{ color: "#333" }}>{selectedSeg.shotType}</p>
-                  </div>
-                )}
-                {selectedSeg.cameraMove && selectedSeg.cameraMove !== "static" && (
-                  <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
-                    <span style={{ color: "#AAA" }}>Camera</span>
-                    <p className="font-medium" style={{ color: "#333" }}>{selectedSeg.cameraMove}</p>
-                  </div>
-                )}
-                {selectedSeg.model && (
-                  <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
-                    <span style={{ color: "#AAA" }}>Model</span>
-                    <p className="font-medium truncate" style={{ color: "#333" }}>{selectedSeg.model.replace(/_/g, " ")}</p>
-                  </div>
-                )}
-                {selectedSeg.tokenCost && (
-                  <div className="p-2 rounded" style={{ background: "#EBEBEB" }}>
-                    <span style={{ color: "#AAA" }}>Cost</span>
-                    <p className="font-medium" style={{ color: "#333" }}>{selectedSeg.tokenCost} coins</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Editable Prompt + Re-generate */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
+              {/* ── Enhanced Prompt Editor with Drag & Drop Asset Tray ── */}
+              <div className="space-y-3">
+                {/* Prompt header with re-generate button */}
+                <div className="flex items-center justify-between">
                   <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#999" }}>Prompt</label>
                   <button
                     onClick={() => handleRegenerate(selectedSeg.id)}
@@ -1061,125 +1135,336 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     {isSubmitting ? "Submitting..." : "▶ Re-generate"}
                   </button>
                 </div>
-                <textarea
-                  value={editingPrompts[selectedSeg.id] ?? selectedSeg.prompt}
-                  onChange={e => setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: e.target.value }))}
-                  rows={6}
-                  className="w-full resize-none text-[11px] leading-relaxed p-2.5 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                  style={{ background: "#EBEBEB", color: "#555", border: "1px solid #D0D0D0" }}
-                />
-                {/* Asset chips — click to insert @mention into prompt */}
+
+                {/* Scene heading badge */}
                 {(() => {
                   const scene = script.scenes.find(s => s.episodeNum === selectedSeg.episodeNum && s.sceneNum === selectedSeg.sceneNum)
-                  const sceneCharNames = new Set<string>()
-                  if (scene?.action) {
-                    try {
-                      const blocks = JSON.parse(scene.action) as Array<{ type: string; character?: string }>
-                      if (Array.isArray(blocks)) {
-                        for (const b of blocks) {
-                          if (b.type === "dialogue" && b.character) sceneCharNames.add(b.character.trim())
+                  return scene?.heading ? (
+                    <div className="text-[10px] font-mono px-2.5 py-1.5 rounded-lg" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
+                      {scene.heading}
+                    </div>
+                  ) : null
+                })()}
+
+                {/* Side-by-side: Prompt (left) + Translation (right) */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Left: Editable Prompt */}
+                  <div
+                    className="relative rounded-lg transition-all"
+                    style={{
+                      border: isDragOver ? "2px dashed #4F46E5" : "1px solid #D0D0D0",
+                      background: isDragOver ? "#EEF2FF" : "#EBEBEB",
+                    }}
+                  >
+                    {isDragOver && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-lg z-10 pointer-events-none"
+                        style={{ background: "rgba(79,70,229,0.08)" }}>
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-full shadow-lg"
+                          style={{ background: "#4F46E5", color: "#fff" }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path d="M12 5v14M5 12h14"/>
+                          </svg>
+                          <span className="text-[11px] font-medium">Drop here to insert</span>
+                        </div>
+                      </div>
+                    )}
+                    <textarea
+                      ref={promptRef}
+                      value={editingPrompts[selectedSeg.id] ?? selectedSeg.prompt}
+                      onChange={e => setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: e.target.value }))}
+                      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); e.dataTransfer.dropEffect = "copy" }}
+                      onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setIsDragOver(false) }}
+                      onDrop={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setIsDragOver(false)
+                        const data = e.dataTransfer.getData("text/plain")
+                        if (data && selectedSeg) {
+                          const textarea = promptRef.current
+                          if (textarea) {
+                            textarea.focus()
+                            const current = editingPrompts[selectedSeg.id] ?? selectedSeg.prompt ?? ""
+                            const pos = textarea.selectionStart ?? current.length
+                            const before = current.substring(0, pos)
+                            const after = current.substring(pos)
+                            const newText = before + data + " " + after
+                            setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: newText }))
+                            setTimeout(() => {
+                              if (promptRef.current) {
+                                const newPos = pos + data.length + 1
+                                promptRef.current.selectionStart = newPos
+                                promptRef.current.selectionEnd = newPos
+                                promptRef.current.focus()
+                              }
+                            }, 0)
+                          } else {
+                            insertAtCursor(selectedSeg.id, data)
+                          }
                         }
-                      }
-                    } catch { /* ok */ }
-                  }
-                  const sceneRoles = script.roles.filter(r =>
-                    sceneCharNames.has(r.name) || sceneCharNames.has(r.name.toUpperCase()) ||
-                    [...sceneCharNames].some(n => n.toUpperCase() === r.name.toUpperCase())
-                  )
-                  if (sceneRoles.length === 0 && !scene?.location) return null
-                  return (
-                    <div className="mt-2 flex flex-wrap gap-1 items-center">
-                      <span className="text-[8px] uppercase tracking-wider mr-0.5" style={{ color: "#CCC" }}>Insert:</span>
-                      {sceneRoles.map(role => (
-                        <button key={role.id} onClick={() => insertAtCursor(selectedSeg.id, `@${role.name}`)}
-                          className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity"
-                          style={{ background: "#DBEAFE", color: "#1D4ED8" }}>
-                          {role.referenceImages?.[0] ? (
-                            <img src={role.referenceImages[0]} alt="" className="w-3 h-3 rounded-full object-cover" />
-                          ) : null}
-                          @{role.name}
-                        </button>
-                      ))}
-                      {scene?.location && (
-                        <button onClick={() => insertAtCursor(selectedSeg.id, `@${scene.location}`)}
-                          className="text-[9px] px-1.5 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity"
-                          style={{ background: "#E0E7FF", color: "#3730A3" }}>
-                          @{scene.location}
-                        </button>
+                      }}
+                      rows={8}
+                      className="w-full h-full resize-none text-[13px] leading-relaxed p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      style={{ background: "transparent", color: "#333", cursor: isDragOver ? "copy" : undefined, minHeight: 160 }}
+                      placeholder="Enter video description, or drag assets here..."
+                    />
+                  </div>
+
+                  {/* Right: Translation */}
+                  <div className="rounded-lg px-3 py-2.5 overflow-y-auto" style={{ background: "#F8F7FF", border: "1px solid #E8E4FF", minHeight: 160 }}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "#7C3AED" }}>
+                        {translationLang === "en" ? "EN Translation" : "CN Translation"}
+                      </span>
+                      {isTranslating && (
+                        <div className="w-2.5 h-2.5 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "#7C3AED" }} />
                       )}
                     </div>
-                  )
-                })()}
-              </div>
-
-              {/* Scene Characters & Costumes */}
-              {(() => {
-                const scene = script.scenes.find(s => s.episodeNum === selectedSeg.episodeNum && s.sceneNum === selectedSeg.sceneNum)
-                if (!scene) return null
-                const sceneCharNames = new Set<string>()
-                if (scene.action) {
-                  try {
-                    const blocks = JSON.parse(scene.action) as Array<{ type: string; character?: string }>
-                    if (Array.isArray(blocks)) {
-                      for (const b of blocks) {
-                        if (b.type === "dialogue" && b.character) sceneCharNames.add(b.character.trim())
-                      }
-                    }
-                  } catch { /* ok */ }
-                }
-                const sceneRoles = script.roles.filter(r =>
-                  sceneCharNames.has(r.name) || sceneCharNames.has(r.name.toUpperCase()) ||
-                  [...sceneCharNames].some(n => n.toUpperCase() === r.name.toUpperCase())
-                )
-                const sceneCostumes = costumeAssets.filter(c => sceneRoles.some(r => r.id === c.role.id))
-                if (sceneRoles.length === 0 && sceneCostumes.length === 0 && !scene.location) return null
-                return (
-                  <div className="pt-1">
-                    {scene.heading && (
-                      <div className="mb-2 text-[10px] font-mono px-2 py-1 rounded" style={{ background: "#E0E4F8", color: "#4F46E5" }}>
-                        {scene.heading}
-                      </div>
-                    )}
-                    {sceneRoles.length > 0 && (
-                      <div className="mb-3">
-                        <label className="text-[10px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: "#999" }}>Characters</label>
-                        <div className="flex gap-2 flex-wrap">
-                          {sceneRoles.map(role => (
-                            <div key={role.id} className="flex flex-col items-center gap-1">
-                              {role.referenceImages?.[0] ? (
-                                <img src={role.referenceImages[0]} alt={role.name}
-                                  className="w-10 h-10 rounded-full object-cover"
-                                  style={{ border: "1.5px solid #D0D0D0" }} />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
-                                  style={{ background: "#D0D0D0", color: "#888" }}>
-                                  {role.name[0]?.toUpperCase()}
-                                </div>
-                              )}
-                              <span className="text-[9px] text-center w-12 truncate" style={{ color: "#555" }}>{role.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {sceneCostumes.length > 0 && (
-                      <div>
-                        <label className="text-[10px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: "#999" }}>Costumes</label>
-                        <div className="flex gap-2 flex-wrap">
-                          {sceneCostumes.map((item, ci) => (
-                            <div key={ci} className="flex flex-col items-center gap-1">
-                              <img src={item.costume.url} alt=""
-                                className="w-10 h-14 rounded object-cover"
-                                style={{ border: "1px solid #D0D0D0" }} />
-                              <span className="text-[9px] text-center w-12 truncate" style={{ color: "#555" }}>{item.role.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    <p className="text-[11px] leading-relaxed" style={{ color: "#555" }}>
+                      {isTranslating ? "Translating..." : translatedText || "Translation will appear here..."}
+                    </p>
                   </div>
-                )
-              })()}
+                </div>
+
+                {/* ── Asset Tray: Draggable Elements ── */}
+                <div className="rounded-lg overflow-hidden" style={{ border: "1px solid #D8D8D8", background: "#fff" }}>
+                  {/* Tab headers */}
+                  <div className="flex" style={{ borderBottom: "1px solid #E8E8E8", background: "#F8F8F8" }}>
+                    {([
+                      { id: "characters" as const, icon: "👤", label: "Characters" },
+                      { id: "locations" as const, icon: "🏞", label: "Locations" },
+                      { id: "materials" as const, icon: "🎬", label: "Materials" },
+                    ]).map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setAssetTab(tab.id)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-medium transition-colors relative"
+                        style={{ color: assetTab === tab.id ? "#4F46E5" : "#999" }}
+                      >
+                        <span>{tab.icon}</span>
+                        <span>{tab.label}</span>
+                        {assetTab === tab.id && (
+                          <div className="absolute bottom-0 left-2 right-2 h-[2px] rounded-t" style={{ background: "#4F46E5" }} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Asset cards */}
+                  <div className="p-2.5 max-h-[280px] overflow-y-auto dev-scrollbar">
+                    {/* ── Characters tab ── */}
+                    {assetTab === "characters" && (() => {
+                      const scene = script.scenes.find(s => s.episodeNum === selectedSeg.episodeNum && s.sceneNum === selectedSeg.sceneNum)
+                      const sceneCharNames = new Set<string>()
+                      if (scene?.action) {
+                        try {
+                          const blocks = JSON.parse(scene.action) as Array<{ type: string; character?: string }>
+                          if (Array.isArray(blocks)) {
+                            for (const b of blocks) if (b.type === "dialogue" && b.character) sceneCharNames.add(b.character.trim())
+                          }
+                        } catch { /* ok */ }
+                      }
+                      const sceneRoles = script.roles.filter(r =>
+                        sceneCharNames.has(r.name) || sceneCharNames.has(r.name.toUpperCase()) ||
+                        [...sceneCharNames].some(n => n.toUpperCase() === r.name.toUpperCase())
+                      )
+                      const otherRoles = script.roles.filter(r => !sceneRoles.includes(r))
+                      const allRoles = [...sceneRoles, ...otherRoles]
+                      return allRoles.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {allRoles.map((role, idx) => {
+                            const isInScene = idx < sceneRoles.length
+                            const costumes: CostumePhoto[] = (() => {
+                              try {
+                                if (role.voiceType?.startsWith("{")) {
+                                  const meta = JSON.parse(role.voiceType) as { costumes?: CostumePhoto[] }
+                                  return meta.costumes || []
+                                }
+                              } catch { /* ok */ }
+                              return []
+                            })()
+                            return (
+                              <div
+                                key={role.id}
+                                draggable
+                                onDragStart={e => {
+                                  e.dataTransfer.setData("text/plain", `@${role.name}`)
+                                  e.dataTransfer.effectAllowed = "copy"
+                                }}
+                                onClick={() => insertAtCursor(selectedSeg.id, `@${role.name}`)}
+                                className="flex flex-col items-center gap-1.5 p-2 rounded-lg cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none group"
+                                style={{
+                                  background: isInScene ? "#EEF2FF" : "#F9F9F9",
+                                  border: `1px solid ${isInScene ? "#C7D2FE" : "#E8E8E8"}`,
+                                }}
+                                title={`Drag to prompt to insert @${role.name}`}
+                              >
+                                {role.referenceImages?.[0] ? (
+                                  <img src={role.referenceImages[0]} alt={role.name}
+                                    className="w-16 h-16 rounded-xl object-cover pointer-events-none group-hover:ring-2 group-hover:ring-indigo-300 transition-all"
+                                    style={{ border: "2px solid #D0D0D0" }} />
+                                ) : (
+                                  <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold pointer-events-none"
+                                    style={{ background: "#E8E4FF", color: "#4F46E5" }}>
+                                    {role.name[0]?.toUpperCase()}
+                                  </div>
+                                )}
+                                <span className="text-[10px] text-center w-full truncate font-semibold leading-tight"
+                                  style={{ color: isInScene ? "#4338CA" : "#555" }}>
+                                  {role.name}
+                                </span>
+                                {isInScene && (
+                                  <span className="text-[7px] px-1.5 py-0.5 rounded" style={{ background: "#C7D2FE", color: "#4338CA" }}>In Scene</span>
+                                )}
+                                {costumes.length > 0 && (
+                                  <div className="flex gap-1 mt-0.5">
+                                    {costumes.slice(0, 2).map((c, ci) => (
+                                      <img key={ci} src={c.url} alt="" className="w-7 h-9 rounded object-cover pointer-events-none"
+                                        style={{ border: `1.5px solid ${c.isApproved ? "#10B981" : "#D0D0D0"}` }} />
+                                    ))}
+                                    {costumes.length > 2 && (
+                                      <span className="text-[8px] self-end" style={{ color: "#AAA" }}>+{costumes.length - 2}</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>No character data</div>
+                    })()}
+
+                    {/* ── Locations tab ── */}
+                    {assetTab === "locations" && (() => {
+                      const scene = script.scenes.find(s => s.episodeNum === selectedSeg.episodeNum && s.sceneNum === selectedSeg.sceneNum)
+                      const currentLoc = scene?.location
+                      return script.locations.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {[...script.locations]
+                            .sort((a, b) => (a.name === currentLoc ? -1 : b.name === currentLoc ? 1 : 0))
+                            .map(loc => {
+                              const isCurrent = loc.name === currentLoc
+                              const photoUrl = loc.photos?.[0]?.url || loc.photoUrl
+                              return (
+                                <div
+                                  key={loc.name}
+                                  draggable
+                                  onDragStart={e => {
+                                    e.dataTransfer.setData("text/plain", `@${loc.name}`)
+                                    e.dataTransfer.effectAllowed = "copy"
+                                  }}
+                                  onClick={() => insertAtCursor(selectedSeg.id, `@${loc.name}`)}
+                                  className="flex flex-col gap-1.5 p-2 rounded-lg cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none group"
+                                  style={{
+                                    background: isCurrent ? "#ECFDF5" : "#F9F9F9",
+                                    border: `1px solid ${isCurrent ? "#A7F3D0" : "#E8E8E8"}`,
+                                  }}
+                                  title={`Drag to prompt to insert @${loc.name}`}
+                                >
+                                  {photoUrl ? (
+                                    <img src={photoUrl} alt={loc.name}
+                                      className="w-full h-24 rounded-lg object-cover pointer-events-none group-hover:ring-2 group-hover:ring-emerald-300 transition-all"
+                                      style={{ border: "1.5px solid #D0D0D0" }} />
+                                  ) : (
+                                    <div className="w-full h-24 rounded-lg flex items-center justify-center pointer-events-none"
+                                      style={{ background: "#FEE2E2" }}>
+                                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth={2}>
+                                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                      </svg>
+                                    </div>
+                                  )}
+                                  <span className="text-[10px] text-center truncate font-semibold leading-tight"
+                                    style={{ color: isCurrent ? "#065F46" : "#555" }}>
+                                    {loc.name}
+                                  </span>
+                                  {isCurrent && (
+                                    <span className="text-[7px] px-1.5 py-0.5 rounded self-center" style={{ background: "#A7F3D0", color: "#065F46" }}>Current</span>
+                                  )}
+                                </div>
+                              )
+                            })}
+                        </div>
+                      ) : <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>No location data</div>
+                    })()}
+
+                    {/* ── Materials tab (previous segments, seed images) ── */}
+                    {assetTab === "materials" && (() => {
+                      const nearbySegs = epSegments
+                        .filter(s => s.id !== selectedSeg.id && (s.thumbnailUrl || s.videoUrl))
+                        .sort((a, b) =>
+                          Math.abs(a.segmentIndex - selectedSeg.segmentIndex) -
+                          Math.abs(b.segmentIndex - selectedSeg.segmentIndex)
+                        )
+                      const prevSeg = epSegments.find(s => s.segmentIndex === selectedSeg.segmentIndex - 1)
+                      return nearbySegs.length > 0 ? (
+                        <div className="space-y-2">
+                          {prevSeg?.thumbnailUrl && useChainMode && (
+                            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                              style={{ background: "#FFF7ED", border: "1px solid #FED7AA" }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth={2}>
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                              </svg>
+                              <span className="text-[8px]" style={{ color: "#C2410C" }}>
+                                Chain Mode uses the last frame of previous segment as visual reference
+                              </span>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-3 gap-2.5">
+                            {nearbySegs.slice(0, 6).map(seg => {
+                              const isPrev = seg.segmentIndex === selectedSeg.segmentIndex - 1
+                              return (
+                                <div
+                                  key={seg.id}
+                                  draggable
+                                  onDragStart={e => {
+                                    e.dataTransfer.setData("text/plain", `[Ref Seg#${seg.segmentIndex + 1}]`)
+                                    e.dataTransfer.effectAllowed = "copy"
+                                  }}
+                                  onClick={() => insertAtCursor(selectedSeg.id, `[Ref Seg#${seg.segmentIndex + 1}]`)}
+                                  className="flex flex-col items-center gap-1.5 p-2 rounded-lg cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none group"
+                                  style={{
+                                    background: isPrev ? "#FFF7ED" : "#F9F9F9",
+                                    border: `1px solid ${isPrev ? "#FED7AA" : "#E8E8E8"}`,
+                                  }}
+                                  title={`Segment #${seg.segmentIndex + 1}${isPrev ? " (Previous)" : ""}`}
+                                >
+                                  {seg.thumbnailUrl ? (
+                                    <img src={seg.thumbnailUrl} alt=""
+                                      className="w-full h-20 rounded-lg object-cover pointer-events-none group-hover:ring-2 group-hover:ring-orange-300 transition-all"
+                                      style={{ border: "1.5px solid #D0D0D0" }} />
+                                  ) : (
+                                    <div className="w-full h-20 rounded-lg flex items-center justify-center pointer-events-none"
+                                      style={{ background: "#E8E8E8" }}>
+                                      <span className="text-[10px] font-mono" style={{ color: "#AAA" }}>#{seg.segmentIndex + 1}</span>
+                                    </div>
+                                  )}
+                                  <span className="text-[9px] font-mono font-semibold"
+                                    style={{ color: isPrev ? "#C2410C" : "#666" }}>
+                                    #{seg.segmentIndex + 1} {isPrev ? "Prev" : `${seg.durationSec}s`}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>
+                          No other segment materials (generate other segments first)
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  {/* Hint bar */}
+                  <div className="px-3 py-1.5 flex items-center gap-1.5" style={{ background: "#FAFAFA", borderTop: "1px solid #F0F0F0" }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#CCC" strokeWidth={2}>
+                      <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                    </svg>
+                    <span className="text-[8px]" style={{ color: "#BBB" }}>Drag cards to prompt area or click to insert</span>
+                  </div>
+                </div>
+              </div>
 
               {selectedSeg.errorMessage && (
                 <div className="p-2.5 rounded text-[11px] leading-relaxed" style={{ background: "#FEE2E2", color: "#991B1B" }}>
@@ -1206,25 +1491,25 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           onClick={e => e.stopPropagation()}
         >
           <div className="px-5 pt-5 pb-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>AI 功能确认</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>AI Feature Confirmation</span>
             <p className="text-sm font-semibold mt-1" style={{ color: "#1A1A1A" }}>
               Generate {epSegments.length} Video Segment{epSegments.length !== 1 ? "s" : ""}
             </p>
           </div>
           <div className="mx-5 mb-4 rounded-lg px-4 py-3" style={{ background: "#F0F0F0" }}>
             <div className="flex items-center justify-between">
-              <span className="text-[11px]" style={{ color: "#666" }}>预计消耗</span>
+              <span className="text-[11px]" style={{ color: "#666" }}>Estimated Cost</span>
               <span className="text-sm font-bold" style={{ color: "#4F46E5" }}>~{estimatedCost} 🪙</span>
             </div>
             <div className="flex items-center justify-between mt-1.5">
-              <span className="text-[11px]" style={{ color: "#666" }}>当前余额</span>
+              <span className="text-[11px]" style={{ color: "#666" }}>Current Balance</span>
               <span className="text-sm font-semibold" style={{ color: balance >= estimatedCost ? "#1A1A1A" : "#EF4444" }}>
                 {balance} 🪙
               </span>
             </div>
             {balance < estimatedCost && (
               <p className="text-[11px] pt-1.5" style={{ color: "#EF4444" }}>
-                余额不足，还需 {estimatedCost - balance} 🪙，请前往充值
+                Insufficient balance, need {estimatedCost - balance} 🪙 more. Please recharge
               </p>
             )}
           </div>
@@ -1234,7 +1519,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               className="flex-1 h-9 rounded-lg text-[12px] font-medium transition-colors"
               style={{ background: "#E8E8E8", color: "#555" }}
             >
-              取消
+              Cancel
             </button>
             <button
               onClick={() => { setShowGenerateConfirm(false); handleGenerate() }}
@@ -1242,7 +1527,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               className="flex-1 h-9 rounded-lg text-[12px] font-semibold transition-colors disabled:opacity-40"
               style={{ background: "#4F46E5", color: "#fff" }}
             >
-              确认 ~{estimatedCost} 🪙
+              Confirm ~{estimatedCost} 🪙
             </button>
           </div>
         </div>

@@ -12,12 +12,20 @@ export interface VideoGenerationRequest {
   aspectRatio?: string
   durationSec: number
   seed?: number          // fixed seed for cross-segment consistency within an episode
+  // Chain mode options (Seedance 1.5 Pro)
+  returnLastFrame?: boolean   // API returns last frame URL → eliminates ffmpeg extraction
+  isChainFrame?: boolean      // true = first imageUrl is a chain frame (role: first_frame)
+  // Audio & quality options (Seedance 1.5 Pro)
+  generateAudio?: boolean     // default true for 1.5 Pro
+  draft?: boolean             // preview mode, lower cost (480p only)
+  serviceTier?: "default" | "flex" // flex = 50% cheaper offline mode
 }
 
 export interface VideoGenerationResult {
   taskId: string
   status: "submitted" | "generating" | "done" | "failed"
   videoUrl?: string
+  lastFrameUrl?: string  // returned when returnLastFrame=true (Seedance 1.5 Pro)
   error?: string
 }
 
@@ -93,8 +101,15 @@ export async function enrichSegmentWithCharacters(
     ? `[Cast: ${charBlock}]\n${segment.prompt}`
     : segment.prompt
 
-  // Merge user-uploaded reference images with character images
-  const allImageUrls = [...(segment.referenceImages || []), ...charImageUrls]
+  // Merge user-uploaded reference images with character images.
+  // Filter to only absolute URLs — relative proxy paths (e.g. /api/r2/...)
+  // can't be fetched by external video generation APIs.
+  const isAbsoluteUrl = (url: string) =>
+    url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")
+  const allImageUrls = [
+    ...(segment.referenceImages || []),
+    ...charImageUrls,
+  ].filter(isAbsoluteUrl)
 
   // Derive a deterministic episode seed from scriptId + episodeNum so all
   // segments in the same episode share the same seed value → more consistent
@@ -145,10 +160,18 @@ const SEEDANCE_MODEL_IDS: Record<string, string> = {
 
 // Duration limits per Seedance model (seconds)
 const SEEDANCE_MAX_DURATION: Record<string, number> = {
-  seedance_2_0:          12,
+  seedance_2_0:          15,  // 2.0 supports 4-15s
   seedance_1_5_pro:      12,
   seedance_1_0_pro:      12,
   seedance_1_0_pro_fast: 12,
+}
+
+// Models that support 1080p (Seedance 2.0 only supports 480p/720p)
+const SEEDANCE_MAX_RESOLUTION: Record<string, string[]> = {
+  seedance_2_0:          ["720p", "480p"],
+  seedance_1_5_pro:      ["1080p", "720p"],
+  seedance_1_0_pro:      ["1080p", "720p"],
+  seedance_1_0_pro_fast: ["1080p", "720p"],
 }
 
 // Resolution → aspect_ratio mapping
@@ -233,18 +256,32 @@ async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId
   if (!modelId) throw new Error(`Unknown Seedance model: ${req.model}`)
 
   const maxDuration = SEEDANCE_MAX_DURATION[req.model] ?? 12
-  const duration = Math.min(Math.max(Math.round(req.durationSec), 4), maxDuration)
+  // Seedance 1.5 Pro supports duration: -1 (auto) — the model picks the optimal
+  // length [4,12] based on prompt content. This prevents dialogue from being cut off
+  // when the AI Plan underestimates how long a scene with dialogue needs.
+  const is15ProModel = req.model === "seedance_1_5_pro"
+  const is20Model = req.model === "seedance_2_0"
+  const duration = is15ProModel ? -1 : Math.min(Math.max(Math.round(req.durationSec), 4), maxDuration)
 
   const hasImages = req.imageUrls && req.imageUrls.length > 0
 
-  // Build content array: reference images first, then text prompt
+  // Build content array: reference image (max 1) first, then text prompt.
+  // Seedance models accept at most 1 image_url content item per request.
+  // The first image is the most important (chain seed frame or primary character ref).
+  // When isChainFrame=true, we set role: "first_frame" to explicitly tell the API
+  // this image is the starting frame for image-to-video generation.
   const buildContent = (promptText: string): Array<Record<string, unknown>> => {
     const items: Array<Record<string, unknown>> = []
     if (hasImages) {
-      items.push(...req.imageUrls!.slice(0, 6).map(url => ({
+      const imgItem: Record<string, unknown> = {
         type: "image_url",
-        image_url: { url },
-      })))
+        image_url: { url: req.imageUrls![0] },
+      }
+      // Chain mode: mark the image as first_frame for I2V (explicit role)
+      if (req.isChainFrame) {
+        imgItem.role = "first_frame"
+      }
+      items.push(imgItem)
     }
     items.push({ type: "text", text: promptText })
     return items
@@ -254,9 +291,18 @@ async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId
   // Fall back to -1 (random) only when no seed is provided.
   const seed = req.seed && req.seed > 0 ? req.seed : -1
 
+  const is15Pro = req.model === "seedance_1_5_pro"
+
+  // Seedance 2.0 only supports 480p/720p — clamp resolution
+  const allowedRes = SEEDANCE_MAX_RESOLUTION[req.model] || ["1080p", "720p"]
+  let resolvedResolution = req.resolution
+  if (!allowedRes.includes(resolvedResolution)) {
+    resolvedResolution = allowedRes[0] // fallback to best allowed
+  }
+
   const baseBody: Record<string, unknown> = {
     model: modelId,
-    resolution: req.resolution === "1080p" ? "1080p" : "720p",
+    resolution: resolvedResolution,
     ratio: req.aspectRatio || getAspectRatio(req.resolution),
     duration,
     seed,
@@ -264,7 +310,38 @@ async function submitSeedanceTask(req: VideoGenerationRequest): Promise<{ taskId
     camera_fixed: false,
   }
 
-  console.log(`[Seedance] Submitting: model=${modelId}, ratio=${baseBody.ratio}, seed=${seed}, images=${req.imageUrls?.length ?? 0}`)
+  // Seedance 2.0 features: supports audio generation natively
+  if (is20Model) {
+    // Audio: Seedance 2.0 supports native audio generation (dialogue + SFX)
+    if (req.generateAudio !== false) {
+      baseBody.generate_audio = true
+    }
+  }
+
+  // Seedance 1.5 Pro exclusive features
+  if (is15Pro) {
+    // return_last_frame: API returns the last frame URL on completion
+    // → eliminates our ffmpeg extraction, faster & more reliable for chain mode
+    if (req.returnLastFrame) {
+      baseBody.return_last_frame = true
+    }
+    // Audio generation: Seedance 1.5 Pro generates synchronized audio by default
+    if (req.generateAudio !== undefined) {
+      baseBody.generate_audio = req.generateAudio
+    }
+    // Draft mode: quick preview at 480p, lower token cost
+    if (req.draft) {
+      baseBody.draft = true
+      baseBody.resolution = "480p" // draft only supports 480p
+    }
+  }
+
+  // Service tier: flex = offline 50% cheaper
+  if (req.serviceTier) {
+    baseBody.service_tier = req.serviceTier
+  }
+
+  console.log(`[Seedance] Submitting: model=${modelId}, ratio=${baseBody.ratio}, seed=${seed}, images=${hasImages ? 1 : 0} (of ${req.imageUrls?.length ?? 0} provided), returnLastFrame=${!!req.returnLastFrame}`)
 
   const trySubmit = async (promptText: string) =>
     seedanceRequest<{ id: string; status: string }>(
@@ -299,8 +376,8 @@ async function querySeedanceTask(model: string, taskId: string): Promise<VideoGe
   const result = await seedanceRequest<{
     id: string
     status: string
-    // content is an object { video_url: string }, NOT an array
-    content?: { video_url?: string } | Array<{ type: string; video_url?: { url: string } }>
+    // content is an object { video_url: string, last_frame_url?: string }, NOT an array
+    content?: { video_url?: string; last_frame_url?: string } | Array<{ type: string; video_url?: { url: string } }>
     error?: { message?: string }
   }>(`/contents/generations/tasks/${taskId}`, undefined, "GET")
 
@@ -309,6 +386,7 @@ async function querySeedanceTask(model: string, taskId: string): Promise<VideoGe
   // Statuses: pending | running | succeeded | failed | cancelled | expired
   if (status === "succeeded") {
     let videoUrl: string | undefined
+    let lastFrameUrl: string | undefined
     if (result.content) {
       if (Array.isArray(result.content)) {
         // Legacy array format (not observed in practice)
@@ -319,12 +397,14 @@ async function querySeedanceTask(model: string, taskId: string): Promise<VideoGe
           }
         }
       } else {
-        // Actual format: { video_url: "https://..." }
-        videoUrl = (result.content as { video_url?: string }).video_url
+        // Actual format: { video_url: "https://...", last_frame_url?: "https://..." }
+        const contentObj = result.content as { video_url?: string; last_frame_url?: string }
+        videoUrl = contentObj.video_url
+        lastFrameUrl = contentObj.last_frame_url
       }
     }
-    console.log(`[Seedance] Task ${taskId} succeeded, videoUrl: ${videoUrl ? "found" : "missing"}`)
-    return { taskId, status: "done", videoUrl }
+    console.log(`[Seedance] Task ${taskId} succeeded, videoUrl: ${videoUrl ? "found" : "missing"}, lastFrameUrl: ${lastFrameUrl ? "found" : "none"}`)
+    return { taskId, status: "done", videoUrl, lastFrameUrl }
   }
 
   if (["failed", "cancelled", "expired"].includes(status)) {

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { aiComplete, buildScriptSystemPrompt, extractJSON } from "@/lib/ai"
-import { getAvailableBalance, confirmDeduction } from "@/lib/tokens"
+import { getAvailableBalance, directDeduction } from "@/lib/tokens"
 import { generateAndSaveSceneImages } from "@/lib/scene-image-gen"
 
 /**
@@ -93,8 +93,39 @@ Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also 
 
   // Save scenes and capture created records for background image generation
   const createdScenes = await Promise.all(
-    scenes.map((scene, i) =>
-      prisma.scriptScene.create({
+    scenes.map((scene, i) => {
+      // Normalize action field to JSON block array format
+      // The workspace expects: [{"type":"action","text":"..."}, {"type":"dialogue","character":"...","parenthetical":"","line":"..."}, ...]
+      let actionStr = ""
+      const rawAction = scene.action
+      if (Array.isArray(rawAction)) {
+        // New format: action is already an array of blocks — serialize it
+        actionStr = JSON.stringify(rawAction)
+      } else if (typeof rawAction === "string") {
+        // Old format: action is plain text — check if dialogue exists separately
+        const dialogueArr = Array.isArray(scene.dialogue) ? scene.dialogue as Array<Record<string, string>> : []
+        if (dialogueArr.length > 0) {
+          // Merge plain action text + separate dialogue array into block format
+          const blocks: Array<Record<string, string>> = []
+          if (rawAction.trim()) blocks.push({ type: "action", text: rawAction.trim() })
+          for (const d of dialogueArr) {
+            blocks.push({
+              type: "dialogue",
+              character: (d.character || "").toUpperCase(),
+              parenthetical: d.direction || d.parenthetical || "",
+              line: d.line || d.text || "",
+            })
+          }
+          actionStr = JSON.stringify(blocks)
+        } else {
+          // No dialogue at all — wrap plain text as action block
+          actionStr = rawAction.trim()
+            ? JSON.stringify([{ type: "action", text: rawAction.trim() }])
+            : ""
+        }
+      }
+
+      return prisma.scriptScene.create({
         data: {
           scriptId,
           episodeNum: targetEpisode,
@@ -103,7 +134,7 @@ Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also 
           location: (scene.location as string) || "",
           timeOfDay: (scene.timeOfDay as string) || "",
           mood: (scene.mood as string) || "",
-          action: (scene.action as string) || "",
+          action: actionStr,
           dialogue: typeof scene.dialogue === "string"
             ? scene.dialogue
             : JSON.stringify(scene.dialogue || []),
@@ -113,11 +144,11 @@ Generate all scenes for Episode ${targetEpisode}. ${targetEpisode === 1 ? "Also 
         },
         select: { id: true, heading: true, location: true, timeOfDay: true, mood: true, action: true },
       })
-    )
+    })
   )
 
   const coinsUsed = calcScriptCostCoins(result.usage.totalTokens)
-  await confirmDeduction(userId, coinsUsed, {
+  await directDeduction(userId, coinsUsed, {
     type: "script_generate",
     episodeNum: targetEpisode,
     totalTokens: result.usage.totalTokens,

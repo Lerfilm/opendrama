@@ -130,6 +130,10 @@ Generate a photorealistic portrait prompt:`,
     try {
       const b64 = b64DataUrl.split(",")[1]
       const buffer = Buffer.from(b64, "base64")
+      if (buffer.length < 1024) {
+        console.error(`[generateCharacterPortrait] Image buffer too small (${buffer.length} bytes) for ${name} — skipping upload`)
+        throw new Error(`Corrupted image data (${buffer.length} bytes)`)
+      }
       const path = storagePath(userId, "role-images", `${name}-portrait.png`)
       imageUrl = await uploadToStorage("role-images", path, buffer, "image/png")
     } catch (err) {
@@ -176,7 +180,7 @@ Requirements:
 - Show the location's character, atmosphere, and architectural details
 - Must feel like a real place where filming would take place
 - IMPORTANT: Read the scene content carefully — the location should match the mood, atmosphere, and activities described
-${existingPrompt ? `- CONSISTENCY: A previous photo was generated with this prompt: "${existingPrompt}". Maintain the SAME architectural style, color palette, and spatial layout. Only vary the lighting/time of day if needed.` : ""}
+${existingPrompt ? `- CRITICAL CONSISTENCY: This is the SAME physical location as a previously generated photo. You MUST reuse this exact prompt as the base and only change the lighting/time of day. Previous prompt: "${existingPrompt}". Keep the IDENTICAL room/space layout, furniture placement, architectural details, color scheme, and camera angle. The viewer must recognize it as the exact same place.` : ""}
 ${styleDirective(styleAnchor)}
 - Output ONLY the image prompt, no explanation`,
       },
@@ -202,6 +206,10 @@ Generate a photorealistic location reference photo prompt:`,
     try {
       const b64 = b64DataUrl.split(",")[1]
       const buffer = Buffer.from(b64, "base64")
+      if (buffer.length < 1024) {
+        console.error(`[generateLocationPhoto] Image buffer too small (${buffer.length} bytes) for ${locName} — skipping upload`)
+        throw new Error(`Corrupted image data (${buffer.length} bytes)`)
+      }
       const path = storagePath(userId, "scene-images", `loc-${locName}.png`)
       url = await uploadToStorage("scene-images", path, buffer, "image/png")
     } catch (err) {
@@ -272,6 +280,10 @@ Generate a photorealistic prop reference photo prompt:`,
     try {
       const b64 = b64DataUrl.split(",")[1]
       const buffer = Buffer.from(b64, "base64")
+      if (buffer.length < 1024) {
+        console.error(`[generatePropPhoto] Image buffer too small (${buffer.length} bytes) for ${propName} — skipping upload`)
+        throw new Error(`Corrupted image data (${buffer.length} bytes)`)
+      }
       const path = storagePath(userId, "props-images", `prop-${propName}.png`)
       url = await uploadToStorage("props-images", path, buffer, "image/png")
     } catch (err) {
@@ -336,6 +348,10 @@ ${sceneSummary}`,
     try {
       const b64 = b64DataUrl.split(",")[1]
       const buffer = Buffer.from(b64, "base64")
+      if (buffer.length < 1024) {
+        console.error(`[generateCoverForEpisode] Image buffer too small (${buffer.length} bytes) — skipping upload`)
+        throw new Error(`Corrupted image data (${buffer.length} bytes)`)
+      }
       const path = `${scriptId}/cover-tall-ep${episodeNum}-${Date.now()}.png`
       coverUrl = await uploadToStorage("covers", path, buffer, "image/png")
     } catch (err) {

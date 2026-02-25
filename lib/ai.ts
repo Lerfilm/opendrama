@@ -271,22 +271,35 @@ export function buildScriptSystemPrompt(language: string = "zh") {
       "episodeNum": 1,
       "sceneNum": 1,
       "heading": "INT./EXT. 场景 - 时间",
-      "action": "动作描述",
-      "dialogue": [
-        {"character": "角色名", "line": "台词内容", "direction": "表演指导"}
+      "location": "场景名称",
+      "timeOfDay": "DAY/NIGHT/DAWN/DUSK",
+      "mood": "情绪氛围",
+      "action": [
+        {"type": "action", "text": "场景开头的动作/环境描写。现在时态，写我们看到和听到的。"},
+        {"type": "dialogue", "character": "角色名", "parenthetical": "(语气/表演指导)", "line": "台词内容"},
+        {"type": "action", "text": "角色的反应、动作描写"},
+        {"type": "dialogue", "character": "另一角色", "parenthetical": "", "line": "回应台词"},
+        {"type": "direction", "text": "(镜头指示：推近/拉远/特写等)"}
       ],
-      "stageDirection": "舞台指示/镜头语言",
       "duration": 60
     }
   ]
 }
+
+关于 action 数组的格式说明：
+- action 字段是一个 JSON 数组，包含交替出现的动作、台词和镜头指示
+- type "action"：动作/场景描写，用现在时态
+- type "dialogue"：角色台词，character 是角色名（大写），parenthetical 是表演指导（可为空字符串），line 是台词
+- type "direction"：镜头语言/舞台指示
+- 每场戏至少包含 2-3 段台词对话
+- 台词应该推动剧情发展，展现角色性格
 
 写作要求：
 - 每场戏 30-90 秒，节奏紧凑
 - 短剧风格：强冲突、快节奏、高反转
 - 竖屏构图（9:16），注意特写和近景
 - 每集 3-5 场戏，总时长 2-3 分钟
-- 台词口语化，贴近生活
+- 台词口语化，贴近生活，每场戏必须有台词
 - 每集结尾设置悬念/反转
 
 重要：只输出纯 JSON，不要添加 markdown 代码块标记、注释或任何其他文字。`
@@ -309,22 +322,35 @@ Output format (JSON):
       "episodeNum": 1,
       "sceneNum": 1,
       "heading": "INT./EXT. Location - Time",
-      "action": "Action description",
-      "dialogue": [
-        {"character": "Name", "line": "Dialogue", "direction": "Acting direction"}
+      "location": "Location name",
+      "timeOfDay": "DAY/NIGHT/DAWN/DUSK",
+      "mood": "Emotional tone",
+      "action": [
+        {"type": "action", "text": "Opening action/scene description. Present tense. What we see and hear."},
+        {"type": "dialogue", "character": "CHARACTER NAME", "parenthetical": "(tone/direction)", "line": "Dialogue text"},
+        {"type": "action", "text": "Character reactions, physical actions"},
+        {"type": "dialogue", "character": "OTHER CHARACTER", "parenthetical": "", "line": "Response dialogue"},
+        {"type": "direction", "text": "(Camera direction: push in / pull back / close-up etc.)"}
       ],
-      "stageDirection": "Stage direction / camera language",
       "duration": 60
     }
   ]
 }
+
+About the action array format:
+- The "action" field is a JSON array of interleaved action, dialogue, and direction blocks
+- type "action": scene description / physical action, written in present tense
+- type "dialogue": character speech. "character" is the name (UPPERCASE), "parenthetical" is acting direction (can be empty string), "line" is the dialogue text
+- type "direction": camera/stage directions
+- Each scene must include at least 2-3 dialogue exchanges
+- Dialogue should advance the plot and reveal character
 
 Requirements:
 - Each scene 30-90 seconds, tight pacing
 - Short drama style: strong conflict, fast pace, plot twists
 - Vertical framing (9:16), focus on close-ups
 - 3-5 scenes per episode, 2-3 minutes total
-- Natural, conversational dialogue
+- Natural, conversational dialogue — every scene MUST have dialogue
 - Each episode ends with a cliffhanger
 
 IMPORTANT: Output ONLY the raw JSON object. No markdown code blocks, no comments, no other text.`
@@ -508,8 +534,19 @@ export async function aiGenerateImage(
   if (typeof content === "string") {
     // Direct data URL or base64 string
     if (content.startsWith("data:")) rawResult = content
-    // Plain base64 without prefix
-    else if (content.length > 100) rawResult = `data:image/png;base64,${content}`
+    // Plain base64 without prefix — must look like actual base64 (only base64 chars)
+    // and decode to a meaningful size (>1KB). This prevents text refusals from being
+    // misinterpreted as base64 image data.
+    else if (content.length > 100 && /^[A-Za-z0-9+/=\s]+$/.test(content.substring(0, 200))) {
+      const testBuf = Buffer.from(content.substring(0, 200), "base64")
+      if (testBuf.length > 100) {
+        rawResult = `data:image/png;base64,${content}`
+      } else {
+        console.warn(`[aiGenerateImage] Content looks like text, not base64 (decoded ${testBuf.length} bytes from first 200 chars). Content preview: "${content.substring(0, 120)}"`)
+      }
+    } else if (content.length > 100) {
+      console.warn(`[aiGenerateImage] Content is text, not image data. Preview: "${content.substring(0, 120)}"`)
+    }
   }
 
   if (!rawResult && Array.isArray(content)) {
@@ -550,6 +587,22 @@ export async function aiGenerateImage(
     } catch (fetchErr) {
       console.warn("[aiGenerateImage] Could not fetch external image URL, storing URL as-is:", fetchErr)
       return rawResult
+    }
+  }
+
+  // Validate the image data is substantial (real images are >10KB, corrupted ones are <1KB)
+  if (rawResult.startsWith("data:")) {
+    const b64Part = rawResult.split(",")[1]
+    if (b64Part) {
+      const decodedSize = Buffer.from(b64Part.substring(0, 2000), "base64").length
+      const estimatedTotalSize = Math.floor(b64Part.length * 3 / 4)
+      if (estimatedTotalSize < 1024) {
+        console.error(`[aiGenerateImage] Image data too small (${estimatedTotalSize} bytes) — likely corrupted or text response. Retrying...`)
+        if (_retryCount < IMAGE_GEN_MAX_RETRIES) {
+          return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
+        }
+        throw new Error(`Image generation produced corrupted data (${estimatedTotalSize} bytes)`)
+      }
     }
   }
 

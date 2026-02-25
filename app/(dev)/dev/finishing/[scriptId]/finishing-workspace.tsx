@@ -51,6 +51,7 @@ interface Script {
   logline?: string | null
   synopsis?: string | null
   coverTall?: string | null
+  coverWide?: string | null
   targetEpisodes: number
   status: string
   metadata?: string | null
@@ -169,6 +170,99 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
   const [editLogline, setEditLogline] = useState(script.logline || "")
   const [isSavingMeta, setIsSavingMeta] = useState(false)
 
+  // Cover / poster state
+  const [coverTall, setCoverTall] = useState<string | null>(script.coverTall || null)
+  const [coverWide, setCoverWide] = useState<string | null>(script.coverWide || null)
+  const [coverUploading, setCoverUploading] = useState<"tall" | "wide" | null>(null)
+  const [coverGenerating, setCoverGenerating] = useState(false)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+  const coverTargetRef = useRef<"tall" | "wide">("tall")
+
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const target = coverTargetRef.current
+    if (!file) return
+    e.target.value = ""
+    setCoverUploading(target)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      fd.append("bucket", "covers")
+      const res = await fetch("/api/upload/media", { method: "POST", body: fd })
+      if (!res.ok) { alert("Upload failed"); return }
+      const data = await res.json()
+      const url = data.url as string
+      // Save to DB
+      const field = target === "tall" ? "coverTall" : "coverWide"
+      const saveRes = await fetch(`/api/scripts/${script.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: url }),
+      })
+      if (!saveRes.ok) { alert("Failed to save cover"); return }
+      if (target === "tall") setCoverTall(url)
+      else setCoverWide(url)
+    } catch (err) {
+      alert("Upload error: " + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setCoverUploading(null)
+    }
+  }
+
+  function triggerCoverUpload(target: "tall" | "wide") {
+    coverTargetRef.current = target
+    coverInputRef.current?.click()
+  }
+
+  async function handleAIGenerateCover() {
+    setCoverGenerating(true)
+    try {
+      const res = await fetch("/api/cover/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptId: script.id, episodeNum: 1 }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        alert("Cover generation failed: " + (d.error || res.statusText))
+        return
+      }
+      const { tallTaskId } = await res.json()
+      // Poll for result
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 3000))
+        const statusRes = await fetch(`/api/cover/status?scriptId=${script.id}&tallTaskId=${encodeURIComponent(tallTaskId)}`)
+        if (!statusRes.ok) continue
+        const status = await statusRes.json()
+        if (status.status === "done") {
+          if (status.coverTall) setCoverTall(status.coverTall)
+          return
+        }
+        if (status.status === "failed") {
+          alert("Cover generation failed")
+          return
+        }
+      }
+      alert("Cover generation timed out")
+    } catch (err) {
+      alert("Error: " + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setCoverGenerating(false)
+    }
+  }
+
+  async function removeCover(field: "tall" | "wide") {
+    const key = field === "tall" ? "coverTall" : "coverWide"
+    const res = await fetch(`/api/scripts/${script.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [key]: null }),
+    })
+    if (!res.ok) { alert("Failed to remove cover"); return }
+    if (field === "tall") setCoverTall(null)
+    else setCoverWide(null)
+  }
+
   async function saveScriptMeta() {
     setIsSavingMeta(true)
     try {
@@ -224,12 +318,21 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
         </div>
 
         <div className="flex-1 overflow-y-auto dev-scrollbar p-4 space-y-5">
+          {/* Hidden file input for cover uploads */}
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleCoverUpload}
+          />
+
           {/* Script info */}
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#AAA" }}>Script</p>
             <div className="flex items-center gap-3">
-              {script.coverTall ? (
-                <img src={script.coverTall} alt="" className="w-12 h-16 rounded object-cover flex-shrink-0" style={{ border: "1px solid #C8C8C8" }} />
+              {coverTall ? (
+                <img src={coverTall} alt="" className="w-12 h-16 rounded object-cover flex-shrink-0" style={{ border: "1px solid #C8C8C8" }} />
               ) : (
                 <div className="w-12 h-16 rounded flex items-center justify-center flex-shrink-0" style={{ background: "#D8D8D8" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} style={{ color: "#AAA" }}>
@@ -310,6 +413,114 @@ export function FinishingWorkspace({ script, series }: { script: Script; series:
                 />
               </div>
               {isSavingMeta && <p className="text-[9px]" style={{ color: "#AAA" }}>Saving...</p>}
+            </div>
+          </div>
+
+          {/* Cover / Poster */}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#AAA" }}>Cover / Poster</p>
+            <div className="space-y-3">
+              {/* Tall cover 3:4 */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[9px] uppercase tracking-wider" style={{ color: "#BBB" }}>Vertical 3:4</span>
+                  {coverTall && (
+                    <button onClick={() => removeCover("tall")} className="text-[9px]" style={{ color: "#EF4444" }}>Remove</button>
+                  )}
+                </div>
+                {coverTall ? (
+                  <div className="relative group">
+                    <img src={coverTall} alt="Cover 3:4" className="w-full rounded-lg object-cover" style={{ aspectRatio: "3/4", border: "1px solid #C8C8C8" }} />
+                    <div className="absolute inset-0 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "rgba(0,0,0,0.4)" }}>
+                      <button
+                        onClick={() => triggerCoverUpload("tall")}
+                        disabled={!!coverUploading}
+                        className="text-[10px] px-3 py-1.5 rounded-lg font-medium"
+                        style={{ background: "#fff", color: "#1A1A1A" }}
+                      >
+                        Replace
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="w-full rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors"
+                    style={{ aspectRatio: "3/4", background: "#E0E0E0", border: "2px dashed #C0C0C0" }}
+                    onClick={() => triggerCoverUpload("tall")}
+                  >
+                    {coverUploading === "tall" ? (
+                      <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
+                    ) : (
+                      <>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} style={{ color: "#AAA" }}>
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        <span className="text-[10px] mt-1" style={{ color: "#AAA" }}>Upload image</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Wide cover 16:9 */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[9px] uppercase tracking-wider" style={{ color: "#BBB" }}>Horizontal 16:9</span>
+                  {coverWide && (
+                    <button onClick={() => removeCover("wide")} className="text-[9px]" style={{ color: "#EF4444" }}>Remove</button>
+                  )}
+                </div>
+                {coverWide ? (
+                  <div className="relative group">
+                    <img src={coverWide} alt="Cover 16:9" className="w-full rounded-lg object-cover" style={{ aspectRatio: "16/9", border: "1px solid #C8C8C8" }} />
+                    <div className="absolute inset-0 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "rgba(0,0,0,0.4)" }}>
+                      <button
+                        onClick={() => triggerCoverUpload("wide")}
+                        disabled={!!coverUploading}
+                        className="text-[10px] px-3 py-1.5 rounded-lg font-medium"
+                        style={{ background: "#fff", color: "#1A1A1A" }}
+                      >
+                        Replace
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="w-full rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors"
+                    style={{ aspectRatio: "16/9", background: "#E0E0E0", border: "2px dashed #C0C0C0" }}
+                    onClick={() => triggerCoverUpload("wide")}
+                  >
+                    {coverUploading === "wide" ? (
+                      <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
+                    ) : (
+                      <>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} style={{ color: "#AAA" }}>
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        <span className="text-[10px] mt-1" style={{ color: "#AAA" }}>Upload image</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* AI Generate button */}
+              <button
+                onClick={handleAIGenerateCover}
+                disabled={coverGenerating}
+                className="w-full py-2 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                style={{ background: "#E0E4F8", color: "#4F46E5", border: "1px solid #C5CCF0" }}
+              >
+                {coverGenerating ? (
+                  <><div className="w-3 h-3 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />Generating...</>
+                ) : (
+                  <>AI Generate Cover</>
+                )}
+              </button>
             </div>
           </div>
 
