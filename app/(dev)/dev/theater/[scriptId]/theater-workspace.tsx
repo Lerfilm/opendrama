@@ -99,6 +99,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const [isDragOver, setIsDragOver] = useState(false)
   const [assetTab, setAssetTab] = useState<"characters" | "locations" | "materials">("characters")
   const promptRef = useRef<HTMLTextAreaElement>(null)
+  const dropPosRef = useRef<number>(0) // tracks caret position during drag for accurate drop insertion
 
   const epSegments = segments.filter(s => s.episodeNum === selectedEp).sort((a, b) => a.segmentIndex - b.segmentIndex)
   const selectedSeg = segments.find(s => s.id === selectedSegId) ?? null
@@ -1142,18 +1143,35 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     ref={promptRef}
                     value={editingPrompts[selectedSeg.id] ?? selectedSeg.prompt}
                     onChange={e => setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: e.target.value }))}
-                    onDragOver={e => { e.preventDefault(); setIsDragOver(true); e.dataTransfer.dropEffect = "copy" }}
+                    onDragOver={e => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = "copy"
+                      setIsDragOver(true)
+                      // Chrome updates selectionStart to follow the visual drag cursor
+                      if (promptRef.current) dropPosRef.current = promptRef.current.selectionStart
+                    }}
                     onDragLeave={() => setIsDragOver(false)}
-                    onDrop={() => {
-                      // Do NOT preventDefault — let browser natively insert text at the visual caret position.
-                      // Then sync React state from the DOM after the browser finishes.
+                    onDrop={e => {
+                      e.preventDefault()
+                      e.stopPropagation()
                       setIsDragOver(false)
-                      requestAnimationFrame(() => {
-                        const textarea = promptRef.current
-                        if (textarea && selectedSeg) {
-                          setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: textarea.value }))
-                        }
-                      })
+                      const data = e.dataTransfer.getData("text/plain")
+                      if (data && selectedSeg) {
+                        const current = editingPrompts[selectedSeg.id] ?? selectedSeg.prompt ?? ""
+                        const pos = dropPosRef.current
+                        const before = current.substring(0, pos)
+                        const after = current.substring(pos)
+                        const newValue = before + data + " " + after
+                        setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: newValue }))
+                        const newPos = pos + data.length + 1
+                        requestAnimationFrame(() => {
+                          if (promptRef.current) {
+                            promptRef.current.focus()
+                            promptRef.current.selectionStart = newPos
+                            promptRef.current.selectionEnd = newPos
+                          }
+                        })
+                      }
                     }}
                     rows={8}
                     className="w-full resize-none text-[13px] leading-relaxed p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
@@ -1207,7 +1225,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                       const otherRoles = script.roles.filter(r => !sceneRoles.includes(r))
                       const allRoles = [...sceneRoles, ...otherRoles]
                       return allRoles.length > 0 ? (
-                        <div className="grid grid-cols-3 gap-1.5">
+                        <div className="grid grid-cols-4 gap-1.5">
                           {allRoles.map((role, idx) => {
                             const isInScene = idx < sceneRoles.length
                             return (
@@ -1225,22 +1243,22 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                               >
                                 {role.referenceImages?.[0] ? (
                                   <img src={role.referenceImages[0]} alt={role.name}
-                                    className="w-full aspect-square object-cover pointer-events-none group-hover:scale-105 transition-transform duration-200" />
+                                    className="w-full h-20 object-cover pointer-events-none group-hover:scale-105 transition-transform duration-200" />
                                 ) : (
-                                  <div className="w-full aspect-square flex items-center justify-center text-xl font-bold pointer-events-none"
+                                  <div className="w-full h-20 flex items-center justify-center text-lg font-bold pointer-events-none"
                                     style={{ background: "#E8E4FF", color: "#4F46E5" }}>
                                     {role.name[0]?.toUpperCase()}
                                   </div>
                                 )}
                                 {/* Overlay label at bottom */}
-                                <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 pointer-events-none"
+                                <div className="absolute bottom-0 left-0 right-0 px-1 py-0.5 pointer-events-none"
                                   style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
-                                  <span className="text-[9px] font-semibold text-white truncate block leading-tight">
+                                  <span className="text-[8px] font-semibold text-white truncate block leading-tight">
                                     {role.name}
                                   </span>
                                 </div>
                                 {isInScene && (
-                                  <div className="absolute top-1 right-1 px-1 py-0.5 rounded text-[7px] font-semibold pointer-events-none"
+                                  <div className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded text-[6px] font-semibold pointer-events-none"
                                     style={{ background: "rgba(99,102,241,0.85)", color: "#fff" }}>
                                     IN
                                   </div>
