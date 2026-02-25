@@ -545,31 +545,16 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   // ── Loading screen while images preload ──
   if (!imagesReady) {
     return (
-      <div className="h-full flex flex-col items-center justify-center" style={{ background: "#1A1A2E" }}>
-        <div className="flex flex-col items-center gap-5">
-          {/* Film clapper icon */}
-          <div className="relative">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={1.5} className="animate-pulse">
-              <rect x="2" y="4" width="20" height="16" rx="2"/>
-              <path d="M2 8h20"/>
-              <path d="M6 4l2 4"/>
-              <path d="M10 4l2 4"/>
-              <path d="M14 4l2 4"/>
-              <path d="M18 4l2 4"/>
-            </svg>
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-semibold" style={{ color: "#E0E0FF" }}>{script.title}</p>
-            <p className="text-[11px] mt-1" style={{ color: "#6366F1" }}>Loading assets...</p>
-          </div>
-          {/* Progress bar */}
-          <div className="w-48 h-1 rounded-full overflow-hidden" style={{ background: "#2A2A4E" }}>
-            <div
-              className="h-full rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${loadProgress}%`, background: "#6366F1" }}
-            />
-          </div>
-          <p className="text-[10px] font-mono" style={{ color: "#555" }}>{loadProgress}%</p>
+      <div className="flex items-center justify-center w-full h-full" style={{ background: "#E8E8E8" }}>
+        <div className="flex flex-col items-center gap-3">
+          <div
+            className="w-8 h-8 rounded-full border-2 animate-spin"
+            style={{
+              borderColor: "rgba(99,102,241,0.2)",
+              borderTopColor: "#6366F1",
+            }}
+          />
+          <span className="text-[11px] font-medium" style={{ color: "#888" }}>Loading workspace...</span>
         </div>
       </div>
     )
