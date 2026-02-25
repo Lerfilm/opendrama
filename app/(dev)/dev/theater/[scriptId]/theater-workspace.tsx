@@ -99,10 +99,6 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const [isDragOver, setIsDragOver] = useState(false)
   const [assetTab, setAssetTab] = useState<"characters" | "locations" | "materials">("characters")
   const promptRef = useRef<HTMLTextAreaElement>(null)
-  const [translatedText, setTranslatedText] = useState("")
-  const [isTranslating, setIsTranslating] = useState(false)
-  const [translationLang, setTranslationLang] = useState<"en" | "zh">("en")
-  const translateTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const epSegments = segments.filter(s => s.episodeNum === selectedEp).sort((a, b) => a.segmentIndex - b.segmentIndex)
   const selectedSeg = segments.find(s => s.id === selectedSegId) ?? null
@@ -323,30 +319,6 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     }
   }
 
-  // Auto-translate prompt (debounced 1s)
-  useEffect(() => {
-    if (!selectedSegId) return
-    const promptText = editingPrompts[selectedSegId] ?? segments.find(s => s.id === selectedSegId)?.prompt ?? ""
-    if (promptText.trim().length < 5) { setTranslatedText(""); return }
-    if (translateTimerRef.current) clearTimeout(translateTimerRef.current)
-    translateTimerRef.current = setTimeout(async () => {
-      setIsTranslating(true)
-      try {
-        const res = await fetch("/api/ai/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: promptText }),
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setTranslatedText(data.translation || "")
-          setTranslationLang(data.targetLang === "en" ? "en" : "zh")
-        }
-      } catch { /* ok */ }
-      finally { setIsTranslating(false) }
-    }, 1000)
-    return () => { if (translateTimerRef.current) clearTimeout(translateTimerRef.current) }
-  }, [selectedSegId, editingPrompts, segments])
 
   const currentModel = MODELS.find(m => m.id === model)
 
@@ -1146,83 +1118,48 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                   ) : null
                 })()}
 
-                {/* Side-by-side: Prompt (left) + Translation (right) */}
-                <div className="grid grid-cols-2 gap-2">
-                  {/* Left: Editable Prompt */}
-                  <div
-                    className="relative rounded-lg transition-all"
-                    style={{
-                      border: isDragOver ? "2px dashed #4F46E5" : "1px solid #D0D0D0",
-                      background: isDragOver ? "#EEF2FF" : "#EBEBEB",
-                    }}
-                  >
-                    {isDragOver && (
-                      <div className="absolute inset-0 flex items-center justify-center rounded-lg z-10 pointer-events-none"
-                        style={{ background: "rgba(79,70,229,0.08)" }}>
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-full shadow-lg"
-                          style={{ background: "#4F46E5", color: "#fff" }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                            <path d="M12 5v14M5 12h14"/>
-                          </svg>
-                          <span className="text-[11px] font-medium">Drop here to insert</span>
-                        </div>
+                {/* Prompt textarea with drop zone — uses native browser drop for accurate caret positioning */}
+                <div
+                  className="relative rounded-lg transition-all"
+                  style={{
+                    border: isDragOver ? "2px dashed #4F46E5" : "1px solid #D0D0D0",
+                    background: isDragOver ? "#EEF2FF" : "#EBEBEB",
+                  }}
+                >
+                  {isDragOver && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg z-10 pointer-events-none"
+                      style={{ background: "rgba(79,70,229,0.08)" }}>
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-full shadow-lg"
+                        style={{ background: "#4F46E5", color: "#fff" }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        <span className="text-[11px] font-medium">Drop here to insert</span>
                       </div>
-                    )}
-                    <textarea
-                      ref={promptRef}
-                      value={editingPrompts[selectedSeg.id] ?? selectedSeg.prompt}
-                      onChange={e => setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: e.target.value }))}
-                      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); e.dataTransfer.dropEffect = "copy" }}
-                      onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setIsDragOver(false) }}
-                      onDrop={e => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setIsDragOver(false)
-                        const data = e.dataTransfer.getData("text/plain")
-                        if (data && selectedSeg) {
-                          const textarea = promptRef.current
-                          if (textarea) {
-                            textarea.focus()
-                            const current = editingPrompts[selectedSeg.id] ?? selectedSeg.prompt ?? ""
-                            const pos = textarea.selectionStart ?? current.length
-                            const before = current.substring(0, pos)
-                            const after = current.substring(pos)
-                            const newText = before + data + " " + after
-                            setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: newText }))
-                            setTimeout(() => {
-                              if (promptRef.current) {
-                                const newPos = pos + data.length + 1
-                                promptRef.current.selectionStart = newPos
-                                promptRef.current.selectionEnd = newPos
-                                promptRef.current.focus()
-                              }
-                            }, 0)
-                          } else {
-                            insertAtCursor(selectedSeg.id, data)
-                          }
-                        }
-                      }}
-                      rows={8}
-                      className="w-full h-full resize-none text-[13px] leading-relaxed p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                      style={{ background: "transparent", color: "#333", cursor: isDragOver ? "copy" : undefined, minHeight: 160 }}
-                      placeholder="Enter video description, or drag assets here..."
-                    />
-                  </div>
-
-                  {/* Right: Translation */}
-                  <div className="rounded-lg px-3 py-2.5 overflow-y-auto" style={{ background: "#F8F7FF", border: "1px solid #E8E4FF", minHeight: 160 }}>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "#7C3AED" }}>
-                        {translationLang === "en" ? "EN Translation" : "CN Translation"}
-                      </span>
-                      {isTranslating && (
-                        <div className="w-2.5 h-2.5 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "#7C3AED" }} />
-                      )}
                     </div>
-                    <p className="text-[11px] leading-relaxed" style={{ color: "#555" }}>
-                      {isTranslating ? "Translating..." : translatedText || "Translation will appear here..."}
-                    </p>
-                  </div>
+                  )}
+                  <textarea
+                    ref={promptRef}
+                    value={editingPrompts[selectedSeg.id] ?? selectedSeg.prompt}
+                    onChange={e => setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: e.target.value }))}
+                    onDragOver={e => { e.preventDefault(); setIsDragOver(true); e.dataTransfer.dropEffect = "copy" }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={() => {
+                      // Do NOT preventDefault — let browser natively insert text at the visual caret position.
+                      // Then sync React state from the DOM after the browser finishes.
+                      setIsDragOver(false)
+                      requestAnimationFrame(() => {
+                        const textarea = promptRef.current
+                        if (textarea && selectedSeg) {
+                          setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: textarea.value }))
+                        }
+                      })
+                    }}
+                    rows={8}
+                    className="w-full resize-none text-[13px] leading-relaxed p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    style={{ background: "transparent", color: "#333" }}
+                    placeholder="Enter video description, or drag assets here..."
+                  />
                 </div>
 
                 {/* ── Asset Tray: Draggable Elements ── */}
@@ -1249,8 +1186,8 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     ))}
                   </div>
 
-                  {/* Asset cards */}
-                  <div className="p-2.5 max-h-[280px] overflow-y-auto dev-scrollbar">
+                  {/* Asset cards — photo-maximized with overlay labels */}
+                  <div className="p-2 max-h-[300px] overflow-y-auto dev-scrollbar">
                     {/* ── Characters tab ── */}
                     {assetTab === "characters" && (() => {
                       const scene = script.scenes.find(s => s.episodeNum === selectedSeg.episodeNum && s.sceneNum === selectedSeg.sceneNum)
@@ -1270,18 +1207,9 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                       const otherRoles = script.roles.filter(r => !sceneRoles.includes(r))
                       const allRoles = [...sceneRoles, ...otherRoles]
                       return allRoles.length > 0 ? (
-                        <div className="grid grid-cols-3 gap-2.5">
+                        <div className="grid grid-cols-3 gap-1.5">
                           {allRoles.map((role, idx) => {
                             const isInScene = idx < sceneRoles.length
-                            const costumes: CostumePhoto[] = (() => {
-                              try {
-                                if (role.voiceType?.startsWith("{")) {
-                                  const meta = JSON.parse(role.voiceType) as { costumes?: CostumePhoto[] }
-                                  return meta.costumes || []
-                                }
-                              } catch { /* ok */ }
-                              return []
-                            })()
                             return (
                               <div
                                 key={role.id}
@@ -1291,39 +1219,30 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                   e.dataTransfer.effectAllowed = "copy"
                                 }}
                                 onClick={() => insertAtCursor(selectedSeg.id, `@${role.name}`)}
-                                className="flex flex-col items-center gap-1.5 p-2 rounded-lg cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none group"
-                                style={{
-                                  background: isInScene ? "#EEF2FF" : "#F9F9F9",
-                                  border: `1px solid ${isInScene ? "#C7D2FE" : "#E8E8E8"}`,
-                                }}
+                                className="relative rounded-lg overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-lg transition-all select-none group"
+                                style={{ border: `2px solid ${isInScene ? "#818CF8" : "transparent"}` }}
                                 title={`Drag to prompt to insert @${role.name}`}
                               >
                                 {role.referenceImages?.[0] ? (
                                   <img src={role.referenceImages[0]} alt={role.name}
-                                    className="w-16 h-16 rounded-xl object-cover pointer-events-none group-hover:ring-2 group-hover:ring-indigo-300 transition-all"
-                                    style={{ border: "2px solid #D0D0D0" }} />
+                                    className="w-full aspect-square object-cover pointer-events-none group-hover:scale-105 transition-transform duration-200" />
                                 ) : (
-                                  <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold pointer-events-none"
+                                  <div className="w-full aspect-square flex items-center justify-center text-xl font-bold pointer-events-none"
                                     style={{ background: "#E8E4FF", color: "#4F46E5" }}>
                                     {role.name[0]?.toUpperCase()}
                                   </div>
                                 )}
-                                <span className="text-[10px] text-center w-full truncate font-semibold leading-tight"
-                                  style={{ color: isInScene ? "#4338CA" : "#555" }}>
-                                  {role.name}
-                                </span>
+                                {/* Overlay label at bottom */}
+                                <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 pointer-events-none"
+                                  style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
+                                  <span className="text-[9px] font-semibold text-white truncate block leading-tight">
+                                    {role.name}
+                                  </span>
+                                </div>
                                 {isInScene && (
-                                  <span className="text-[7px] px-1.5 py-0.5 rounded" style={{ background: "#C7D2FE", color: "#4338CA" }}>In Scene</span>
-                                )}
-                                {costumes.length > 0 && (
-                                  <div className="flex gap-1 mt-0.5">
-                                    {costumes.slice(0, 2).map((c, ci) => (
-                                      <img key={ci} src={c.url} alt="" className="w-7 h-9 rounded object-cover pointer-events-none"
-                                        style={{ border: `1.5px solid ${c.isApproved ? "#10B981" : "#D0D0D0"}` }} />
-                                    ))}
-                                    {costumes.length > 2 && (
-                                      <span className="text-[8px] self-end" style={{ color: "#AAA" }}>+{costumes.length - 2}</span>
-                                    )}
+                                  <div className="absolute top-1 right-1 px-1 py-0.5 rounded text-[7px] font-semibold pointer-events-none"
+                                    style={{ background: "rgba(99,102,241,0.85)", color: "#fff" }}>
+                                    IN
                                   </div>
                                 )}
                               </div>
@@ -1338,7 +1257,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                       const scene = script.scenes.find(s => s.episodeNum === selectedSeg.episodeNum && s.sceneNum === selectedSeg.sceneNum)
                       const currentLoc = scene?.location
                       return script.locations.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-2 gap-1.5">
                           {[...script.locations]
                             .sort((a, b) => (a.name === currentLoc ? -1 : b.name === currentLoc ? 1 : 0))
                             .map(loc => {
@@ -1353,19 +1272,15 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                     e.dataTransfer.effectAllowed = "copy"
                                   }}
                                   onClick={() => insertAtCursor(selectedSeg.id, `@${loc.name}`)}
-                                  className="flex flex-col gap-1.5 p-2 rounded-lg cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none group"
-                                  style={{
-                                    background: isCurrent ? "#ECFDF5" : "#F9F9F9",
-                                    border: `1px solid ${isCurrent ? "#A7F3D0" : "#E8E8E8"}`,
-                                  }}
+                                  className="relative rounded-lg overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-lg transition-all select-none group"
+                                  style={{ border: `2px solid ${isCurrent ? "#34D399" : "transparent"}` }}
                                   title={`Drag to prompt to insert @${loc.name}`}
                                 >
                                   {photoUrl ? (
                                     <img src={photoUrl} alt={loc.name}
-                                      className="w-full h-24 rounded-lg object-cover pointer-events-none group-hover:ring-2 group-hover:ring-emerald-300 transition-all"
-                                      style={{ border: "1.5px solid #D0D0D0" }} />
+                                      className="w-full h-28 object-cover pointer-events-none group-hover:scale-105 transition-transform duration-200" />
                                   ) : (
-                                    <div className="w-full h-24 rounded-lg flex items-center justify-center pointer-events-none"
+                                    <div className="w-full h-28 flex items-center justify-center pointer-events-none"
                                       style={{ background: "#FEE2E2" }}>
                                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth={2}>
                                         <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
@@ -1373,12 +1288,17 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                       </svg>
                                     </div>
                                   )}
-                                  <span className="text-[10px] text-center truncate font-semibold leading-tight"
-                                    style={{ color: isCurrent ? "#065F46" : "#555" }}>
-                                    {loc.name}
-                                  </span>
+                                  <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 pointer-events-none"
+                                    style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
+                                    <span className="text-[9px] font-semibold text-white truncate block leading-tight">
+                                      {loc.name}
+                                    </span>
+                                  </div>
                                   {isCurrent && (
-                                    <span className="text-[7px] px-1.5 py-0.5 rounded self-center" style={{ background: "#A7F3D0", color: "#065F46" }}>Current</span>
+                                    <div className="absolute top-1 right-1 px-1 py-0.5 rounded text-[7px] font-semibold pointer-events-none"
+                                      style={{ background: "rgba(16,185,129,0.85)", color: "#fff" }}>
+                                      NOW
+                                    </div>
                                   )}
                                 </div>
                               )
@@ -1387,7 +1307,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                       ) : <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>No location data</div>
                     })()}
 
-                    {/* ── Materials tab (previous segments, seed images) ── */}
+                    {/* ── Materials tab ── */}
                     {assetTab === "materials" && (() => {
                       const nearbySegs = epSegments
                         .filter(s => s.id !== selectedSeg.id && (s.thumbnailUrl || s.videoUrl))
@@ -1410,7 +1330,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                               </span>
                             </div>
                           )}
-                          <div className="grid grid-cols-3 gap-2.5">
+                          <div className="grid grid-cols-3 gap-1.5">
                             {nearbySegs.slice(0, 6).map(seg => {
                               const isPrev = seg.segmentIndex === selectedSeg.segmentIndex - 1
                               return (
@@ -1422,27 +1342,25 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                     e.dataTransfer.effectAllowed = "copy"
                                   }}
                                   onClick={() => insertAtCursor(selectedSeg.id, `[Ref Seg#${seg.segmentIndex + 1}]`)}
-                                  className="flex flex-col items-center gap-1.5 p-2 rounded-lg cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none group"
-                                  style={{
-                                    background: isPrev ? "#FFF7ED" : "#F9F9F9",
-                                    border: `1px solid ${isPrev ? "#FED7AA" : "#E8E8E8"}`,
-                                  }}
+                                  className="relative rounded-lg overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-lg transition-all select-none group"
+                                  style={{ border: `2px solid ${isPrev ? "#FB923C" : "transparent"}` }}
                                   title={`Segment #${seg.segmentIndex + 1}${isPrev ? " (Previous)" : ""}`}
                                 >
                                   {seg.thumbnailUrl ? (
                                     <img src={seg.thumbnailUrl} alt=""
-                                      className="w-full h-20 rounded-lg object-cover pointer-events-none group-hover:ring-2 group-hover:ring-orange-300 transition-all"
-                                      style={{ border: "1.5px solid #D0D0D0" }} />
+                                      className="w-full h-20 object-cover pointer-events-none group-hover:scale-105 transition-transform duration-200" />
                                   ) : (
-                                    <div className="w-full h-20 rounded-lg flex items-center justify-center pointer-events-none"
+                                    <div className="w-full h-20 flex items-center justify-center pointer-events-none"
                                       style={{ background: "#E8E8E8" }}>
                                       <span className="text-[10px] font-mono" style={{ color: "#AAA" }}>#{seg.segmentIndex + 1}</span>
                                     </div>
                                   )}
-                                  <span className="text-[9px] font-mono font-semibold"
-                                    style={{ color: isPrev ? "#C2410C" : "#666" }}>
-                                    #{seg.segmentIndex + 1} {isPrev ? "Prev" : `${seg.durationSec}s`}
-                                  </span>
+                                  <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 pointer-events-none"
+                                    style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.65))" }}>
+                                    <span className="text-[8px] font-mono font-semibold text-white">
+                                      #{seg.segmentIndex + 1} {isPrev ? "Prev" : `${seg.durationSec}s`}
+                                    </span>
+                                  </div>
                                 </div>
                               )
                             })}
@@ -1454,14 +1372,6 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                         </div>
                       )
                     })()}
-                  </div>
-
-                  {/* Hint bar */}
-                  <div className="px-3 py-1.5 flex items-center gap-1.5" style={{ background: "#FAFAFA", borderTop: "1px solid #F0F0F0" }}>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#CCC" strokeWidth={2}>
-                      <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
-                    </svg>
-                    <span className="text-[8px]" style={{ color: "#BBB" }}>Drag cards to prompt area or click to insert</span>
                   </div>
                 </div>
               </div>
