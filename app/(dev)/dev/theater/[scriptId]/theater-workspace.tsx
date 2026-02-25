@@ -339,6 +339,67 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   }
 
 
+  // Build name→type lookup for @mention highlighting (keyed by lowercase)
+  const mentionLookup = useMemo(() => {
+    const map = new Map<string, "char" | "loc">()
+    for (const r of script.roles) map.set(r.name.toLowerCase(), "char")
+    for (const l of script.locations) map.set(l.name.toLowerCase(), "loc")
+    return map
+  }, [script.roles, script.locations])
+
+  // Build regex from known names (longest first to avoid partial matches)
+  const mentionRegex = useMemo(() => {
+    const names = [
+      ...script.roles.map(r => r.name),
+      ...script.locations.map(l => l.name),
+    ].filter(Boolean).sort((a, b) => b.length - a.length) // longest first
+    const escaped = names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    if (escaped.length === 0) return /\[Ref Seg#\d+\]/g
+    return new RegExp(`(@(?:${escaped.join("|")}))|(\\[Ref Seg#\\d+\\])`, "gi")
+  }, [script.roles, script.locations])
+
+  // Render prompt text with colored @mentions and [Ref] tags
+  function renderHighlightedPrompt(text: string) {
+    const parts: React.ReactNode[] = []
+    let lastIndex = 0
+    let key = 0
+    // Reset regex state
+    mentionRegex.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = mentionRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(<span key={key++}>{text.slice(lastIndex, match.index)}</span>)
+      }
+      const token = match[0]
+      if (match[1]) {
+        // @Name match
+        const name = token.slice(1)
+        const type = mentionLookup.get(name.toLowerCase())
+        const color = type === "char" ? "#6366F1" : type === "loc" ? "#10B981" : "#F59E0B"
+        const bg = type === "char" ? "rgba(99,102,241,0.15)" : type === "loc" ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)"
+        parts.push(
+          <span key={key++} style={{ color, background: bg, borderRadius: 3, padding: "0 2px", fontWeight: 600 }}>
+            {token}
+          </span>
+        )
+      } else {
+        // [Ref Seg#N]
+        parts.push(
+          <span key={key++} style={{ color: "#F97316", background: "rgba(249,115,22,0.15)", borderRadius: 3, padding: "0 2px", fontWeight: 600 }}>
+            {token}
+          </span>
+        )
+      }
+      lastIndex = match.index + token.length
+    }
+    if (lastIndex < text.length) {
+      parts.push(<span key={key++}>{text.slice(lastIndex)}</span>)
+    }
+    // Trailing newline so overlay height matches textarea
+    parts.push(<br key="tail" />)
+    return parts
+  }
+
   const currentModel = MODELS.find(m => m.id === model)
 
   // ── Main tab: call sheet or segments ──
@@ -1036,7 +1097,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                       <span className="text-[10px] ml-auto" style={{ color: "#AAA" }}>{seg.durationSec}s</span>
                     </div>
                     <p className="text-[11px] leading-relaxed line-clamp-2" style={{ color: "#555", paddingLeft: 20 }}>
-                      {seg.prompt.slice(0, 100)}
+                      {renderHighlightedPrompt(seg.prompt?.slice(0, 120) ?? "")}
                     </p>
                     {seg.status === "failed" && seg.errorMessage && (
                       <p className="text-[10px] mt-1 pl-5" style={{ color: "#EF4444" }}>{seg.errorMessage.slice(0, 80)}</p>
@@ -1137,7 +1198,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                   ) : null
                 })()}
 
-                {/* Prompt textarea with drop zone — uses native browser drop for accurate caret positioning */}
+                {/* Prompt editor with colored @mention overlay */}
                 <div
                   className="relative rounded-lg transition-all"
                   style={{
@@ -1146,7 +1207,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                   }}
                 >
                   {isDragOver && (
-                    <div className="absolute inset-0 flex items-center justify-center rounded-lg z-10 pointer-events-none"
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg z-20 pointer-events-none"
                       style={{ background: "rgba(79,70,229,0.08)" }}>
                       <div className="flex items-center gap-2 px-4 py-2 rounded-full shadow-lg"
                         style={{ background: "#4F46E5", color: "#fff" }}>
@@ -1157,6 +1218,14 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                       </div>
                     </div>
                   )}
+                  {/* Highlight overlay — renders colored @mentions behind the transparent textarea */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0 p-3 text-[13px] leading-relaxed overflow-hidden whitespace-pre-wrap break-words pointer-events-none"
+                    style={{ color: "#333", fontFamily: "inherit" }}
+                  >
+                    {renderHighlightedPrompt(editingPrompts[selectedSeg.id] ?? selectedSeg.prompt ?? "")}
+                  </div>
                   <textarea
                     ref={promptRef}
                     value={editingPrompts[selectedSeg.id] ?? selectedSeg.prompt}
@@ -1165,7 +1234,6 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                       e.preventDefault()
                       e.dataTransfer.dropEffect = "copy"
                       setIsDragOver(true)
-                      // Chrome updates selectionStart to follow the visual drag cursor
                       if (promptRef.current) dropPosRef.current = promptRef.current.selectionStart
                     }}
                     onDragLeave={() => setIsDragOver(false)}
@@ -1192,8 +1260,8 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                       }
                     }}
                     rows={8}
-                    className="w-full resize-none text-[13px] leading-relaxed p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    style={{ background: "transparent", color: "#333" }}
+                    className="relative z-10 w-full resize-none text-[13px] leading-relaxed p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    style={{ background: "transparent", color: "transparent", caretColor: "#333" }}
                     placeholder="Enter video description, or drag assets here..."
                   />
                 </div>
