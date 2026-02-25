@@ -119,7 +119,7 @@ ${sceneContext ? `--- SCENE APPEARANCES (use to understand character personality
 Generate a photorealistic portrait prompt:`,
       },
     ],
-    maxTokens: 150,
+    maxTokens: 800,  // Reasoning models (MiniMax M2.5) need ~500 reasoning + ~200 output tokens
   })
 
   const prompt = truncatePrompt(llmResult.content.trim())
@@ -191,7 +191,7 @@ ${sceneContext ? `--- SCENES AT THIS LOCATION (read for atmosphere/context) ---\
 Generate a photorealistic location reference photo prompt:`,
       },
     ],
-    maxTokens: 120,
+    maxTokens: 600,  // Reasoning models need room for thinking + output
   })
 
   const prompt = truncatePrompt(llmResult.content.trim())
@@ -261,7 +261,7 @@ ${sceneContext ? `--- SCENES WHERE THIS PROP APPEARS ---\n${sceneContext}\n---` 
 Generate a photorealistic prop reference photo prompt:`,
       },
     ],
-    maxTokens: 120,
+    maxTokens: 600,  // Reasoning models need room for thinking + output
   })
 
   const prompt = truncatePrompt(llmResult.content.trim())
@@ -325,7 +325,7 @@ ${sceneSummary}`,
       },
     ],
     temperature: 0.9,
-    maxTokens: 200,
+    maxTokens: 800,  // Reasoning models need room for thinking + output
   })
 
   const prompt = truncatePrompt(promptResult.content.trim())
@@ -426,7 +426,7 @@ Characters: ${params.characterSummary}
 Locations: ${params.locationSummary}`,
       },
     ],
-    maxTokens: 200,
+    maxTokens: 600,  // Reasoning models need room for thinking + output
     temperature: 0.7,
   })
 

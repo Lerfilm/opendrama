@@ -134,22 +134,37 @@ export async function aiComplete(options: AICompletionOptions): Promise<AIComple
 
   const choice = data.choices?.[0]
 
-  if (!choice?.message?.content) {
+  // Some models (e.g. MiniMax M2.5) put all output in `reasoning` and leave
+  // `content` empty when maxTokens is exhausted by the thinking phase.
+  // Fall back to the reasoning field so we don't throw away useful work.
+  let content = choice?.message?.content || ""
+  if (!content && choice?.message?.reasoning) {
+    console.warn("[aiComplete] content empty but reasoning present — extracting from reasoning field")
+    const reasoning: string = choice.message.reasoning
+    // The reasoning often ends with the actual desired output after the thinking.
+    // Try to find the last complete sentence or block that looks like a prompt/answer.
+    // Use the last 600 chars of reasoning as a rough fallback.
+    const tail = reasoning.length > 600 ? reasoning.slice(-600) : reasoning
+    content = tail.trim()
+  }
+
+  if (!content) {
     console.error("Empty AI response. Full response:", JSON.stringify(data).slice(0, 500))
     if (retryCount < MAX_RETRIES) {
       console.log(`[aiComplete] Empty response, retry ${retryCount + 1}/${MAX_RETRIES} (truncating context)...`)
-      // Reduce context on retry
+      // Reduce context on retry — and DOUBLE maxTokens to give reasoning models room
       const retryMessages = options.messages.map(m => ({
         ...m,
         content: m.content.length > 600 ? m.content.substring(0, 600) + "\n[truncated]" : m.content,
       }))
-      return aiComplete({ ...options, messages: retryMessages, _retryCount: retryCount + 1 })
+      const boostedTokens = Math.min((options.maxTokens ?? 1024) * 2, 4096)
+      return aiComplete({ ...options, messages: retryMessages, maxTokens: boostedTokens, _retryCount: retryCount + 1 })
     }
     throw new Error("Empty AI response")
   }
 
   return {
-    content: choice.message.content,
+    content,
     model: data.model || model,
     usage: {
       promptTokens: data.usage?.prompt_tokens ?? 0,

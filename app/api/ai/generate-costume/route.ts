@@ -135,7 +135,7 @@ ${sceneContent ? `--- FULL SCENE CONTENT (read carefully for costume context) --
 Based on the scene content above, generate a costume reference photo prompt that matches what the character would wear in this specific scene:`,
       },
     ],
-    maxTokens: 150,
+    maxTokens: 800,  // Reasoning models need room for thinking + output
   })
 
   const prompt = llmResult.content.trim().substring(0, 500)
