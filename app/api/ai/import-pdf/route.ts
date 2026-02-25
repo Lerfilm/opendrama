@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic"
-export const maxDuration = 300 // 5 minutes
+export const maxDuration = 900 // 15 minutes — Fly.io containers support long-running streaming requests
 
 import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
@@ -1075,8 +1075,8 @@ export async function POST(req: NextRequest) {
           // Sort by priority and cap at 20
           imageTasks.sort((a, b) => a.priority - b.priority)
           const cappedTasks = imageTasks.slice(0, 20)
-          const IMAGE_CONCURRENCY = 3
-          const IMAGE_PHASE_TIMEOUT_MS = 180_000
+          const IMAGE_CONCURRENCY = 5
+          const IMAGE_PHASE_TIMEOUT_MS = 600_000 // 10 minutes for image generation
           const imagePhaseStart = Date.now()
           let imagesDone = 0
 
