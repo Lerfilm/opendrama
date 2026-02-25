@@ -63,7 +63,7 @@ export default async function TheaterPage({ params }: { params: Promise<{ script
   return (
     <TheaterWorkspace
       script={resolved as Parameters<typeof TheaterWorkspace>[0]["script"]}
-      initialBalance={balance?.balance ?? 0}
+      initialBalance={(balance?.balance ?? 0) - (balance?.reserved ?? 0)}
     />
   )
 }

@@ -114,8 +114,19 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const ungeneratedSegments = epSegments.filter(s => !["done", "submitted", "generating", "reserved"].includes(s.status))
   const estimatedCost = ungeneratedSegments.reduce((sum, s) => {
     const pricePerSec = MODEL_PRICING[model]?.[resolution] ?? 0
-    return sum + Math.ceil(s.durationSec * pricePerSec / 100)
+    return sum + Math.ceil(s.durationSec * pricePerSec * 2 / 100) // must match server calculateTokenCost: API cost × 2
   }, 0)
+
+  // Refresh coin balance from server
+  async function refreshBalance() {
+    try {
+      const res = await fetch("/api/tokens/balance")
+      if (res.ok) {
+        const data = await res.json()
+        setBalance(data.available ?? data.balance ?? 0)
+      }
+    } catch { /* ok */ }
+  }
 
   // Poll for status updates
   const pollStatus = useCallback(async () => {
@@ -131,6 +142,8 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           return [...map.values()]
         })
       }
+      // Also refresh balance during polling (tokens consumed as segments complete)
+      refreshBalance()
     } finally {
       setIsPolling(false)
     }
@@ -185,6 +198,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
         })
       }
       await pollStatus()
+      await refreshBalance()
     } finally {
       setIsSubmitting(false)
     }
@@ -199,6 +213,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     })
     setSegments(prev => prev.filter(s => s.id !== segId))
     if (selectedSegId === segId) setSelectedSegId(null)
+    await refreshBalance()
   }
 
   // Reset all segments for episode
@@ -211,6 +226,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     })
     setSegments(prev => prev.filter(s => s.episodeNum !== selectedEp))
     setSelectedSegId(null)
+    await refreshBalance()
   }
 
   // AI Plan: Enhanced split that includes transition analysis + Seedance 2.0 optimized prompts
@@ -258,6 +274,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           return [...filtered, ...(saved.segments || [])].sort((a, b) => a.episodeNum - b.episodeNum || a.segmentIndex - b.segmentIndex)
         })
       }
+      await refreshBalance()
     } catch {
       alert("AI Plan failed")
     } finally {
@@ -290,6 +307,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
         setSegments(prev => prev.map(s => s.id === segmentId ? data.segment : s))
       }
       await pollStatus()
+      await refreshBalance()
     } finally { setIsSubmitting(false) }
   }
 
