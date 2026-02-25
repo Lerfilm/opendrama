@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { Code } from "@/components/icons"
 import { RechargeModal } from "./recharge-modal"
+import { CommandPalette } from "./command-palette"
 
 interface TopBarProps {
   user: { name?: string | null; email?: string | null; image?: string | null }
@@ -17,6 +18,7 @@ export function TopBar({ user, balance, className }: TopBarProps) {
   const pathname = usePathname()
   const [showRecharge, setShowRecharge] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   // Close user menu on outside click
@@ -28,6 +30,20 @@ export function TopBar({ user, balance, className }: TopBarProps) {
     document.addEventListener("mousedown", handle)
     return () => document.removeEventListener("mousedown", handle)
   }, [showUserMenu])
+
+  // ⌘K global shortcut
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setShowSearch(true)
+      }
+    }
+    window.addEventListener("keydown", handleKey)
+    return () => window.removeEventListener("keydown", handleKey)
+  }, [])
+
+  const closeSearch = useCallback(() => setShowSearch(false), [])
 
   // Detect which module we're in and extract scriptId
   const moduleMatch = pathname.match(/^\/dev\/(script|casting|location|props|theater|editing|finishing|media)\/([^/]+)/)
@@ -92,26 +108,24 @@ export function TopBar({ user, balance, className }: TopBarProps) {
           )}
         </div>
 
-        {/* Center: Search */}
+        {/* Center: Search — opens command palette */}
         <div className="flex-1 max-w-sm">
-          <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: "#666" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <button
+            onClick={() => setShowSearch(true)}
+            className="w-full h-6 flex items-center gap-2 pl-2.5 pr-2 text-[11px] rounded transition-colors hover:border-[#555]"
+            style={{
+              background: "#2A2A2E",
+              border: "1px solid #3A3A3E",
+              color: "#666",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
-            <input
-              type="text"
-              placeholder="Search..."
-              className="w-full h-6 pl-7 pr-8 text-[11px] rounded focus:outline-none"
-              style={{
-                background: "#2A2A2E",
-                border: "1px solid #3A3A3E",
-                color: "#D0D0D0",
-              }}
-              disabled
-            />
-            <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-mono" style={{ color: "#666" }}>⌘K</kbd>
-          </div>
+            <span className="flex-1 text-left">Search...</span>
+            <kbd className="text-[9px] font-mono" style={{ color: "#555" }}>⌘K</kbd>
+          </button>
         </div>
 
         {/* Right: Balance + Status + User */}
@@ -231,6 +245,9 @@ export function TopBar({ user, balance, className }: TopBarProps) {
       {showRecharge && balance !== undefined && (
         <RechargeModal balance={balance} onClose={() => setShowRecharge(false)} />
       )}
+
+      {/* Command palette (⌘K search) */}
+      <CommandPalette open={showSearch} onClose={closeSearch} />
     </>
   )
 }
