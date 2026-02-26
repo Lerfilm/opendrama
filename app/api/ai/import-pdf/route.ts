@@ -1148,13 +1148,13 @@ export async function POST(req: NextRequest) {
             })
           }
 
-          // Sort by priority and cap based on project size (min 20, max 60)
+          // Sort by priority — generate ALL role/location images, cap only props/extras
           imageTasks.sort((a, b) => a.priority - b.priority)
-          const imagesCap = Math.min(60, Math.max(20, imageTasks.length))
-          const cappedTasks = imageTasks.slice(0, imagesCap)
+          // No hard cap — let all roles + locations + props + cover through (typically ≤120)
+          const cappedTasks = imageTasks.slice(0, Math.max(20, imageTasks.length))
           const IMAGE_CONCURRENCY = 5
-          // Scale timeout: 30s per image, minimum 10 min, max 20 min
-          const IMAGE_PHASE_TIMEOUT_MS = Math.min(1_200_000, Math.max(600_000, cappedTasks.length * 30_000))
+          // Scale timeout: 20s per image, minimum 10 min, max 30 min
+          const IMAGE_PHASE_TIMEOUT_MS = Math.min(1_800_000, Math.max(600_000, cappedTasks.length * 20_000))
           const imagePhaseStart = Date.now()
           let imagesDone = 0
 
