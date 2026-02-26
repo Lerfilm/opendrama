@@ -321,6 +321,11 @@ const zh = {
   "settings.version": "版本",
   "settings.terms": "服务条款",
   "settings.privacy": "隐私政策",
+  "settings.devTeam": "开发团队",
+  "settings.leadDev": "首席开发者",
+  "settings.sysArch": "系统架构与质量保证",
+  "settings.uiDesign": "UI / UX 设计",
+  "settings.softwareEng": "软件工程",
 
   // 观看历史
   "history.title": "观看历史",
@@ -434,6 +439,8 @@ const zh = {
   "studio.saving": "保存中...",
   "studio.saved": "已保存",
   "studio.saveFailed": "保存失败",
+  "studio.createFailed": "创建失败，请重试",
+  "studio.uploadFailed": "上传失败",
   "studio.sceneHeading": "场景标题",
   "studio.action": "动作描述",
   "studio.dialogue": "对白",

@@ -120,7 +120,7 @@ export default async function WatchHistoryPage() {
                             {t("history.progress", { percent: progress })}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {formatTimeAgo(event.createdAt)}
+                            {formatTimeAgo(event.createdAt, t)}
                           </span>
                         </div>
                       </div>
@@ -136,16 +136,16 @@ export default async function WatchHistoryPage() {
   )
 }
 
-function formatTimeAgo(date: Date): string {
+function formatTimeAgo(date: Date, t: (key: string, params?: Record<string, string | number>) => string): string {
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
 
-  if (minutes < 1) return "刚刚"
-  if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  if (days < 30) return `${days}天前`
+  if (minutes < 1) return t("review.justNow")
+  if (minutes < 60) return t("review.minutesAgo", { min: minutes })
+  if (hours < 24) return t("review.hoursAgo", { hours })
+  if (days < 30) return t("review.daysAgo", { days })
   return date.toLocaleDateString()
 }

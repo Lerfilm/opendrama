@@ -116,21 +116,21 @@ function RoleCard({
         canvas.width = width; canvas.height = height
         canvas.getContext("2d")?.drawImage(img, 0, 0, width, height)
         canvas.toBlob(async (blob) => {
-          if (!blob) { reject(new Error("Compression failed")); return }
+          if (!blob) { reject(new Error(t("studio.uploadFailed"))); return }
           const compressed = new File([blob], file.name, { type: "image/jpeg" })
           const fd = new FormData()
           fd.append("file", compressed)
           const res = await fetch("/api/upload/role-image", { method: "POST", body: fd })
           if (!res.ok) {
             const data = await res.json().catch(() => ({}))
-            reject(new Error((data as { error?: string }).error || "Upload failed"))
+            reject(new Error((data as { error?: string }).error || t("studio.uploadFailed")))
             return
           }
           const data = await res.json() as { url: string }
           resolve(data.url)
         }, "image/jpeg", 0.82)
       }
-      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Invalid image")) }
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error(t("studio.uploadFailed"))) }
       img.src = objectUrl
     })
   }
@@ -155,7 +155,7 @@ function RoleCard({
       })
       onImagesChange(merged)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed")
+      setError(e instanceof Error ? e.message : t("studio.uploadFailed"))
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""

@@ -131,23 +131,23 @@ export default async function SettingsPage() {
       {/* 开发团队 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Development Team</CardTitle>
+          <CardTitle className="text-base">{t("settings.devTeam")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Lead Developer</span>
+            <span className="text-sm text-muted-foreground">{t("settings.leadDev")}</span>
             <span className="text-sm font-medium">Jeff Lee, MPSE</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">System Architecture &amp; QA</span>
+            <span className="text-sm text-muted-foreground">{t("settings.sysArch")}</span>
             <span className="text-sm font-medium">Nancy</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">UI / UX Design</span>
+            <span className="text-sm text-muted-foreground">{t("settings.uiDesign")}</span>
             <span className="text-sm font-medium">Joey</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Software Engineering</span>
+            <span className="text-sm text-muted-foreground">{t("settings.softwareEng")}</span>
             <span className="text-sm font-medium">Mia</span>
           </div>
         </CardContent>

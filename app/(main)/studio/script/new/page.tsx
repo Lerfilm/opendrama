@@ -73,7 +73,7 @@ export default function NewScriptPage() {
       const data = await res.json()
       router.push(`/studio/script/${data.script.id}`)
     } catch {
-      alert(t("common.processing"))
+      alert(t("studio.createFailed"))
     } finally {
       setIsSubmitting(false)
     }

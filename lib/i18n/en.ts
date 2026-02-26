@@ -319,6 +319,11 @@ const en: Record<string, string> = {
   "settings.version": "Version",
   "settings.terms": "Terms of Service",
   "settings.privacy": "Privacy Policy",
+  "settings.devTeam": "Development Team",
+  "settings.leadDev": "Lead Developer",
+  "settings.sysArch": "System Architecture & QA",
+  "settings.uiDesign": "UI / UX Design",
+  "settings.softwareEng": "Software Engineering",
 
   // Watch History
   "history.title": "Watch History",
@@ -432,6 +437,8 @@ const en: Record<string, string> = {
   "studio.saving": "Saving...",
   "studio.saved": "Saved",
   "studio.saveFailed": "Save failed",
+  "studio.createFailed": "Failed to create, please try again",
+  "studio.uploadFailed": "Upload failed",
   "studio.sceneHeading": "Scene Heading",
   "studio.action": "Action",
   "studio.dialogue": "Dialogue",

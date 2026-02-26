@@ -216,7 +216,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
         }),
       })
 
-      if (!res.ok) throw new Error("Split failed")
+      if (!res.ok) throw new Error(t("studio.splitFailed"))
 
       const data = await res.json()
       const segs: GeneratedSegment[] = (data.segments || []).map(
@@ -232,7 +232,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
       setGeneratedSegments(segs)
       if (segs.length > 0) setExpandedSegment(0)
     } catch {
-      alert(t("studio.splitFailed") || "Split failed")
+      alert(t("studio.splitFailed"))
     } finally {
       setIsSplitting(false)
     }
@@ -268,7 +268,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
         }),
       })
 
-      if (!res.ok) throw new Error("Save failed")
+      if (!res.ok) throw new Error(t("studio.saveFailed"))
 
       setSaveSuccess(true)
       setGeneratedSegments([])
@@ -280,7 +280,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
 
       setTimeout(() => setSaveSuccess(false), 3000)
     } catch {
-      alert(t("studio.saveFailed") || "Save failed")
+      alert(t("studio.saveFailed"))
     } finally {
       setIsSaving(false)
     }
@@ -301,7 +301,7 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.error || "Cover generation failed")
+        throw new Error(data.error || t("studio.coverFailed"))
       }
       const data = await res.json()
       // Save task ID to start polling

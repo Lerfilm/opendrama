@@ -56,7 +56,7 @@ export default function SubscribePage() {
 
       if (!res.ok) {
         const data = await res.json()
-        alert(data.error || "Failed to subscribe")
+        alert(data.error || t("subscribe.failed"))
         return
       }
 
