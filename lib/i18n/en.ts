@@ -869,6 +869,8 @@ const en: Record<string, string> = {
   "dev.theater.alertPlanConfirm": "AI Plan Episode {ep}? This analyzes scenes, adds transitions, and generates Seedance-optimized video segments. Replaces existing segments.",
   "dev.theater.alertPlanInsufficient": "Insufficient balance. Need {required} coins, have {balance}.",
   "dev.theater.alertPlanFailed": "AI Plan failed",
+  "dev.theater.aiPlan": "✦ AI Plan",
+  "dev.theater.aiPlanHint": "Analyze scenes & generate segments",
 }
 
 export default en

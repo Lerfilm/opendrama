@@ -871,6 +871,8 @@ const zh = {
   "dev.theater.alertPlanConfirm": "AI 规划第{ep}集？将分析场景、添加转场，并生成 Seedance 优化的视频片段。将替换现有片段。",
   "dev.theater.alertPlanInsufficient": "余额不足，需要 {required} 金币，当前 {balance}。",
   "dev.theater.alertPlanFailed": "AI 规划失败",
+  "dev.theater.aiPlan": "✦ AI 规划",
+  "dev.theater.aiPlanHint": "分析场景并生成视频片段",
 } as const
 
 export type TranslationKey = keyof typeof zh

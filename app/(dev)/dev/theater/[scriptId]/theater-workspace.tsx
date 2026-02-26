@@ -1119,32 +1119,34 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               )}
             </button>
           </div>
-          {/* Row 2: Secondary actions — only when segments exist */}
-          {epSegments.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={handleAIPlan}
-                disabled={isSplitting}
-                className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded transition-colors disabled:opacity-50"
-                style={{ color: "#4F46E5" }}
-              >
-                {isSplitting ? (
-                  <div className="w-2 h-2 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "#4F46E5" }} />
-                ) : (
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path d="M2 17l10 5 10-5"/>
-                    <path d="M2 12l10 5 10-5"/>
-                  </svg>
-                )}
-                {isSplitting ? t("dev.theater.planning") : t("dev.theater.replan")}
-              </button>
-              <span style={{ color: "#DDD" }}>·</span>
-              <button onClick={handleResetAll} className="text-[9px] px-2 py-0.5 rounded transition-colors" style={{ color: "#999" }}>
-                {t("dev.theater.resetAll")}
-              </button>
-            </div>
-          )}
+          {/* Row 2: AI Plan (always visible) + Reset All (only when segments exist) */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleAIPlan}
+              disabled={isSplitting}
+              className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+              style={{ color: "#4F46E5" }}
+            >
+              {isSplitting ? (
+                <div className="w-2 h-2 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "#4F46E5" }} />
+              ) : (
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                  <path d="M2 17l10 5 10-5"/>
+                  <path d="M2 12l10 5 10-5"/>
+                </svg>
+              )}
+              {isSplitting ? t("dev.theater.planning") : epSegments.length > 0 ? t("dev.theater.replan") : t("dev.theater.aiPlan")}
+            </button>
+            {epSegments.length > 0 && (
+              <>
+                <span style={{ color: "#DDD" }}>·</span>
+                <button onClick={handleResetAll} className="text-[9px] px-2 py-0.5 rounded transition-colors" style={{ color: "#999" }}>
+                  {t("dev.theater.resetAll")}
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Segment list */}
@@ -1156,7 +1158,24 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                 <line x1="9" x2="9" y1="3" y2="21" />
               </svg>
               <p className="text-xs">{t("dev.theater.noSegsEmpty")}</p>
-              <p className="text-[10px] mt-1" style={{ color: "#DDD" }}>{t("dev.theater.noSegsHint")}</p>
+              <button
+                onClick={handleAIPlan}
+                disabled={isSplitting}
+                className="mt-3 flex items-center gap-2 text-[11px] px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-50"
+                style={{ background: "#4F46E5", color: "#fff" }}
+              >
+                {isSplitting ? (
+                  <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                  </svg>
+                )}
+                {isSplitting ? t("dev.theater.planning") : t("dev.theater.aiPlan")}
+              </button>
+              <p className="text-[9px] mt-1.5" style={{ color: "#BBB" }}>{t("dev.theater.aiPlanHint")}</p>
             </div>
           ) : (
             <div className="p-2 space-y-1.5">
