@@ -604,11 +604,27 @@ export async function POST(req: NextRequest) {
           part: typeof allParts[0],
           chunkResult: ChunkResult,
         ) {
-          // Collect roles (deduplicated)
+          // Collect roles (deduplicated with fuzzy matching)
           if (chunkResult.roles?.length) {
             for (const role of chunkResult.roles) {
-              if (role.name && !allRoles.find(r => r.name.toLowerCase() === role.name.toLowerCase())) {
+              if (!role.name) continue
+              // Strip common screenplay parentheticals: (V.O.), (O.S.), (O.C.), (CONT'D)
+              const cleanName = role.name.replace(/\s*\((?:V\.?O\.?|O\.?S\.?|O\.?C\.?|CONT'?D)\)\s*/gi, "").trim()
+              const cleanLower = cleanName.toLowerCase()
+              // Check exact match, prefix match, or contained match
+              const existing = allRoles.find(r => {
+                const rClean = r.name.replace(/\s*\((?:V\.?O\.?|O\.?S\.?|O\.?C\.?|CONT'?D)\)\s*/gi, "").trim().toLowerCase()
+                return rClean === cleanLower
+                  || rClean.startsWith(cleanLower + " ")  // "ETHAN" matches "ETHAN WINTHROP"
+                  || cleanLower.startsWith(rClean + " ")   // "ETHAN WINTHROP" matches existing "ETHAN"
+              })
+              if (!existing) {
+                role.name = cleanName  // Use cleaned name
                 allRoles.push(role)
+              } else if (cleanName.length > existing.name.length) {
+                // Prefer longer (more specific) name: "ETHAN WINTHROP" over "ETHAN"
+                existing.name = cleanName
+                if (role.description && !existing.description) existing.description = role.description
               }
             }
           }
@@ -620,11 +636,12 @@ export async function POST(req: NextRequest) {
             const computedSceneNum = part.partIndex > 0 ? startSceneNum + j + 1 : (scene.sceneNum || j + 1)
             const sceneKey = `E${part.episodeNum}S${computedSceneNum}`
             const blocks = (Array.isArray(scene.action) ? scene.action : []) as Array<{ type?: string; character?: string; line?: string; text?: string }>
+            const normalizedLocation = (scene.location || "").trim().toUpperCase()
             const sceneInfo = {
               key: sceneKey,
               sceneId: "",
               heading: scene.heading || "",
-              location: scene.location || "",
+              location: normalizedLocation,
               timeOfDay: scene.timeOfDay || "",
               mood: scene.mood || "",
             }
@@ -666,7 +683,7 @@ export async function POST(req: NextRequest) {
               sceneNum: computedSceneNum,
               sortOrder: (part.episodeNum - 1) * 10000 + computedSceneNum,
               heading: scene.heading || "",
-              location: scene.location || "",
+              location: normalizedLocation,
               timeOfDay: scene.timeOfDay || "",
               action: Array.isArray(scene.action) ? JSON.stringify(scene.action) : (typeof scene.action === "string" ? scene.action : ""),
               mood: scene.mood || "",
@@ -1131,11 +1148,13 @@ export async function POST(req: NextRequest) {
             })
           }
 
-          // Sort by priority and cap at 20
+          // Sort by priority and cap based on project size (min 20, max 60)
           imageTasks.sort((a, b) => a.priority - b.priority)
-          const cappedTasks = imageTasks.slice(0, 20)
+          const imagesCap = Math.min(60, Math.max(20, imageTasks.length))
+          const cappedTasks = imageTasks.slice(0, imagesCap)
           const IMAGE_CONCURRENCY = 5
-          const IMAGE_PHASE_TIMEOUT_MS = 600_000 // 10 minutes for image generation
+          // Scale timeout: 30s per image, minimum 10 min, max 20 min
+          const IMAGE_PHASE_TIMEOUT_MS = Math.min(1_200_000, Math.max(600_000, cappedTasks.length * 30_000))
           const imagePhaseStart = Date.now()
           let imagesDone = 0
 
