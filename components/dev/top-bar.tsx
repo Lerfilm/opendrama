@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { Code } from "@/components/icons"
+import { t } from "@/lib/i18n"
 import { RechargeModal } from "./recharge-modal"
 import { CommandPalette } from "./command-palette"
 
@@ -49,14 +50,14 @@ export function TopBar({ user, balance, className }: TopBarProps) {
   const moduleMatch = pathname.match(/^\/dev\/(script|casting|location|props|theater|editing|finishing|media)\/([^/]+)/)
   const currentModule = moduleMatch?.[1] ?? null
   const moduleLabels: Record<string, string> = {
-    script: "Script",
-    casting: "Casting",
-    location: "Location Scout",
-    props: "Props",
-    theater: "Theater",
-    editing: "Editing",
-    finishing: "Finishing",
-    media: "Media Library",
+    script: t("dev.topbar.moduleScript"),
+    casting: t("dev.topbar.moduleCasting"),
+    location: t("dev.topbar.moduleLocation"),
+    props: t("dev.topbar.moduleProps"),
+    theater: t("dev.topbar.moduleTheater"),
+    editing: t("dev.topbar.moduleEditing"),
+    finishing: t("dev.topbar.moduleFinishing"),
+    media: t("dev.topbar.moduleMedia"),
   }
   const buildVersion = process.env.NEXT_PUBLIC_BUILD_VERSION || "V1.0.dev"
   const isInModule = !!currentModule
@@ -95,7 +96,7 @@ export function TopBar({ user, balance, className }: TopBarProps) {
               <path d="M3 14h7v7H3z" />
               <path d="M14 14h7v7h-7z" />
             </svg>
-            Projects
+            {t("dev.topbar.projects")}
           </Link>
 
           {isInModule && currentModule && (
@@ -123,7 +124,7 @@ export function TopBar({ user, balance, className }: TopBarProps) {
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
-            <span className="flex-1 text-left">Search...</span>
+            <span className="flex-1 text-left">{t("dev.topbar.search")}</span>
             <kbd className="text-[9px] font-mono" style={{ color: "#555" }}>⌘K</kbd>
           </button>
         </div>
@@ -146,7 +147,7 @@ export function TopBar({ user, balance, className }: TopBarProps) {
                   {balance.toLocaleString()}
                 </span>
                 <span className="text-[9px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(245,158,11,0.28)", color: "#FCD34D" }}>
-                  + Recharge
+                  {t("dev.topbar.recharge")}
                 </span>
               </button>
               <div className="w-px h-4" style={{ background: "#333" }} />
@@ -158,7 +159,7 @@ export function TopBar({ user, balance, className }: TopBarProps) {
           {/* Status */}
           <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "#9CA3AF" }}>
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>Ready</span>
+            <span>{t("dev.topbar.ready")}</span>
           </div>
 
           <div className="w-px h-4" style={{ background: "#333" }} />
@@ -208,7 +209,7 @@ export function TopBar({ user, balance, className }: TopBarProps) {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                       <path d="M3 3h7v7H3z" /><path d="M14 3h7v7h-7z" /><path d="M3 14h7v7H3z" /><path d="M14 14h7v7h-7z" />
                     </svg>
-                    Projects
+                    {t("dev.topbar.projects")}
                   </Link>
                   <Link href="/" onClick={() => setShowUserMenu(false)}
                     className="flex items-center gap-2 px-4 py-2 text-[11px] transition-colors hover:bg-white/5"
@@ -217,7 +218,7 @@ export function TopBar({ user, balance, className }: TopBarProps) {
                       <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                       <polyline points="9 22 9 12 15 12 15 22" />
                     </svg>
-                    Home
+                    {t("dev.topbar.home")}
                   </Link>
                 </div>
 
@@ -232,7 +233,7 @@ export function TopBar({ user, balance, className }: TopBarProps) {
                       <polyline points="16 17 21 12 16 7" />
                       <line x1="21" x2="9" y1="12" y2="12" />
                     </svg>
-                    Log Out
+                    {t("dev.topbar.logout")}
                   </button>
                 </div>
               </div>

@@ -8,14 +8,14 @@ interface SettingsPanelProps {
 }
 
 const KEYBOARD_SHORTCUTS = [
-  { keys: ["⌘", "K"], description: "Command palette / search" },
-  { keys: ["⌘", "S"], description: "Save current scene" },
-  { keys: ["⌘", "Z"], description: "Undo" },
-  { keys: ["⌘", "⇧", "Z"], description: "Redo" },
-  { keys: ["⌘", "↑"], description: "Previous scene" },
-  { keys: ["⌘", "↓"], description: "Next scene" },
-  { keys: ["⌘", "↵"], description: "Generate / confirm" },
-  { keys: ["Esc"], description: "Close panel / cancel" },
+  { keys: ["⌘", "K"], descKey: "dev.settings.ks.cmdPalette" },
+  { keys: ["⌘", "S"], descKey: "dev.settings.ks.save" },
+  { keys: ["⌘", "Z"], descKey: "dev.settings.ks.undo" },
+  { keys: ["⌘", "⇧", "Z"], descKey: "dev.settings.ks.redo" },
+  { keys: ["⌘", "↑"], descKey: "dev.settings.ks.prevScene" },
+  { keys: ["⌘", "↓"], descKey: "dev.settings.ks.nextScene" },
+  { keys: ["⌘", "↵"], descKey: "dev.settings.ks.confirm" },
+  { keys: ["Esc"], descKey: "dev.settings.ks.close" },
 ]
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
@@ -71,7 +71,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
-            <span className="text-[13px] font-semibold" style={{ color: "#F0F0F0" }}>Settings</span>
+            <span className="text-[13px] font-semibold" style={{ color: "#F0F0F0" }}>{t("dev.settings.title")}</span>
           </div>
           <button
             onClick={onClose}
@@ -97,7 +97,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 border: activeTab === tab ? "1px solid rgba(99,102,241,0.4)" : "1px solid transparent",
               }}
             >
-              {tab === "general" ? "General" : "Shortcuts"}
+              {tab === "general" ? t("dev.settings.general") : t("dev.settings.shortcuts")}
             </button>
           ))}
         </div>
@@ -109,7 +109,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               {/* Language */}
               <div>
                 <label className="block text-[11px] font-medium mb-2" style={{ color: "#A0A0A8" }}>
-                  Interface Language
+                  {t("dev.settings.language")}
                 </label>
                 <div className="flex gap-2">
                   {(["en", "zh"] as const).map(lang => (
@@ -127,13 +127,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     </button>
                   ))}
                 </div>
-                <p className="mt-1.5 text-[10px]" style={{ color: "#555" }}>Applies on save. Page will reload.</p>
+                <p className="mt-1.5 text-[10px]" style={{ color: "#555" }}>{t("dev.settings.langHint")}</p>
               </div>
 
               {/* Autosave interval */}
               <div>
                 <label className="block text-[11px] font-medium mb-2" style={{ color: "#A0A0A8" }}>
-                  Autosave Interval
+                  {t("dev.settings.autosave")}
                 </label>
                 <div className="flex gap-2">
                   {[
@@ -156,34 +156,34 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     </button>
                   ))}
                 </div>
-                <p className="mt-1.5 text-[10px]" style={{ color: "#555" }}>Auto-saves unsaved scene changes.</p>
+                <p className="mt-1.5 text-[10px]" style={{ color: "#555" }}>{t("dev.settings.autosaveHint")}</p>
               </div>
 
               {/* Theme (placeholder) */}
               <div>
                 <label className="block text-[11px] font-medium mb-2" style={{ color: "#A0A0A8" }}>
-                  Theme
+                  {t("dev.settings.theme")}
                 </label>
                 <div className="flex gap-2">
                   <button
                     className="flex-1 py-1.5 rounded-lg text-[11px] font-medium"
                     style={{ background: "rgba(99,102,241,0.25)", border: "1px solid rgba(99,102,241,0.5)", color: "#A5B4FC" }}
                   >
-                    Dark
+                    {t("dev.settings.dark")}
                   </button>
                   <button
                     className="flex-1 py-1.5 rounded-lg text-[11px] font-medium cursor-not-allowed"
                     style={{ background: "#2A2A2E", border: "1px solid #3A3A3E", color: "#555" }}
-                    title="Coming soon"
+                    title={t("dev.settings.comingSoon")}
                   >
-                    Light
+                    {t("dev.settings.light")}
                   </button>
                   <button
                     className="flex-1 py-1.5 rounded-lg text-[11px] font-medium cursor-not-allowed"
                     style={{ background: "#2A2A2E", border: "1px solid #3A3A3E", color: "#555" }}
-                    title="Coming soon"
+                    title={t("dev.settings.comingSoon")}
                   >
-                    System
+                    {t("dev.settings.system")}
                   </button>
                 </div>
               </div>
@@ -210,7 +210,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     </div>
                   ))}
                 </div>
-                <p className="mt-1.5 text-[10px]" style={{ color: "#555" }}>OpenDrama v1.0.0</p>
+                <p className="mt-1.5 text-[10px]" style={{ color: "#555" }}>{t("dev.settings.version")}</p>
               </div>
             </div>
           )}
@@ -218,7 +218,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           {activeTab === "shortcuts" && (
             <div>
               <p className="text-[11px] mb-4" style={{ color: "#666" }}>
-                Keyboard shortcuts available in the dev workspace.
+                {t("dev.settings.shortcutsDesc")}
               </p>
               <div className="space-y-1">
                 {KEYBOARD_SHORTCUTS.map((shortcut, i) => (
@@ -228,7 +228,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     style={{ background: i % 2 === 0 ? "rgba(255,255,255,0.03)" : "transparent" }}
                   >
                     <span className="text-[11px]" style={{ color: "#B0B0B0" }}>
-                      {shortcut.description}
+                      {t(shortcut.descKey)}
                     </span>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {shortcut.keys.map((key, ki) => (
@@ -265,7 +265,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               className="px-4 py-1.5 rounded text-[12px] font-medium transition-colors"
               style={{ color: "#888", background: "#2A2A2E", border: "1px solid #3A3A3E" }}
             >
-              Cancel
+              {t("dev.settings.cancel")}
             </button>
             <button
               onClick={handleSave}
@@ -276,7 +276,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 color: saved ? "#6EE7B7" : "#A5B4FC",
               }}
             >
-              {saved ? "Saved ✓" : "Save Settings"}
+              {saved ? t("dev.settings.saved") : t("dev.settings.save")}
             </button>
           </div>
         )}

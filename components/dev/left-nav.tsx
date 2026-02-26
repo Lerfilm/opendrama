@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import { t } from "@/lib/i18n"
 import { SettingsPanel } from "./settings-panel"
 
 export function LeftNav() {
@@ -26,7 +27,7 @@ export function LeftNav() {
           <polyline points="10 9 9 9 8 9" />
         </svg>
       ),
-      label: "Script",
+      label: t("dev.nav.script"),
       href: scriptId ? `/dev/script/${scriptId}` : "/dev",
       enabled: true,
       active: pathname.startsWith("/dev/script/") || pathname === "/dev",
@@ -41,7 +42,7 @@ export function LeftNav() {
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       ),
-      label: "Casting",
+      label: t("dev.nav.casting"),
       href: scriptId ? `/dev/casting/${scriptId}` : "/dev",
       enabled: !!scriptId,
       active: pathname.startsWith("/dev/casting/"),
@@ -54,7 +55,7 @@ export function LeftNav() {
           <circle cx="12" cy="10" r="3" />
         </svg>
       ),
-      label: "Location",
+      label: t("dev.nav.location"),
       href: scriptId ? `/dev/location/${scriptId}` : "/dev",
       enabled: !!scriptId,
       active: pathname.startsWith("/dev/location/"),
@@ -68,7 +69,7 @@ export function LeftNav() {
           <line x1="12" y1="22" x2="12" y2="12" />
         </svg>
       ),
-      label: "Props",
+      label: t("dev.nav.props"),
       href: scriptId ? `/dev/props/${scriptId}` : "/dev",
       enabled: !!scriptId,
       active: pathname.startsWith("/dev/props/"),
@@ -80,7 +81,7 @@ export function LeftNav() {
           <polygon points="5 3 19 12 5 21 5 3" />
         </svg>
       ),
-      label: "Theater",
+      label: t("dev.nav.theater"),
       href: scriptId ? `/dev/theater/${scriptId}` : "/dev",
       enabled: !!scriptId,
       active: pathname.startsWith("/dev/theater/"),
@@ -93,7 +94,7 @@ export function LeftNav() {
           <line x1="9" x2="9" y1="3" y2="21" />
         </svg>
       ),
-      label: "Editing",
+      label: t("dev.nav.editing"),
       href: scriptId ? `/dev/editing/${scriptId}` : "/dev",
       enabled: !!scriptId,
       active: pathname.startsWith("/dev/editing/"),
@@ -107,7 +108,7 @@ export function LeftNav() {
           <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
         </svg>
       ),
-      label: "Media",
+      label: t("dev.nav.media"),
       href: scriptId ? `/dev/media/${scriptId}` : "/dev",
       enabled: !!scriptId,
       active: pathname.startsWith("/dev/media/"),
@@ -121,7 +122,7 @@ export function LeftNav() {
           <line x1="12" x2="12" y1="15" y2="3" />
         </svg>
       ),
-      label: "Finishing",
+      label: t("dev.nav.finishing"),
       href: scriptId ? `/dev/finishing/${scriptId}` : "/dev",
       enabled: !!scriptId,
       active: pathname.startsWith("/dev/finishing/"),
@@ -162,7 +163,7 @@ export function LeftNav() {
                 className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50"
                 style={{ background: "#2C2C30", color: "#AAA", border: "1px solid #3A3A3E" }}
               >
-                Open a project first
+                {t("dev.nav.openProject")}
               </div>
             </div>
           )}
@@ -183,7 +184,7 @@ export function LeftNav() {
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
             <circle cx="12" cy="12" r="3" />
           </svg>
-          <span className="text-[9px] mt-0.5 font-medium tracking-wide">Settings</span>
+          <span className="text-[9px] mt-0.5 font-medium tracking-wide">{t("dev.nav.settings")}</span>
         </button>
       </div>
 

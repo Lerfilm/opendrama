@@ -1,5 +1,6 @@
 "use client"
 
+import { t } from "@/lib/i18n"
 import { useState } from "react"
 
 const PACKAGES = [
@@ -29,11 +30,11 @@ export function RechargeModal({ balance, onClose }: RechargeModalProps) {
         const data = await res.json()
         window.location.href = data.url
       } else {
-        alert("Payment failed. Please try again.")
+        alert(t("dev.recharge.payFailed"))
         setLoadingId(null)
       }
     } catch {
-      alert("Network error. Please try again.")
+      alert(t("dev.recharge.networkError"))
       setLoadingId(null)
     }
   }
@@ -54,14 +55,14 @@ export function RechargeModal({ balance, onClose }: RechargeModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid #2A2A2E" }}>
           <div>
-            <p className="text-[11px] font-medium" style={{ color: "#888" }}>Current Balance</p>
+            <p className="text-[11px] font-medium" style={{ color: "#888" }}>{t("dev.recharge.balance")}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ color: "#F59E0B" }}>
                 <circle cx="12" cy="12" r="10" fill="#F59E0B" opacity="0.25" />
                 <text x="12" y="16" textAnchor="middle" fontSize="11" fill="#F59E0B" fontWeight="bold">¢</text>
               </svg>
               <span className="text-xl font-bold" style={{ color: "#F59E0B" }}>{balance.toLocaleString()}</span>
-              <span className="text-[10px]" style={{ color: "#666" }}>coins</span>
+              <span className="text-[10px]" style={{ color: "#666" }}>{t("dev.recharge.coins")}</span>
             </div>
           </div>
           <button
@@ -91,7 +92,7 @@ export function RechargeModal({ balance, onClose }: RechargeModalProps) {
                   className="absolute -top-2 left-3 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                   style={{ background: "#10B981", color: "#fff" }}
                 >
-                  POPULAR
+                  {t("dev.recharge.popular")}
                 </span>
               )}
 
@@ -124,7 +125,7 @@ export function RechargeModal({ balance, onClose }: RechargeModalProps) {
                     <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                     </svg>
-                  ) : "Buy"}
+                  ) : t("dev.recharge.buy")}
                 </button>
               </div>
             </div>
@@ -134,7 +135,7 @@ export function RechargeModal({ balance, onClose }: RechargeModalProps) {
         {/* Footer */}
         <div className="px-4 py-2.5" style={{ borderTop: "1px solid #2A2A2E" }}>
           <p className="text-[10px] text-center" style={{ color: "#555" }}>
-            Powered by Stripe · Secure payment
+            {t("dev.recharge.footer")}
           </p>
         </div>
       </div>

@@ -2,16 +2,17 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useAITasks, type AITask } from "@/lib/ai-task-context"
+import { t } from "@/lib/i18n"
 
 // ── ETA helper ──────────────────────────────────────────────────────────────
 
 function formatEta(ms: number): string {
   if (ms <= 0) return ""
   const secs = Math.ceil(ms / 1000)
-  if (secs < 60) return `~${secs}s left`
+  if (secs < 60) return t("dev.tasks.secsLeft").replace("{s}", String(secs))
   const mins = Math.floor(secs / 60)
   const rem = secs % 60
-  return `~${mins}:${String(rem).padStart(2, "0")} left`
+  return t("dev.tasks.minsLeft").replace("{m}", String(mins)).replace("{ss}", String(rem).padStart(2, "0"))
 }
 
 function calcEta(task: AITask): string {
@@ -99,9 +100,9 @@ function TaskCard({ task }: { task: AITask }) {
               onClick={() => cancelTask(task.id)}
               className="text-[10px] px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors"
               style={{ color: "#EF4444" }}
-              title="Cancel"
+              title={t("dev.tasks.cancel")}
             >
-              Cancel
+              {t("dev.tasks.cancel")}
             </button>
           )}
           {isDone && (
@@ -130,17 +131,17 @@ function TaskCard({ task }: { task: AITask }) {
       {/* Completed/cancelled summary */}
       {task.status === "completed" && (
         <div className="text-[10px] mb-1" style={{ color: "#10B981" }}>
-          Completed ({task.done}/{task.total})
+          {t("dev.tasks.completed")} ({task.done}/{task.total})
         </div>
       )}
       {task.status === "cancelled" && (
         <div className="text-[10px] mb-1" style={{ color: "#9CA3AF" }}>
-          Cancelled ({task.done}/{task.total} done)
+          {t("dev.tasks.cancelled")} ({task.done}/{task.total} {t("dev.tasks.done")})
         </div>
       )}
       {task.status === "failed" && (
         <div className="text-[10px] mb-1 truncate" style={{ color: "#EF4444" }}>
-          {task.error || "Failed"}
+          {task.error || t("dev.tasks.failed")}
         </div>
       )}
 
@@ -237,7 +238,7 @@ export function GlobalTaskPanel() {
         <div className="flex items-center gap-1.5">
           <span style={{ fontSize: 11 }}>✨</span>
           <span className="text-[11px] font-semibold" style={{ color: "#555" }}>
-            AI Tasks
+            {t("dev.tasks.title")}
           </span>
           {activeTasks.length > 0 && (
             <span

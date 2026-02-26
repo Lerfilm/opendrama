@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter, usePathname } from "next/navigation"
+import { t } from "@/lib/i18n"
 
 interface SearchAssets {
   scripts: { id: string; title: string; coverImage: string | null }[]
@@ -76,14 +77,14 @@ const PAGE_ICON = {
 function buildPageItems(scriptId: string | null): SearchItem[] {
   if (!scriptId) return []
   return [
-    { type: "page", label: "Script", sub: "Script editor & breakdown", icon: PAGE_ICON.script, url: `/dev/script/${scriptId}` },
-    { type: "page", label: "Casting", sub: "Character casting management", icon: PAGE_ICON.casting, url: `/dev/casting/${scriptId}` },
-    { type: "page", label: "Location", sub: "Location scouting", icon: PAGE_ICON.location, url: `/dev/location/${scriptId}` },
-    { type: "page", label: "Props", sub: "Props library", icon: PAGE_ICON.props, url: `/dev/props/${scriptId}` },
-    { type: "page", label: "Theater", sub: "Video generation", icon: PAGE_ICON.theater, url: `/dev/theater/${scriptId}` },
-    { type: "page", label: "Editing", sub: "Video editing & export", icon: PAGE_ICON.editing, url: `/dev/editing/${scriptId}` },
-    { type: "page", label: "Media", sub: "Asset library", icon: PAGE_ICON.media, url: `/dev/media/${scriptId}` },
-    { type: "page", label: "Finishing", sub: "Publishing & delivery", icon: PAGE_ICON.finishing, url: `/dev/finishing/${scriptId}` },
+    { type: "page", label: t("dev.nav.script"), sub: t("dev.search.subScript"), icon: PAGE_ICON.script, url: `/dev/script/${scriptId}` },
+    { type: "page", label: t("dev.nav.casting"), sub: t("dev.search.subCasting"), icon: PAGE_ICON.casting, url: `/dev/casting/${scriptId}` },
+    { type: "page", label: t("dev.nav.location"), sub: t("dev.search.subLocation"), icon: PAGE_ICON.location, url: `/dev/location/${scriptId}` },
+    { type: "page", label: t("dev.nav.props"), sub: t("dev.search.subProps"), icon: PAGE_ICON.props, url: `/dev/props/${scriptId}` },
+    { type: "page", label: t("dev.nav.theater"), sub: t("dev.search.subTheater"), icon: PAGE_ICON.theater, url: `/dev/theater/${scriptId}` },
+    { type: "page", label: t("dev.nav.editing"), sub: t("dev.search.subEditing"), icon: PAGE_ICON.editing, url: `/dev/editing/${scriptId}` },
+    { type: "page", label: t("dev.nav.media"), sub: t("dev.search.subMedia"), icon: PAGE_ICON.media, url: `/dev/media/${scriptId}` },
+    { type: "page", label: t("dev.nav.finishing"), sub: t("dev.search.subFinishing"), icon: PAGE_ICON.finishing, url: `/dev/finishing/${scriptId}` },
   ]
 }
 
@@ -126,7 +127,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const projects: SearchItem[] = (assets?.scripts ?? []).map(s => ({
       type: "project" as const,
       label: s.title,
-      sub: "Project",
+      sub: t("dev.search.project"),
       img: s.coverImage,
       url: `/dev/script/${s.id}`,
     }))
@@ -218,11 +219,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const grouped: { type: string; label: string; items: (SearchItem & { globalIdx: number })[] }[] = []
   let idx = 0
   const typeLabels: Record<string, string> = {
-    page: "Pages",
-    project: "Projects",
-    character: "Characters",
-    location: "Locations",
-    prop: "Props",
+    page: t("dev.search.pages"),
+    project: t("dev.search.projects"),
+    character: t("dev.search.characters"),
+    location: t("dev.search.locations"),
+    prop: t("dev.search.props"),
   }
   for (const item of filteredItems) {
     const group = grouped.find(g => g.type === item.type)
@@ -256,7 +257,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             type="text"
             value={query}
             onChange={e => { setQuery(e.target.value); setActiveIdx(0) }}
-            placeholder="Search pages, characters, locations, props..."
+            placeholder={t("dev.search.placeholder")}
             className="flex-1 bg-transparent text-sm focus:outline-none"
             style={{ color: "#E0E0E0" }}
           />
@@ -269,7 +270,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         <div ref={listRef} className="flex-1 overflow-y-auto py-1" style={{ maxHeight: "calc(60vh - 52px)" }}>
           {filteredItems.length === 0 ? (
             <div className="px-4 py-8 text-center">
-              <p className="text-[12px]" style={{ color: "#666" }}>No results found</p>
+              <p className="text-[12px]" style={{ color: "#666" }}>{t("dev.search.noResults")}</p>
             </div>
           ) : (
             grouped.map(group => (
@@ -315,7 +316,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                       background: item.type === "page" ? "rgba(99,102,241,0.15)" : "rgba(255,255,255,0.05)",
                       color: item.type === "page" ? "#818CF8" : "#555",
                     }}>
-                      {item.type === "page" ? "Page" : item.type === "character" ? "Cast" : item.type === "location" ? "Loc" : item.type === "prop" ? "Prop" : ""}
+                      {item.type === "page" ? t("dev.search.badgePage") : item.type === "character" ? t("dev.search.badgeCast") : item.type === "location" ? t("dev.search.badgeLoc") : item.type === "prop" ? t("dev.search.badgeProp") : ""}
                     </span>
                   </button>
                 ))}
@@ -328,15 +329,15 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         <div className="flex items-center gap-4 px-4 py-2" style={{ borderTop: "1px solid #2E2E32" }}>
           <div className="flex items-center gap-1">
             <kbd className="text-[8px] font-mono px-1 py-0.5 rounded" style={{ background: "#2A2A2E", color: "#555", border: "1px solid #333" }}>↑↓</kbd>
-            <span className="text-[9px]" style={{ color: "#555" }}>Navigate</span>
+            <span className="text-[9px]" style={{ color: "#555" }}>{t("dev.search.navigate")}</span>
           </div>
           <div className="flex items-center gap-1">
             <kbd className="text-[8px] font-mono px-1 py-0.5 rounded" style={{ background: "#2A2A2E", color: "#555", border: "1px solid #333" }}>↵</kbd>
-            <span className="text-[9px]" style={{ color: "#555" }}>Open</span>
+            <span className="text-[9px]" style={{ color: "#555" }}>{t("dev.search.open")}</span>
           </div>
           <div className="flex items-center gap-1">
             <kbd className="text-[8px] font-mono px-1 py-0.5 rounded" style={{ background: "#2A2A2E", color: "#555", border: "1px solid #333" }}>esc</kbd>
-            <span className="text-[9px]" style={{ color: "#555" }}>Close</span>
+            <span className="text-[9px]" style={{ color: "#555" }}>{t("dev.search.close")}</span>
           </div>
         </div>
       </div>

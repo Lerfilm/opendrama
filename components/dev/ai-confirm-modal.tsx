@@ -1,5 +1,6 @@
 "use client"
 
+import { t } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 
 interface AIConfirmModalProps {
@@ -54,7 +55,7 @@ export function AIConfirmModal({ featureKey, featureLabel, onConfirm, onCancel }
         {/* Header */}
         <div className="px-5 pt-5 pb-3">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>AI 功能确认</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>{t("dev.ai.title")}</span>
           </div>
           <p className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>{featureLabel}</p>
         </div>
@@ -64,25 +65,25 @@ export function AIConfirmModal({ featureKey, featureLabel, onConfirm, onCancel }
           {loading ? (
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full border border-indigo-400 border-t-transparent animate-spin" />
-              <span className="text-xs" style={{ color: "#999" }}>加载价格中...</span>
+              <span className="text-xs" style={{ color: "#999" }}>{t("dev.ai.loadingPrice")}</span>
             </div>
           ) : (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px]" style={{ color: "#666" }}>本次消耗</span>
+                <span className="text-[11px]" style={{ color: "#666" }}>{t("dev.ai.cost")}</span>
                 <span className="text-sm font-bold" style={{ color: costCoins === 0 ? "#10B981" : "#4F46E5" }}>
-                  {costCoins === 0 ? "免费" : `${costCoins} 🪙`}
+                  {costCoins === 0 ? t("dev.ai.free") : `${costCoins} 🪙`}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px]" style={{ color: "#666" }}>当前余额</span>
+                <span className="text-[11px]" style={{ color: "#666" }}>{t("dev.ai.balance")}</span>
                 <span className="text-sm font-semibold" style={{ color: canAfford ? "#1A1A1A" : "#EF4444" }}>
                   {balance ?? "—"} 🪙
                 </span>
               </div>
               {!canAfford && costCoins !== null && costCoins > 0 && (
                 <p className="text-[11px] pt-1" style={{ color: "#EF4444" }}>
-                  余额不足，还需 {(costCoins - (balance ?? 0))} 🪙，请前往充值
+                  {t("dev.ai.insufficient").replace("{n}", String(costCoins - (balance ?? 0)))}
                 </p>
               )}
             </div>
@@ -96,7 +97,7 @@ export function AIConfirmModal({ featureKey, featureLabel, onConfirm, onCancel }
             className="flex-1 h-9 rounded-lg text-[12px] font-medium transition-colors"
             style={{ background: "#E8E8E8", color: "#555" }}
           >
-            取消
+            {t("dev.ai.cancel")}
           </button>
           <button
             onClick={onConfirm}
@@ -107,7 +108,7 @@ export function AIConfirmModal({ featureKey, featureLabel, onConfirm, onCancel }
               color: canAfford || costCoins === 0 ? "#fff" : "#AAA",
             }}
           >
-            {loading ? "..." : costCoins === 0 ? "确认" : `确认扣除 ${costCoins} 🪙`}
+            {loading ? "..." : costCoins === 0 ? t("dev.ai.confirm") : t("dev.ai.confirmDeduct").replace("{n}", String(costCoins))}
           </button>
         </div>
       </div>
