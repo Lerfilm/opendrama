@@ -6,7 +6,7 @@ import { confirmDeduction, refundReservation } from "@/lib/tokens"
 import { uploadSegmentToMux } from "@/lib/mux"
 
 // Segments stuck in generating/submitted for longer than this are auto-failed
-const STALE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+const STALE_TIMEOUT_MS = 45 * 60 * 1000 // 45 minutes
 
 /**
  * Sync active segments with the video generation provider,
@@ -52,7 +52,7 @@ async function syncActiveSegments(
       console.warn(`[VideoStatus] Segment ${seg.id} stuck for ${Math.round(ageMs / 60000)}min — auto-failing`)
       const { count } = await prisma.videoSegment.updateMany({
         where: { id: seg.id, status: { in: ["submitted", "generating"] } },
-        data: { status: "failed", errorMessage: "Generation timed out (>30min)" },
+        data: { status: "failed", errorMessage: "Generation timed out (>45min)" },
       })
       if (count > 0 && userId && seg.tokenCost) {
         await refundReservation(
@@ -61,7 +61,7 @@ async function syncActiveSegments(
           `Refund: segment ${seg.id} timed out`
         ).catch(() => {})
       }
-      Object.assign(seg, { status: "failed", errorMessage: "Generation timed out (>30min)" })
+      Object.assign(seg, { status: "failed", errorMessage: "Generation timed out (>45min)" })
       // Also kick next reserved segment after timeout-fail
       if (count > 0) kickNextReservedSegment(seg.scriptId, seg.episodeNum, userId).catch(() => {})
       continue

@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma"
 import { queryVideoTask } from "@/lib/video-generation"
 import { confirmDeduction, refundReservation } from "@/lib/tokens"
 
-const STALE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+const STALE_TIMEOUT_MS = 45 * 60 * 1000 // 45 minutes
 
 /**
  * GET /api/rehearsal/status — poll all active rehearsals for the current user
@@ -31,15 +31,15 @@ export async function GET() {
   const now = Date.now()
 
   for (const r of active) {
-    // Auto-fail stale tasks
-    const ageMs = now - new Date(r.createdAt).getTime()
+    // Auto-fail stale tasks — use updatedAt (tracks when status changed to submitted/generating)
+    const ageMs = now - new Date(r.updatedAt).getTime()
     if (ageMs > STALE_TIMEOUT_MS) {
       if (r.tokenCost) {
         await refundReservation(session.user.id, r.tokenCost, `Rehearsal stale timeout: ${r.id}`)
       }
       await prisma.rehearsal.update({
         where: { id: r.id },
-        data: { status: "failed", errorMessage: "Generation timed out (30min)" },
+        data: { status: "failed", errorMessage: "Generation timed out (45min)" },
       })
       continue
     }
