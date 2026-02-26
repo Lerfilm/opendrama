@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   // Aggregate all assets from DB
   const assets: Array<{
     id: string
-    type: "video" | "thumbnail" | "seed" | "character" | "cover" | "document"
+    type: "video" | "thumbnail" | "seed" | "character" | "cover" | "document" | "rehearsal"
     url: string
     label: string
     bucket: string
@@ -94,6 +94,19 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Rehearsal videos (user-level, not script-level)
+  const rehearsals = await prisma.rehearsal.findMany({
+    where: { userId: session.user.id as string, status: "done", videoUrl: { not: null } },
+    select: { id: true, prompt: true, model: true, durationSec: true, videoUrl: true },
+    orderBy: { createdAt: "desc" },
+  })
+  for (const reh of rehearsals) {
+    if (reh.videoUrl) {
+      const promptLabel = reh.prompt.length > 30 ? reh.prompt.substring(0, 30) + "…" : reh.prompt
+      assets.push({ id: `rehearsal-${reh.id}`, type: "rehearsal", url: reh.videoUrl, label: `🧪 ${promptLabel}`, bucket: "rehearsal" })
+    }
+  }
+
   // Also list from Supabase Storage if configured
   const storageAssets: Array<{ name: string; url: string; bucket: string; size: number }> = []
   if (isStorageConfigured()) {
@@ -120,6 +133,7 @@ export async function GET(req: NextRequest) {
       characters: assets.filter(a => a.type === "character").length,
       thumbnails: assets.filter(a => a.type === "thumbnail").length,
       videos: assets.filter(a => a.type === "video").length,
+      rehearsals: assets.filter(a => a.type === "rehearsal").length,
       seeds: assets.filter(a => a.type === "seed").length,
       covers: assets.filter(a => a.type === "cover").length,
       total: assets.length,

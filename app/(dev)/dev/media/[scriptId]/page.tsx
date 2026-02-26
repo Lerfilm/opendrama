@@ -10,33 +10,51 @@ export default async function MediaPage({ params }: { params: Promise<{ scriptId
   const session = await auth()
   if (!session?.user) redirect("/auth/signin")
 
-  const script = await prisma.script.findFirst({
-    where: { id: scriptId, userId: session.user.id as string },
-    select: {
-      id: true,
-      title: true,
-      coverImage: true,
-      coverWide: true,
-      coverTall: true,
-      metadata: true,
-      roles: {
-        select: { id: true, name: true, role: true, referenceImages: true, avatarUrl: true },
-      },
-      locations: {
-        select: { id: true, name: true, type: true, photoUrl: true, photos: true },
-      },
-      props: {
-        select: { id: true, name: true, category: true, photoUrl: true, photos: true },
-      },
-      videoSegments: {
-        select: {
-          id: true, episodeNum: true, segmentIndex: true, sceneNum: true,
-          status: true, videoUrl: true, thumbnailUrl: true, seedImageUrl: true, durationSec: true,
+  // Fetch script + rehearsals in parallel
+  const [script, rehearsals] = await Promise.all([
+    prisma.script.findFirst({
+      where: { id: scriptId, userId: session.user.id as string },
+      select: {
+        id: true,
+        title: true,
+        coverImage: true,
+        coverWide: true,
+        coverTall: true,
+        metadata: true,
+        roles: {
+          select: { id: true, name: true, role: true, referenceImages: true, avatarUrl: true },
         },
-        orderBy: [{ episodeNum: "asc" }, { segmentIndex: "asc" }],
+        locations: {
+          select: { id: true, name: true, type: true, photoUrl: true, photos: true },
+        },
+        props: {
+          select: { id: true, name: true, category: true, photoUrl: true, photos: true },
+        },
+        videoSegments: {
+          select: {
+            id: true, episodeNum: true, segmentIndex: true, sceneNum: true,
+            status: true, videoUrl: true, thumbnailUrl: true, seedImageUrl: true, durationSec: true,
+          },
+          orderBy: [{ episodeNum: "asc" }, { segmentIndex: "asc" }],
+        },
       },
-    },
-  })
+    }),
+    prisma.rehearsal.findMany({
+      where: { userId: session.user.id as string, status: "done", videoUrl: { not: null } },
+      select: {
+        id: true,
+        prompt: true,
+        model: true,
+        resolution: true,
+        durationSec: true,
+        videoUrl: true,
+        thumbnailUrl: true,
+        createdAt: true,
+        completedAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ])
 
   if (!script) redirect("/dev")
 
@@ -77,6 +95,11 @@ export default async function MediaPage({ params }: { params: Promise<{ scriptId
       ...s,
       thumbnailUrl: resolveImageUrl(s.thumbnailUrl),
       seedImageUrl: resolveImageUrl(s.seedImageUrl),
+    })),
+    rehearsals: rehearsals.map(r => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+      completedAt: r.completedAt?.toISOString() ?? null,
     })),
   }
 

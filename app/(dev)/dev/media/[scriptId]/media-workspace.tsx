@@ -41,6 +41,18 @@ interface VideoSegment {
   durationSec: number
 }
 
+interface RehearsalData {
+  id: string
+  prompt: string
+  model: string
+  resolution: string
+  durationSec: number
+  videoUrl?: string | null
+  thumbnailUrl?: string | null
+  createdAt: string
+  completedAt?: string | null
+}
+
 interface Script {
   id: string
   title: string
@@ -52,9 +64,10 @@ interface Script {
   locations: LocationData[]
   props: PropData[]
   videoSegments: VideoSegment[]
+  rehearsals?: RehearsalData[]
 }
 
-type AssetType = "all" | "character" | "location" | "prop" | "thumbnail" | "video" | "seed" | "cover" | "document"
+type AssetType = "all" | "character" | "location" | "prop" | "thumbnail" | "video" | "seed" | "cover" | "document" | "rehearsal"
 
 interface Asset {
   id: string
@@ -69,6 +82,10 @@ interface Asset {
   roleName?: string
   locationId?: string
   propId?: string
+  rehearsalId?: string
+  rehearsalPrompt?: string
+  rehearsalModel?: string
+  rehearsalDuration?: number
   isBase64?: boolean
 }
 
@@ -83,6 +100,7 @@ const BUCKET_LABELS: Record<string, { label: string; color: string; bg: string }
   "props-images":  { label: "Props",      color: "#8B5CF6", bg: "#F5F3FF" },
   "scripts":       { label: "Scripts",    color: "#DC2626", bg: "#FEF2F2" },
   "video-assets":  { label: "Videos",     color: "#059669", bg: "#D1FAE5" },
+  "rehearsal":     { label: "Rehearsal",  color: "#D97706", bg: "#FEF3C7" },
 }
 
 const UPLOAD_BUCKETS: BucketName[] = ["role-images", "scene-images", "video-thumbs", "seed-images", "covers", "props-images"]
@@ -96,6 +114,7 @@ const TYPE_FILTERS: { id: AssetType; label: string; icon: string }[] = [
   { id: "prop",      label: "Props",      icon: "🎭" },
   { id: "thumbnail", label: "Thumbnails", icon: "🖼" },
   { id: "video",     label: "Videos",     icon: "▶" },
+  { id: "rehearsal", label: "Rehearsal",  icon: "🧪" },
   { id: "seed",      label: "Seeds",      icon: "🌱" },
 ]
 
@@ -180,6 +199,24 @@ export function MediaWorkspace({ script }: { script: Script }) {
       if (seg.seedImageUrl) list.push({ id: `seed-${seg.id}`,  type: "seed",      url: seg.seedImageUrl, label: `${base} Seed`,  bucket: "seed-images", episodeNum: seg.episodeNum, segmentIndex: seg.segmentIndex, sceneNum: seg.sceneNum, isBase64: seg.seedImageUrl.startsWith("data:") })
     }
 
+    // Rehearsal videos
+    for (const reh of (script.rehearsals || [])) {
+      if (reh.videoUrl) {
+        const promptLabel = reh.prompt.length > 30 ? reh.prompt.substring(0, 30) + "…" : reh.prompt
+        list.push({
+          id: `rehearsal-${reh.id}`,
+          type: "rehearsal",
+          url: reh.videoUrl,
+          label: `🧪 ${promptLabel}`,
+          bucket: "rehearsal",
+          rehearsalId: reh.id,
+          rehearsalPrompt: reh.prompt,
+          rehearsalModel: reh.model,
+          rehearsalDuration: reh.durationSec,
+        })
+      }
+    }
+
     return list
   }, [script])
 
@@ -196,15 +233,16 @@ export function MediaWorkspace({ script }: { script: Script }) {
   }, [allAssets, filterType, filterEp])
 
   const stats = useMemo(() => ({
-    character: allAssets.filter(a => a.type === "character").length,
-    location:  allAssets.filter(a => a.type === "location").length,
-    prop:      allAssets.filter(a => a.type === "prop").length,
-    thumbnail: allAssets.filter(a => a.type === "thumbnail").length,
-    video:     allAssets.filter(a => a.type === "video").length,
-    seed:      allAssets.filter(a => a.type === "seed").length,
-    cover:     allAssets.filter(a => a.type === "cover").length,
-    base64:    allAssets.filter(a => a.isBase64).length,
-    cloud:     allAssets.filter(a => !a.isBase64 && a.url.startsWith("http")).length,
+    character:  allAssets.filter(a => a.type === "character").length,
+    location:   allAssets.filter(a => a.type === "location").length,
+    prop:       allAssets.filter(a => a.type === "prop").length,
+    thumbnail:  allAssets.filter(a => a.type === "thumbnail").length,
+    video:      allAssets.filter(a => a.type === "video").length,
+    rehearsal:  allAssets.filter(a => a.type === "rehearsal").length,
+    seed:       allAssets.filter(a => a.type === "seed").length,
+    cover:      allAssets.filter(a => a.type === "cover").length,
+    base64:     allAssets.filter(a => a.isBase64).length,
+    cloud:      allAssets.filter(a => !a.isBase64 && a.url.startsWith("http")).length,
   }), [allAssets])
 
   // ── Handlers ──
@@ -352,6 +390,7 @@ export function MediaWorkspace({ script }: { script: Script }) {
             { label: "Locations",  val: stats.location,  color: "#10B981" },
             { label: "Props",      val: stats.prop,      color: "#8B5CF6" },
             { label: "Videos",     val: stats.video,     color: "#059669" },
+            { label: "Rehearsal",  val: stats.rehearsal, color: "#D97706" },
             { label: "Thumbs",     val: stats.thumbnail, color: "#6366F1" },
           ].map(s => (
             <div key={s.label} className="flex items-center gap-1">
@@ -555,11 +594,14 @@ export function MediaWorkspace({ script }: { script: Script }) {
                     >
                       {/* Thumbnail */}
                       <div className="relative bg-gray-100" style={{ aspectRatio: "16/10", background: "#E8E8E8" }}>
-                        {asset.type === "video" ? (
-                          <div className="w-full h-full flex items-center justify-center" style={{ background: "#1A1A1A" }}>
+                        {(asset.type === "video" || asset.type === "rehearsal") ? (
+                          <div className="w-full h-full flex items-center justify-center" style={{ background: asset.type === "rehearsal" ? "#2D1B00" : "#1A1A1A" }}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="white" opacity={0.5}>
                               <polygon points="5 3 19 12 5 21 5 3"/>
                             </svg>
+                            {asset.type === "rehearsal" && (
+                              <span className="absolute top-1 left-1 text-[7px] px-1 py-0.5 rounded font-bold" style={{ background: "#D97706", color: "#fff" }}>🧪</span>
+                            )}
                           </div>
                         ) : asset.type === "document" ? (
                           <a href={asset.url} target="_blank" rel="noopener noreferrer"
@@ -653,7 +695,7 @@ export function MediaWorkspace({ script }: { script: Script }) {
           <div className="w-64 flex flex-col flex-shrink-0 overflow-y-auto dev-scrollbar" style={{ background: "#FAFAFA", borderLeft: "1px solid #D8D8D8" }}>
             {/* Preview */}
             <div className="relative" style={{ background: "#1A1A1A", aspectRatio: "1" }}>
-              {selectedAsset.type === "video" ? (
+              {(selectedAsset.type === "video" || selectedAsset.type === "rehearsal") ? (
                 <video src={selectedAsset.url} controls className="w-full h-full object-contain" style={{ display: "block" }} />
               ) : selectedAsset.type === "document" ? (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-2" style={{ background: "#1A1A1A" }}>
@@ -689,6 +731,8 @@ export function MediaWorkspace({ script }: { script: Script }) {
                   selectedAsset.roleName ? ["Character", selectedAsset.roleName] : null,
                   selectedAsset.episodeNum != null ? ["Episode", `Ep ${selectedAsset.episodeNum}`] : null,
                   selectedAsset.sceneNum != null ? ["Scene", `SC${String(selectedAsset.sceneNum).padStart(2, "0")}`] : null,
+                  selectedAsset.rehearsalModel ? ["Model", selectedAsset.rehearsalModel] : null,
+                  selectedAsset.rehearsalDuration ? ["Duration", `${selectedAsset.rehearsalDuration}s`] : null,
                 ].filter((x): x is [string, string] => x !== null).map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between">
                     <span className="text-[9px]" style={{ color: "#AAA" }}>{k}</span>
@@ -696,6 +740,16 @@ export function MediaWorkspace({ script }: { script: Script }) {
                   </div>
                 ))}
               </div>
+
+              {/* Rehearsal prompt */}
+              {selectedAsset.rehearsalPrompt && (
+                <div>
+                  <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#AAA" }}>Prompt</p>
+                  <div className="rounded p-2 text-[9px] leading-4" style={{ background: "#FEF3C7", color: "#78350F", maxHeight: 80, overflowY: "auto" }}>
+                    {selectedAsset.rehearsalPrompt}
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="space-y-1.5">
