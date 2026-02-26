@@ -166,7 +166,7 @@ export default async function DiscoverPage({
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 flex items-center justify-center text-white/30 text-sm">
+                    <div className="w-full h-full bg-gradient-to-br from-stone-800 to-stone-900 flex items-center justify-center text-white/30 text-sm">
                       {t("common.noCover")}
                     </div>
                   )}

@@ -50,9 +50,9 @@ export default async function HomePage() {
         <StarParticles count={30} />
 
         {/* Decorative glows */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 md:w-96 md:h-96 bg-indigo-500/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-48 h-48 bg-violet-500/12 rounded-full blur-3xl" />
-        <div className="absolute top-0 left-0 w-32 h-32 bg-sky-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 md:w-96 md:h-96 bg-orange-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-48 h-48 bg-amber-500/12 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-0 w-32 h-32 bg-red-500/10 rounded-full blur-3xl" />
 
         <div className="relative z-10 px-6 pt-12 pb-10 md:pt-16 md:pb-14 text-center">
           {/* User status bar — mobile only (desktop has TopNav) */}
@@ -120,17 +120,17 @@ export default async function HomePage() {
       <div className="px-4 md:px-6 -mt-6 relative z-20">
         <div className="grid grid-cols-3 gap-2.5 md:gap-4">
           {[
-            { href: "/studio", icon: PenTool, color: "indigo", title: t("home.aiStudioTitle"), desc: t("home.aiStudioDesc") },
-            { href: "/generate", icon: Film, color: "violet", title: t("home.theaterTitle"), desc: t("home.theaterDesc") },
+            { href: "/studio", icon: PenTool, color: "amber", title: t("home.aiStudioTitle"), desc: t("home.aiStudioDesc") },
+            { href: "/generate", icon: Film, color: "orange", title: t("home.theaterTitle"), desc: t("home.theaterDesc") },
             { href: "/discover", icon: Compass, color: "rose", title: t("home.discoverTitle"), desc: t("home.discoverDesc") },
           ].map(({ href, icon: Icon, color, title, desc }) => (
             <Link key={href} href={href}>
               <div className="ai-card rounded-2xl p-3 md:p-5 text-center shadow-lg border backdrop-blur-sm bg-card/90 hover:bg-card transition-all">
                 <div className={`w-9 h-9 md:w-11 md:h-11 mx-auto mb-2 rounded-xl flex items-center justify-center ${
-                  color === "indigo" ? "bg-indigo-500/10" : color === "violet" ? "bg-violet-500/10" : "bg-rose-500/10"
+                  color === "amber" ? "bg-amber-500/10" : color === "orange" ? "bg-orange-500/10" : "bg-rose-500/10"
                 }`}>
                   <Icon className={`w-4 h-4 md:w-5 md:h-5 ${
-                    color === "indigo" ? "text-indigo-500" : color === "violet" ? "text-violet-500" : "text-rose-500"
+                    color === "amber" ? "text-amber-600" : color === "orange" ? "text-orange-500" : "text-rose-500"
                   }`} />
                 </div>
                 <h3 className="text-[11px] md:text-sm font-bold mb-0.5 line-clamp-1">{title}</h3>
@@ -144,7 +144,7 @@ export default async function HomePage() {
       {/* ===== Top Up Banner ===== */}
       <div className="px-4 md:px-6 mt-6">
         <Link href="/recharge">
-          <div className="relative bg-gradient-to-r from-indigo-600 to-violet-500 rounded-2xl p-5 md:p-6 overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-indigo-500/10 transition-shadow">
+          <div className="relative bg-gradient-to-r from-orange-600 to-amber-500 rounded-2xl p-5 md:p-6 overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-orange-500/10 transition-shadow">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
             <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-4 -translate-x-4" />
             <div className="relative z-10 flex items-center justify-between">
@@ -192,7 +192,7 @@ export default async function HomePage() {
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 flex items-center justify-center">
+                    <div className="w-full h-full bg-gradient-to-br from-stone-800 to-stone-900 flex items-center justify-center">
                       <Play className="w-8 h-8 text-white/30" />
                     </div>
                   )}

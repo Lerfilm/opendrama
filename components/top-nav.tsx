@@ -23,7 +23,7 @@ export function TopNav({ user, balance }: TopNavProps) {
     <header className="hidden md:flex fixed top-0 left-0 right-0 z-50 h-14 items-center justify-between px-6 bg-background/80 backdrop-blur-lg border-b border-border/50">
       {/* Left: Logo */}
       <Link href="/" className="flex items-center gap-2.5 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
           <Film className="w-4 h-4 text-white" />
         </div>
         <span className="text-base font-bold tracking-tight">OpenDrama</span>

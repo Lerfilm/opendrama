@@ -8,14 +8,21 @@ export default async function MainLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await auth()
-  const userBalance = session?.user?.id
-    ? await prisma.userBalance.findUnique({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let session: any = null
+  let available = 0
+  try {
+    session = await auth()
+    if (session?.user?.id) {
+      const userBalance = await prisma.userBalance.findUnique({
         where: { userId: session.user.id as string },
         select: { balance: true, reserved: true },
       })
-    : null
-  const available = userBalance ? userBalance.balance - userBalance.reserved : 0
+      available = userBalance ? userBalance.balance - userBalance.reserved : 0
+    }
+  } catch {
+    /* layout should never crash – render with defaults */
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 md:pt-14">

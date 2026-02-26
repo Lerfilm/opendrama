@@ -165,7 +165,7 @@ export default async function SeriesDetailPage({ params }: Props) {
             priority
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-indigo-950 to-slate-900" />
+          <div className="w-full h-full bg-gradient-to-br from-stone-900 to-stone-950" />
         )}
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
