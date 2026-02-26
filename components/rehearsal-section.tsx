@@ -10,6 +10,7 @@ import {
   ChevronDown, ChevronUp, FlaskConical,
 } from "@/components/icons"
 import { MODEL_PRICING } from "@/lib/model-pricing"
+import { t } from "@/lib/i18n"
 
 interface Rehearsal {
   id: string
@@ -158,9 +159,9 @@ export function RehearsalSection() {
         setRehearsals((prev) => prev.map((r) => (r.id === id ? data.rehearsal : r)))
       } else {
         const data = await res.json()
-        alert(data.error || "Submit failed")
+        alert(data.error || t("rehearsal.submitFailed"))
       }
-    } catch { alert("Submit failed") }
+    } catch { alert(t("rehearsal.submitFailed")) }
     finally { setSubmittingId(null) }
   }
 
@@ -207,12 +208,12 @@ export function RehearsalSection() {
   }
 
   const statusLabels: Record<string, string> = {
-    draft: "Draft",
-    reserved: "Queued",
-    submitted: "Submitted",
-    generating: "Generating",
-    done: "Done",
-    failed: "Failed",
+    draft: t("rehearsal.draft"),
+    reserved: t("rehearsal.queued"),
+    submitted: t("rehearsal.submitted"),
+    generating: t("rehearsal.generating"),
+    done: t("rehearsal.done"),
+    failed: t("common.failed"),
   }
 
   if (loading) {
@@ -220,7 +221,7 @@ export function RehearsalSection() {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <FlaskConical className="w-4 h-4 text-orange-500" />
-          <h2 className="text-sm font-semibold">Rehearsal</h2>
+          <h2 className="text-sm font-semibold">{t("rehearsal.title")}</h2>
         </div>
         <div className="flex items-center justify-center p-6">
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -235,8 +236,8 @@ export function RehearsalSection() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FlaskConical className="w-4 h-4 text-orange-500" />
-          <h2 className="text-sm font-semibold">Rehearsal</h2>
-          <span className="text-[10px] text-muted-foreground">Prompt playground</span>
+          <h2 className="text-sm font-semibold">{t("rehearsal.title")}</h2>
+          <span className="text-[10px] text-muted-foreground">{t("rehearsal.subtitle")}</span>
         </div>
         <Button
           size="sm"
@@ -246,7 +247,7 @@ export function RehearsalSection() {
           disabled={creating}
         >
           {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-          <span className="ml-1">New</span>
+          <span className="ml-1">{t("rehearsal.new")}</span>
         </Button>
       </div>
 
@@ -256,10 +257,10 @@ export function RehearsalSection() {
           <CardContent className="p-6 text-center space-y-2">
             <FlaskConical className="w-8 h-8 text-muted-foreground mx-auto" />
             <p className="text-sm text-muted-foreground">
-              No rehearsals yet. Create a prompt to test video generation.
+              {t("rehearsal.empty")}
             </p>
             <Button size="sm" variant="outline" onClick={handleCreate} disabled={creating}>
-              <Plus className="w-3 h-3 mr-1" /> Create First Rehearsal
+              <Plus className="w-3 h-3 mr-1" /> {t("rehearsal.createFirst")}
             </Button>
           </CardContent>
         </Card>
@@ -330,7 +331,7 @@ export function RehearsalSection() {
                           rows={4}
                           value={draftPrompt}
                           onChange={(e) => setDraftPrompt(e.target.value)}
-                          placeholder="Describe your video scene..."
+                          placeholder={t("rehearsal.placeholder")}
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : isDraft || isFailed ? (
@@ -339,7 +340,7 @@ export function RehearsalSection() {
                           onClick={(e) => { e.stopPropagation(); startEdit(r) }}
                         >
                           {r.prompt}
-                          <span className="text-[10px] ml-2 text-primary">Click to edit</span>
+                          <span className="text-[10px] ml-2 text-primary">{t("rehearsal.clickToEdit")}</span>
                         </div>
                       ) : null}
 
@@ -389,7 +390,7 @@ export function RehearsalSection() {
                           {/* Cost indicator */}
                           <div className="flex items-center gap-1 text-xs text-amber-600 ml-auto">
                             <Coins className="w-3 h-3" />
-                            <span className="font-medium">{cost} coins</span>
+                            <span className="font-medium">{cost} {t("common.coins")}</span>
                           </div>
                         </div>
                       )}
@@ -400,7 +401,7 @@ export function RehearsalSection() {
                           <span>{r.model.replace(/_/g, " ")}</span>
                           <span>{r.resolution}</span>
                           <span>{r.durationSec}s</span>
-                          {r.tokenCost && <span>{r.tokenCost} coins</span>}
+                          {r.tokenCost && <span>{r.tokenCost} {t("common.coins")}</span>}
                         </div>
                       )}
 
@@ -441,7 +442,7 @@ export function RehearsalSection() {
                         <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50">
                           <Loader2 className="w-4 h-4 animate-spin text-amber-500 shrink-0" />
                           <span className="text-xs text-amber-700 dark:text-amber-300">
-                            Generating your video... This may take 1-3 minutes.
+                            {t("rehearsal.generatingHint")}
                           </span>
                         </div>
                       )}
@@ -455,7 +456,7 @@ export function RehearsalSection() {
                             className="text-xs h-7 px-3 bg-primary text-primary-foreground"
                             onClick={() => handleSave(r.id)}
                           >
-                            Save
+                            {t("common.save")}
                           </Button>
                         )}
 
@@ -467,7 +468,7 @@ export function RehearsalSection() {
                             className="text-xs h-7 px-2"
                             onClick={() => startEdit(r)}
                           >
-                            Edit
+                            {t("common.edit")}
                           </Button>
                         )}
 
@@ -486,7 +487,7 @@ export function RehearsalSection() {
                             ) : (
                               <Zap className="w-3 h-3 mr-1" />
                             )}
-                            {isFailed ? "Retry" : "Generate"}{" "}
+                            {isFailed ? t("common.retry") : t("rehearsal.generate")}{" "}
                             <span className="opacity-70 ml-0.5">({cost})</span>
                           </Button>
                         )}
@@ -504,7 +505,7 @@ export function RehearsalSection() {
                             ) : (
                               <RefreshCw className="w-3 h-3 mr-1" />
                             )}
-                            Regenerate ({cost})
+                            {t("rehearsal.regenerate")} ({cost})
                           </Button>
                         )}
 

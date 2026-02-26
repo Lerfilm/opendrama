@@ -4,12 +4,13 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, Compass, PenTool, Film, Coins } from "@/components/icons"
+import { t } from "@/lib/i18n"
 
-const navLinks = [
-  { href: "/", icon: Home, label: "Home" },
-  { href: "/discover", icon: Compass, label: "Discover" },
-  { href: "/studio", icon: PenTool, label: "Create" },
-  { href: "/generate", icon: Film, label: "Theater" },
+const navKeys = [
+  { href: "/", icon: Home, key: "nav.home" },
+  { href: "/discover", icon: Compass, key: "nav.discover" },
+  { href: "/studio", icon: PenTool, key: "nav.create" },
+  { href: "/generate", icon: Film, key: "nav.theater" },
 ]
 
 interface UserData {
@@ -51,7 +52,7 @@ export function TopNav() {
 
       {/* Center: Nav links */}
       <nav className="flex items-center gap-1">
-        {navLinks.map(({ href, icon: Icon, label }) => {
+        {navKeys.map(({ href, icon: Icon, key }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href))
           return (
             <Link
@@ -64,7 +65,7 @@ export function TopNav() {
               }`}
             >
               <Icon className="w-4 h-4" />
-              {label}
+              {t(key)}
             </Link>
           )
         })}
@@ -97,7 +98,7 @@ export function TopNav() {
             href="/auth/signin"
             className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
           >
-            Sign In
+            {t("common.login")}
           </Link>
         )}
       </div>

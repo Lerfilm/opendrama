@@ -17,25 +17,25 @@ const RARITY_STYLES = {
   common: {
     border: "border-gray-300",
     glow: "shadow-[0_0_30px_rgba(200,200,200,0.5)]",
-    label: "Common",
+    labelKey: "rarity.common",
     labelBg: "bg-gray-500",
   },
   rare: {
     border: "border-blue-400",
     glow: "shadow-[0_0_40px_rgba(59,130,246,0.6)]",
-    label: "Rare",
+    labelKey: "rarity.rare",
     labelBg: "bg-blue-500",
   },
   epic: {
     border: "border-purple-500",
     glow: "shadow-[0_0_50px_rgba(168,85,247,0.7)]",
-    label: "Epic",
+    labelKey: "rarity.epic",
     labelBg: "bg-purple-600",
   },
   legendary: {
     border: "border-yellow-400",
     glow: "shadow-[0_0_60px_rgba(250,204,21,0.8)]",
-    label: "Legendary",
+    labelKey: "rarity.legendary",
     labelBg: "bg-gradient-to-r from-yellow-500 to-amber-500",
   },
 }
@@ -132,7 +132,7 @@ export function AchievementAnimation({ show, card, onClose }: AchievementAnimati
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
             <h3 className="text-white font-bold text-lg">{card.title}</h3>
             <span className={`inline-block px-2 py-0.5 rounded-full text-xs text-white mt-1 ${style.labelBg}`}>
-              {style.label}
+              {t(style.labelKey)}
             </span>
           </div>
 

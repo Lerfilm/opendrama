@@ -378,6 +378,7 @@ const zh = {
   "series.likes": "{count}",
   "series.favorites": "{count}",
   "series.share": "分享",
+  "share.copied": "已复制",
   "series.tags": "标签",
   "series.like": "喜欢",
   "series.favorite": "收藏",
@@ -619,6 +620,24 @@ const zh = {
   "studio.stepStory": "故事大纲",
   "studio.stepSettings": "设置",
   "studio.stepCreate": "创建",
+
+  // Rehearsal
+  "rehearsal.title": "排练场",
+  "rehearsal.subtitle": "Prompt 试炼",
+  "rehearsal.new": "新建",
+  "rehearsal.empty": "还没有排练。创建 Prompt 来测试视频生成。",
+  "rehearsal.createFirst": "创建第一个排练",
+  "rehearsal.placeholder": "描述你的视频场景...",
+  "rehearsal.clickToEdit": "点击编辑",
+  "rehearsal.generatingHint": "正在生成视频...大约需要 1-3 分钟。",
+  "rehearsal.generate": "生成",
+  "rehearsal.regenerate": "重新生成",
+  "rehearsal.submitFailed": "提交失败",
+  "rehearsal.draft": "草稿",
+  "rehearsal.queued": "排队中",
+  "rehearsal.submitted": "已提交",
+  "rehearsal.generating": "生成中",
+  "rehearsal.done": "完成",
 
   // Developer Mode
   "developer.title": "开发者模式",

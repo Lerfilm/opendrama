@@ -376,6 +376,7 @@ const en: Record<string, string> = {
   "series.likes": "{count}",
   "series.favorites": "{count}",
   "series.share": "Share",
+  "share.copied": "Copied",
   "series.tags": "Tags",
   "series.like": "Like",
   "series.favorite": "Favorite",
@@ -617,6 +618,24 @@ const en: Record<string, string> = {
   "studio.stepStory": "Story Outline",
   "studio.stepSettings": "Settings",
   "studio.stepCreate": "Create",
+
+  // Rehearsal
+  "rehearsal.title": "Rehearsal",
+  "rehearsal.subtitle": "Prompt playground",
+  "rehearsal.new": "New",
+  "rehearsal.empty": "No rehearsals yet. Create a prompt to test video generation.",
+  "rehearsal.createFirst": "Create First Rehearsal",
+  "rehearsal.placeholder": "Describe your video scene...",
+  "rehearsal.clickToEdit": "Click to edit",
+  "rehearsal.generatingHint": "Generating your video... This may take 1-3 minutes.",
+  "rehearsal.generate": "Generate",
+  "rehearsal.regenerate": "Regenerate",
+  "rehearsal.submitFailed": "Submit failed",
+  "rehearsal.draft": "Draft",
+  "rehearsal.queued": "Queued",
+  "rehearsal.submitted": "Submitted",
+  "rehearsal.generating": "Generating",
+  "rehearsal.done": "Done",
 
   // Developer Mode
   "developer.title": "Developer Mode",
