@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -40,7 +40,27 @@ const RESOLUTIONS: Record<string, string[]> = {
 
 const DURATIONS = [5, 10, 15]
 
-export function RehearsalSection() {
+interface AssetRole {
+  id: string
+  name: string
+  role: string
+  referenceImages: string[]
+}
+
+interface AssetLocation {
+  name: string
+  photoUrl: string | null
+  photos: { url: string; note?: string }[]
+}
+
+interface RehearsalSectionProps {
+  assets?: {
+    roles: AssetRole[]
+    locations: AssetLocation[]
+  }
+}
+
+export function RehearsalSection({ assets }: RehearsalSectionProps = {}) {
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -55,6 +75,60 @@ export function RehearsalSection() {
   const [draftModel, setDraftModel] = useState("seedance_2_0")
   const [draftResolution, setDraftResolution] = useState("720p")
   const [draftDuration, setDraftDuration] = useState(5)
+
+  // Drag & drop state (only used when assets are provided)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [assetTab, setAssetTab] = useState<"characters" | "locations">("characters")
+  const promptRef = useRef<HTMLTextAreaElement>(null)
+  const dropPosRef = useRef<number>(0)
+
+  // Insert text at cursor position in draft prompt
+  function insertAtCursor(text: string) {
+    const textarea = promptRef.current
+    if (!textarea) {
+      setDraftPrompt(prev => prev + text + " ")
+      return
+    }
+    const pos = textarea.selectionStart
+    const before = draftPrompt.substring(0, pos)
+    const after = draftPrompt.substring(pos)
+    const newValue = before + text + " " + after
+    setDraftPrompt(newValue)
+    const newPos = pos + text.length + 1
+    requestAnimationFrame(() => {
+      if (promptRef.current) {
+        promptRef.current.selectionStart = newPos
+        promptRef.current.selectionEnd = newPos
+        promptRef.current.focus()
+      }
+    })
+  }
+
+  // Render prompt with colored @mentions
+  function renderHighlightedPrompt(text: string) {
+    if (!assets) return text
+    const parts: React.ReactNode[] = []
+    const regex = /@[\w\u4e00-\u9fff]+(?:\s[\w\u4e00-\u9fff]+)*/g
+    let lastIdx = 0
+    let match: RegExpExecArray | null
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIdx) parts.push(text.slice(lastIdx, match.index))
+      const name = match[0].slice(1)
+      const isRole = assets.roles.some(r => r.name === name || r.name.toUpperCase() === name.toUpperCase())
+      const isLoc = assets.locations.some(l => l.name === name || l.name.toUpperCase() === name.toUpperCase())
+      parts.push(
+        <span key={match.index} style={{
+          color: isRole ? "#7C3AED" : isLoc ? "#059669" : "#4F46E5",
+          fontWeight: 600,
+        }}>
+          {match[0]}
+        </span>
+      )
+      lastIdx = match.index + match[0].length
+    }
+    if (lastIdx < text.length) parts.push(text.slice(lastIdx))
+    return parts.length > 0 ? parts : text
+  }
 
   // Fetch rehearsals
   const fetchRehearsals = useCallback(async () => {
@@ -324,22 +398,194 @@ export function RehearsalSection() {
                   {/* Expanded: editing or detail view */}
                   {isExpanded && (
                     <div className="space-y-3 pt-1">
-                      {/* Prompt textarea */}
+                      {/* Prompt textarea with optional drag & drop */}
                       {isEditing ? (
-                        <textarea
-                          className="w-full rounded-lg border border-border bg-muted/50 p-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
-                          rows={4}
-                          value={draftPrompt}
-                          onChange={(e) => setDraftPrompt(e.target.value)}
-                          placeholder={t("rehearsal.placeholder")}
-                          onClick={(e) => e.stopPropagation()}
-                        />
+                        <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                          <div
+                            className="relative rounded-lg transition-all"
+                            style={{
+                              border: isDragOver && assets ? "2px dashed #4F46E5" : "1px solid var(--border, #D0D0D0)",
+                              background: isDragOver && assets ? "#EEF2FF" : "var(--muted, #F5F5F5)",
+                            }}
+                          >
+                            {isDragOver && assets && (
+                              <div className="absolute inset-0 flex items-center justify-center rounded-lg z-20 pointer-events-none"
+                                style={{ background: "rgba(79,70,229,0.08)" }}>
+                                <div className="flex items-center gap-2 px-4 py-2 rounded-full shadow-lg"
+                                  style={{ background: "#4F46E5", color: "#fff" }}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                    <path d="M12 5v14M5 12h14"/>
+                                  </svg>
+                                  <span className="text-[11px] font-medium">Drop here to insert</span>
+                                </div>
+                              </div>
+                            )}
+                            {/* Highlight overlay for @mentions */}
+                            {assets && (
+                              <div
+                                aria-hidden
+                                className="absolute inset-0 p-2.5 text-sm leading-relaxed overflow-hidden whitespace-pre-wrap break-words pointer-events-none"
+                                style={{ color: "#333", fontFamily: "inherit" }}
+                              >
+                                {renderHighlightedPrompt(draftPrompt)}
+                              </div>
+                            )}
+                            <textarea
+                              ref={promptRef}
+                              className="relative z-10 w-full resize-none text-sm leading-relaxed p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              rows={assets ? 6 : 4}
+                              value={draftPrompt}
+                              onChange={(e) => setDraftPrompt(e.target.value)}
+                              placeholder={t("rehearsal.placeholder")}
+                              style={assets ? { background: "transparent", color: "transparent", caretColor: "#333" } : { background: "transparent" }}
+                              onDragOver={assets ? (e) => {
+                                e.preventDefault()
+                                e.dataTransfer.dropEffect = "copy"
+                                setIsDragOver(true)
+                                if (promptRef.current) dropPosRef.current = promptRef.current.selectionStart
+                              } : undefined}
+                              onDragLeave={assets ? () => setIsDragOver(false) : undefined}
+                              onDrop={assets ? (e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setIsDragOver(false)
+                                const data = e.dataTransfer.getData("text/plain")
+                                if (data) {
+                                  const pos = dropPosRef.current
+                                  const before = draftPrompt.substring(0, pos)
+                                  const after = draftPrompt.substring(pos)
+                                  const newValue = before + data + " " + after
+                                  setDraftPrompt(newValue)
+                                  const newPos = pos + data.length + 1
+                                  requestAnimationFrame(() => {
+                                    if (promptRef.current) {
+                                      promptRef.current.focus()
+                                      promptRef.current.selectionStart = newPos
+                                      promptRef.current.selectionEnd = newPos
+                                    }
+                                  })
+                                }
+                              } : undefined}
+                            />
+                          </div>
+
+                          {/* ── Asset Tray: Draggable Elements ── */}
+                          {assets && assets.roles.length + assets.locations.length > 0 && (
+                            <div className="rounded-lg overflow-hidden" style={{ border: "1px solid #D8D8D8", background: "#fff" }}>
+                              {/* Tab headers */}
+                              <div className="flex" style={{ borderBottom: "1px solid #E8E8E8", background: "#F8F8F8" }}>
+                                {([
+                                  { id: "characters" as const, icon: "👤", label: "Characters" },
+                                  { id: "locations" as const, icon: "🏞", label: "Locations" },
+                                ]).map(tab => (
+                                  <button
+                                    key={tab.id}
+                                    onClick={() => setAssetTab(tab.id)}
+                                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-medium transition-colors relative"
+                                    style={{ color: assetTab === tab.id ? "#4F46E5" : "#999" }}
+                                  >
+                                    <span>{tab.icon}</span>
+                                    <span>{tab.label}</span>
+                                    {assetTab === tab.id && (
+                                      <div className="absolute bottom-0 left-2 right-2 h-[2px] rounded-t" style={{ background: "#4F46E5" }} />
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+
+                              {/* Asset cards */}
+                              <div className="p-2 max-h-[220px] overflow-y-auto">
+                                {/* Characters */}
+                                {assetTab === "characters" && (
+                                  assets.roles.length > 0 ? (
+                                    <div className="grid grid-cols-4 gap-1.5">
+                                      {assets.roles.map(role => (
+                                        <div
+                                          key={role.id}
+                                          draggable
+                                          onDragStart={e => {
+                                            e.dataTransfer.setData("text/plain", `@${role.name}`)
+                                            e.dataTransfer.effectAllowed = "copy"
+                                          }}
+                                          onClick={() => insertAtCursor(`@${role.name}`)}
+                                          className="relative rounded-lg overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-lg transition-all select-none group"
+                                          style={{ border: "2px solid transparent" }}
+                                          title={`Drag or click to insert @${role.name}`}
+                                        >
+                                          {role.referenceImages?.[0] ? (
+                                            <img src={role.referenceImages[0]} alt={role.name}
+                                              className="w-full h-16 object-cover pointer-events-none group-hover:scale-105 transition-transform duration-200" />
+                                          ) : (
+                                            <div className="w-full h-16 flex items-center justify-center text-lg font-bold pointer-events-none"
+                                              style={{ background: "#E8E4FF", color: "#4F46E5" }}>
+                                              {role.name[0]?.toUpperCase()}
+                                            </div>
+                                          )}
+                                          <div className="absolute bottom-0 left-0 right-0 px-1 py-0.5 pointer-events-none"
+                                            style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
+                                            <span className="text-[8px] font-semibold text-white truncate block leading-tight">
+                                              {role.name}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : <div className="py-3 text-center text-[10px]" style={{ color: "#CCC" }}>No character data</div>
+                                )}
+
+                                {/* Locations */}
+                                {assetTab === "locations" && (
+                                  assets.locations.length > 0 ? (
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                      {assets.locations.map(loc => {
+                                        const photoUrl = loc.photos?.[0]?.url || loc.photoUrl
+                                        return (
+                                          <div
+                                            key={loc.name}
+                                            draggable
+                                            onDragStart={e => {
+                                              e.dataTransfer.setData("text/plain", `@${loc.name}`)
+                                              e.dataTransfer.effectAllowed = "copy"
+                                            }}
+                                            onClick={() => insertAtCursor(`@${loc.name}`)}
+                                            className="relative rounded-lg overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-lg transition-all select-none group"
+                                            style={{ border: "2px solid transparent" }}
+                                            title={`Drag or click to insert @${loc.name}`}
+                                          >
+                                            {photoUrl ? (
+                                              <img src={photoUrl} alt={loc.name}
+                                                className="w-full h-24 object-cover pointer-events-none group-hover:scale-105 transition-transform duration-200" />
+                                            ) : (
+                                              <div className="w-full h-24 flex items-center justify-center pointer-events-none"
+                                                style={{ background: "#FEE2E2" }}>
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth={2}>
+                                                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                                                  <circle cx="12" cy="10" r="3"/>
+                                                </svg>
+                                              </div>
+                                            )}
+                                            <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 pointer-events-none"
+                                              style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
+                                              <span className="text-[9px] font-semibold text-white truncate block leading-tight">
+                                                {loc.name}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  ) : <div className="py-3 text-center text-[10px]" style={{ color: "#CCC" }}>No location data</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       ) : isDraft || isFailed ? (
                         <div
                           className="w-full rounded-lg border border-dashed border-border bg-muted/30 p-2.5 text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
                           onClick={(e) => { e.stopPropagation(); startEdit(r) }}
                         >
-                          {r.prompt}
+                          {assets ? renderHighlightedPrompt(r.prompt) : r.prompt}
                           <span className="text-[10px] ml-2 text-primary">{t("rehearsal.clickToEdit")}</span>
                         </div>
                       ) : null}

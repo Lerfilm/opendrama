@@ -567,8 +567,8 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     <div className="flex items-center px-3 gap-0 flex-shrink-0" style={{ background: "#E2E2E2", borderBottom: "1px solid #C8C8C8" }}>
       {([
         { id: "callsheet", label: "📋 Call Sheet" },
-        { id: "segments", label: "◼ Segments" },
         { id: "rehearsal", label: "🧪 Rehearsal" },
+        { id: "segments", label: "◼ Action" },
       ] as const).map(tab => (
         <button
           key={tab.id}
@@ -1563,7 +1563,12 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
       {/* ── REHEARSAL VIEW ── */}
       {mainTab === "rehearsal" && (
         <div className="flex-1 overflow-y-auto dev-scrollbar p-4" style={{ background: "#F5F5F5" }}>
-          <RehearsalSection />
+          <RehearsalSection
+            assets={{
+              roles: script.roles,
+              locations: script.locations,
+            }}
+          />
         </div>
       )}
     </div>
