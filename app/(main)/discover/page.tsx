@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic"
 import prisma from "@/lib/prisma"
-import { Star } from "@/components/icons"
+import { Star, Compass } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
@@ -100,8 +100,8 @@ export default async function DiscoverPage({
   }
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-2xl font-bold">{t("discover.title")}</h1>
+    <div className="space-y-4 p-4 md:p-6">
+      <h1 className="text-2xl md:text-3xl font-bold">{t("discover.title")}</h1>
 
       <DiscoverSearch defaultValue={query} />
 
@@ -115,7 +115,7 @@ export default async function DiscoverPage({
             <Button
               variant={genre === g.key ? "default" : "outline"}
               size="sm"
-              className="whitespace-nowrap"
+              className="whitespace-nowrap rounded-full"
             >
               {t(g.label)}
             </Button>
@@ -144,24 +144,26 @@ export default async function DiscoverPage({
       </div>
 
       {sorted.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
+        <div className="text-center py-16 text-muted-foreground">
+          <Compass className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p>{t("discover.noResults")}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
           {sorted.map((series) => {
             const rating = ratingMap[series.id]
 
             return (
               <Link key={series.id} href={`/series/${series.id}`}>
-                <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-muted hover:shadow-lg transition-shadow">
+                <div className="group relative aspect-[9/16] rounded-2xl overflow-hidden bg-muted
+                                hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 hover:scale-[1.02]">
                   {(series.coverTall || series.coverUrl) ? (
                     <Image
                       src={series.coverTall || series.coverUrl!}
                       alt={series.title}
                       fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 flex items-center justify-center text-white/30 text-sm">
@@ -171,12 +173,12 @@ export default async function DiscoverPage({
                   {/* Bottom gradient + title + stats */}
                   <div className="absolute bottom-0 left-0 right-0
                                   bg-gradient-to-t from-black/80 via-black/40 to-transparent
-                                  px-2.5 pt-8 pb-2.5">
-                    <h3 className="text-white font-bold text-xs leading-tight line-clamp-2 mb-1">
+                                  px-3 pt-10 pb-3">
+                    <h3 className="text-white font-bold text-xs md:text-sm leading-tight line-clamp-2 mb-1">
                       {series.title}
                     </h3>
                     <div className="flex items-center justify-between">
-                      <p className="text-white/70 text-[10px]">
+                      <p className="text-white/60 text-[10px] md:text-xs">
                         {t("discover.viewCount", { count: series.viewCount })}
                       </p>
                       {rating && rating.count > 0 && (

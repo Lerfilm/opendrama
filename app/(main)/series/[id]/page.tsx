@@ -155,7 +155,7 @@ export default async function SeriesDetailPage({ params }: Props) {
       <SeriesViewTracker seriesId={id} />
 
       {/* ── Hero Section (Netflix-style wide backdrop) ── */}
-      <div className="relative h-[280px] sm:h-[380px] -mx-4 -mt-4 overflow-hidden">
+      <div className="relative h-[300px] sm:h-[380px] lg:h-[460px] -mx-4 -mt-4 overflow-hidden">
         {heroImage ? (
           <Image
             src={heroImage}
@@ -171,26 +171,26 @@ export default async function SeriesDetailPage({ params }: Props) {
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
 
         {/* Content at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-bold leading-tight">{series.title}</h1>
+        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 space-y-2">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight">{series.title}</h1>
 
           {/* Meta line: genre · year · episodes · rating */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+          <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground flex-wrap">
             {series.genre && (
-              <Badge variant="outline" className="text-[10px]">{series.genre}</Badge>
+              <Badge variant="outline" className="text-[10px] md:text-xs">{series.genre}</Badge>
             )}
             <span>{createdYear}</span>
             <span>·</span>
             <span>{t("home.episodeCount", { count: series.episodes.length })}</span>
             <span>·</span>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-[10px] md:text-xs">
               {series.status === "active" ? t("common.ongoing") : t("common.completed")}
             </Badge>
             {avgRating > 0 && (
               <>
                 <span>·</span>
                 <div className="flex items-center gap-0.5">
-                  <Star className="w-3 h-3 text-amber-400" />
+                  <Star className="w-3 h-3 md:w-4 md:h-4 text-amber-400" />
                   <span className="font-medium text-foreground">{avgRating}</span>
                 </div>
               </>
@@ -204,19 +204,19 @@ export default async function SeriesDetailPage({ params }: Props) {
       </div>
 
       {/* ── Creator / Director ── */}
-      <div className="px-4 py-3 flex items-center gap-3">
+      <div className="px-4 md:px-6 py-3 md:py-4 flex items-center gap-3">
         {series.user ? (
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
             {series.user.image ? (
               <Image
                 src={series.user.image}
                 alt={series.user.name || ""}
-                width={32}
-                height={32}
-                className="rounded-full shrink-0"
+                width={36}
+                height={36}
+                className="rounded-full shrink-0 ring-2 ring-background"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground shrink-0">
+              <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground shrink-0">
                 {(series.user.name || "?")[0]?.toUpperCase()}
               </div>
             )}
@@ -227,7 +227,7 @@ export default async function SeriesDetailPage({ params }: Props) {
           </div>
         ) : (
           <div className="flex items-center gap-2 flex-1">
-            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
               <UserIcon className="w-4 h-4 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">{t("series.anonymous")}</p>
@@ -236,7 +236,7 @@ export default async function SeriesDetailPage({ params }: Props) {
       </div>
 
       {/* ── Actions (Like / Favorite / Share) ── */}
-      <div className="px-4">
+      <div className="px-4 md:px-6">
         <SeriesActions
           seriesId={id}
           initialLiked={!!userLike}
@@ -248,14 +248,14 @@ export default async function SeriesDetailPage({ params }: Props) {
       </div>
 
       {/* ── Tags ── */}
-      <div className="px-4 pt-1">
+      <div className="px-4 md:px-6 pt-1">
         <SeriesTags genre={series.genre} tags={series.tags} />
       </div>
 
       {/* ── Synopsis ── */}
       {synopsisText && (
-        <div className="px-4 py-3">
-          <h3 className="text-sm font-semibold mb-2">{t("series.synopsis")}</h3>
+        <div className="px-4 md:px-6 py-3 md:py-4">
+          <h3 className="text-sm md:text-base font-semibold mb-2">{t("series.synopsis")}</h3>
           <ExpandableSynopsis text={synopsisText} maxLines={3} />
         </div>
       )}
@@ -264,7 +264,7 @@ export default async function SeriesDetailPage({ params }: Props) {
       <CastSection roles={castRoles} />
 
       {/* ── Star Rating ── */}
-      <div className="px-4 border-t border-b">
+      <div className="px-4 md:px-6 border-t border-b">
         <StarRating
           seriesId={id}
           initialAvgRating={avgRating}
@@ -284,7 +284,7 @@ export default async function SeriesDetailPage({ params }: Props) {
       />
 
       {/* ── Comments ── */}
-      <div className="px-4 pb-4">
+      <div className="px-4 md:px-6 pb-4">
         <CommentSection
           seriesId={id}
           initialComments={comments.map((c) => ({

@@ -17,8 +17,8 @@ export function BottomNav() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border safe-area-inset-bottom z-50 md:hidden">
-      <div className="flex items-center justify-around h-16 max-w-screen-md mx-auto">
+    <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t border-border/50 safe-area-inset-bottom z-50 md:hidden">
+      <div className="flex items-center justify-around h-16 max-w-screen-lg mx-auto">
         {navItems.map(({ href, icon: Icon, label, accent }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href))
           return (
@@ -34,15 +34,20 @@ export function BottomNav() {
               }`}
             >
               {accent ? (
-                <div className={`p-1.5 rounded-full -mt-4 ${
+                <div className={`p-2 rounded-full -mt-5 ${
                   isActive
                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
-                    : "bg-primary/10 text-primary"
+                    : "bg-primary/10 text-primary animate-pulse-glow"
                 }`}>
                   <Icon className="w-5 h-5" />
                 </div>
               ) : (
-                <Icon className="w-5 h-5 mb-1" />
+                <div className="relative flex flex-col items-center">
+                  <Icon className="w-5 h-5 mb-1" />
+                  {isActive && (
+                    <span className="absolute -bottom-1 w-1 h-1 rounded-full bg-primary" />
+                  )}
+                </div>
               )}
               <span className={`text-[10px] font-medium ${accent ? "mt-0.5" : ""}`}>{label}</span>
             </Link>
