@@ -6,13 +6,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Play } from "@/components/icons"
 import Link from "next/link"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 
 export default async function WatchHistoryPage() {
   const session = await auth()
   if (!session?.user?.id) {
     redirect("/auth/signin")
   }
+  const t = createT(await getLocaleAsync())
 
   // 获取用户最近的观看记录，按最近观看时间排序
   const watchEvents = await prisma.watchEvent.findMany({

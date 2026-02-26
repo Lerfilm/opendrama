@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { RechargeButton } from "@/components/recharge-button"
 import { COIN_PACKAGES } from "@/lib/stripe"
 import { Coins, Sparkles, Zap, Crown } from "@/components/icons"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 
 export default async function RechargePage() {
   const session = await auth()
@@ -15,6 +15,7 @@ export default async function RechargePage() {
   if (!session?.user) {
     redirect("/auth/signin")
   }
+  const t = createT(await getLocaleAsync())
 
   const userBalance = await prisma.userBalance.findUnique({
     where: { userId: session.user.id },

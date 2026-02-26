@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import prisma from "@/lib/prisma"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 import { ScriptEditor } from "./script-editor"
 
 export default async function ScriptDetailPage({
@@ -12,6 +12,7 @@ export default async function ScriptDetailPage({
 }) {
   const session = await auth()
   if (!session?.user?.id) redirect("/auth/signin")
+  const t = createT(await getLocaleAsync())
 
   const { id } = await params
   const script = await prisma.script.findFirst({

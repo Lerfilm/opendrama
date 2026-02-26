@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Lock } from "@/components/icons"
 import Link from "next/link"
 import type { Metadata } from "next"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 
 type Props = {
   params: Promise<{ id: string }>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = createT(await getLocaleAsync())
   const { id } = await params
   const episode = await prisma.episode.findUnique({
     where: { id },
@@ -51,6 +52,7 @@ export default async function EpisodePage({ params }: Props) {
   if (!session?.user?.id) {
     redirect("/auth/signin")
   }
+  const t = createT(await getLocaleAsync())
 
   const userId = session.user.id
 

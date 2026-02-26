@@ -4,7 +4,7 @@ import { Star, Compass } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 import { DiscoverSearch } from "./discover-search"
 
 const GENRES = [
@@ -27,6 +27,7 @@ export default async function DiscoverPage({
 }: {
   searchParams: Promise<{ q?: string; genre?: string; tab?: string }>
 }) {
+  const t = createT(await getLocaleAsync())
   const params = await searchParams
   const query = params.q || ""
   const tab = params.tab || "trending"

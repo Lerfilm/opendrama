@@ -7,13 +7,13 @@ const translations: Record<Locale, Record<string, string>> = { zh, en }
 
 /**
  * Get locale synchronously.
- * Server-side: defaults to "en" (use getLocaleAsync for cookie-based).
+ * Server-side: reads x-locale header set by middleware (via async getLocaleFromHeaders).
  * Client-side: reads from cookie or navigator.
  */
 export function getLocale(): Locale {
   if (typeof window === "undefined") {
-    // Server-side: can't call cookies() synchronously in Next.js 15+
-    // Default to en; pages can use getLocaleAsync() if needed
+    // Server-side synchronous: no reliable way to read cookies/headers synchronously in Next.js 15+
+    // Pages should use getLocaleAsync() for accurate results
     return "en"
   }
 
@@ -28,10 +28,21 @@ export function getLocale(): Locale {
 }
 
 /**
- * Async locale getter for server components.
+ * Async locale getter — works in server components and route handlers.
+ * Reads the x-locale header injected by middleware (fastest)
+ * or falls back to reading the locale cookie directly.
  */
 export async function getLocaleAsync(): Promise<Locale> {
   if (typeof window === "undefined") {
+    try {
+      const { headers } = await import("next/headers")
+      const h = await headers()
+      const fromHeader = h.get("x-locale")
+      if (fromHeader === "zh") return "zh"
+      if (fromHeader === "en") return "en"
+    } catch {
+      // fallback to cookies
+    }
     try {
       const { cookies } = await import("next/headers")
       const cookieStore = await cookies()
@@ -46,7 +57,8 @@ export async function getLocaleAsync(): Promise<Locale> {
 
 /**
  * Translate a key with optional interpolation.
- * Usage: t("home.greeting", { name: "Alice" })
+ * Client-side: uses getLocale() (reads cookie synchronously).
+ * Server-side: defaults to "en" — use tAsync() or createT(locale) for proper server-side i18n.
  */
 export function t(key: string, params?: Record<string, string | number>): string {
   const locale = getLocale()
@@ -63,6 +75,7 @@ export function t(key: string, params?: Record<string, string | number>): string
 
 /**
  * Create a translator bound to a specific locale.
+ * Use in server components: const t = createT(await getLocaleAsync())
  */
 export function createT(locale: Locale) {
   return function (key: string, params?: Record<string, string | number>): string {

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { t, getLocale, setLocale } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -12,8 +12,8 @@ export default async function SettingsPage() {
   if (!session?.user) {
     redirect("/auth/signin")
   }
-
-  const locale = getLocale()
+  const locale = await getLocaleAsync()
+  const t = createT(locale)
 
   async function switchLocale(formData: FormData) {
     "use server"
@@ -25,6 +25,7 @@ export default async function SettingsPage() {
         maxAge: 365 * 24 * 60 * 60,
       })
     }
+    redirect("/settings")
   }
 
   return (
@@ -44,31 +45,30 @@ export default async function SettingsPage() {
           <CardTitle className="text-base">{t("settings.language")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={switchLocale} className="flex gap-2">
-            <input type="hidden" name="locale" value="zh" />
-            <Button
-              type="submit"
-              variant={locale === "zh" ? "default" : "outline"}
-              size="sm"
-              className="flex-1"
-              name="locale"
-              value="zh"
-            >
-              中文
-            </Button>
-          </form>
-          <form action={switchLocale} className="mt-2">
-            <Button
-              type="submit"
-              variant={locale === "en" ? "default" : "outline"}
-              size="sm"
-              className="w-full"
-              name="locale"
-              value="en"
-            >
-              English
-            </Button>
-          </form>
+          <div className="flex gap-2">
+            <form action={switchLocale} className="flex-1">
+              <input type="hidden" name="locale" value="zh" />
+              <Button
+                type="submit"
+                variant={locale === "zh" ? "default" : "outline"}
+                size="sm"
+                className="w-full"
+              >
+                中文
+              </Button>
+            </form>
+            <form action={switchLocale} className="flex-1">
+              <input type="hidden" name="locale" value="en" />
+              <Button
+                type="submit"
+                variant={locale === "en" ? "default" : "outline"}
+                size="sm"
+                className="w-full"
+              >
+                English
+              </Button>
+            </form>
+          </div>
         </CardContent>
       </Card>
 
@@ -124,6 +124,31 @@ export default async function SettingsPage() {
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">{t("settings.privacy")}</span>
             <Link href="/privacy" className="text-sm text-primary">→</Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 开发团队 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Development Team</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Lead Developer</span>
+            <span className="text-sm font-medium">Jeff Lee, MPSE</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">System Architecture &amp; QA</span>
+            <span className="text-sm font-medium">Nancy</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">UI / UX Design</span>
+            <span className="text-sm font-medium">Joey</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Software Engineering</span>
+            <span className="text-sm font-medium">Mia</span>
           </div>
         </CardContent>
       </Card>

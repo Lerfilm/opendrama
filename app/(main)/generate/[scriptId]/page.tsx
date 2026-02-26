@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, CheckCircle, Loader2, Play } from "@/components/icons"
 import Link from "next/link"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 
 export default async function GenerateScriptPage({
   params,
@@ -15,6 +15,7 @@ export default async function GenerateScriptPage({
 }) {
   const session = await auth()
   if (!session?.user?.id) redirect("/auth/signin")
+  const t = createT(await getLocaleAsync())
 
   const { scriptId } = await params
   const script = await prisma.script.findFirst({

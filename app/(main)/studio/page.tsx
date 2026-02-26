@@ -6,11 +6,12 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle } from "@/components/icons"
 import Link from "next/link"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 
 export default async function StudioPage() {
   const session = await auth()
   if (!session?.user) redirect("/auth/signin")
+  const t = createT(await getLocaleAsync())
 
   const scripts = await prisma.script.findMany({
     where: { userId: session.user.id },

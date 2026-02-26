@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CheckCircle, Coins } from "@/components/icons"
 import Link from "next/link"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 
 /**
  * Fallback fulfillment: if webhook hasn't processed the payment yet,
@@ -122,6 +122,7 @@ export default async function RechargeSuccessPage({
   if (!session?.user) {
     redirect("/auth/signin")
   }
+  const t = createT(await getLocaleAsync())
 
   const params = await searchParams
   const sessionId = params.session_id

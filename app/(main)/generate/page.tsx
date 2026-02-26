@@ -6,11 +6,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Film, CheckCircle, Loader2, Zap, PenTool, XIcon, Radio } from "@/components/icons"
 import Link from "next/link"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
+import { RehearsalSection } from "@/components/rehearsal-section"
 
 export default async function TheaterPage() {
   const session = await auth()
   if (!session?.user?.id) redirect("/auth/signin")
+  const t = createT(await getLocaleAsync())
 
   const scripts = await prisma.script.findMany({
     where: { userId: session.user.id },
@@ -251,6 +253,9 @@ export default async function TheaterPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Rehearsal — Prompt Playground ── */}
+      <RehearsalSection />
     </div>
   )
 }

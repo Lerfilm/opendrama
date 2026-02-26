@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Coins, Calendar } from "@/components/icons"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 
 export default async function PurchasesPage() {
   const session = await auth()
@@ -13,6 +13,7 @@ export default async function PurchasesPage() {
   if (!session?.user) {
     redirect("/auth/signin")
   }
+  const t = createT(await getLocaleAsync())
 
   const purchases = await prisma.purchase.findMany({
     where: {

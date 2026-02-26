@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Eye, Star, User as UserIcon } from "@/components/icons"
 import Image from "next/image"
 import type { Metadata } from "next"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 import SeriesActions from "@/components/series-actions"
 import StarRating from "@/components/star-rating"
 import CommentSection from "@/components/comment-section"
@@ -22,6 +22,7 @@ type Props = {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = createT(await getLocaleAsync())
   const { id } = await params
   const series = await prisma.series.findUnique({
     where: { id },
@@ -63,6 +64,7 @@ function formatViewCount(n: number): string {
 export default async function SeriesDetailPage({ params }: Props) {
   const { id } = await params
   const session = await auth()
+  const t = createT(await getLocaleAsync())
   const userId = session?.user?.id
 
   // Fetch series with creator, cast, and episodes

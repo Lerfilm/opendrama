@@ -37,6 +37,7 @@ model User {
   publishedScripts  PublishedScript[]
   achievementCards  AchievementCard[]
   series            Series[]
+  rehearsals        Rehearsal[]
 
   @@map("users")
 }
@@ -614,4 +615,35 @@ model AchievementCard {
 
   @@index([userId, earnedAt])
   @@map("achievement_cards")
+}
+
+// ============================================
+// Rehearsal — 独立视频生成试验台
+// ============================================
+
+model Rehearsal {
+  id             String    @id @default(cuid())
+  userId         String
+  prompt         String    @db.Text
+  model          String    @default("seedance_2_0")
+  resolution     String    @default("720p")
+  durationSec    Int       @default(5)
+
+  // 生成结果
+  status         String    @default("draft") // draft | reserved | submitted | generating | done | failed
+  providerTaskId String?
+  videoUrl       String?
+  thumbnailUrl   String?
+  tokenCost      Int?
+  errorMessage   String?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  completedAt    DateTime?
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("rehearsals")
 }

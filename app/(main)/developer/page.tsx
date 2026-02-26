@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { isDeveloper } from "@/lib/developer"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +22,7 @@ export default async function DeveloperPage() {
   if (!isDeveloper(session.user.email)) {
     redirect("/profile")
   }
+  const t = createT(await getLocaleAsync())
 
   const cookieStore = await cookies()
   const devMode = cookieStore.get("devMode")?.value === "1"

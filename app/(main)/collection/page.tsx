@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { redirect } from "next/navigation"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 import { Badge } from "@/components/ui/badge"
 import { CardCollection } from "./card-collection"
 
@@ -13,6 +13,7 @@ export default async function CollectionPage() {
   if (!session?.user?.id) {
     redirect("/login")
   }
+  const t = createT(await getLocaleAsync())
 
   const cards = await prisma.achievementCard.findMany({
     where: { userId: session.user.id },

@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Play, Coins, PenTool, Film, Sparkles, Compass } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 import ContinueWatching from "@/components/continue-watching"
 import { StarParticles } from "@/components/star-particles"
 
 export default async function HomePage() {
   const session = await auth()
+  const t = createT(await getLocaleAsync())
 
   const userBalance = session?.user?.id
     ? await prisma.userBalance.findUnique({

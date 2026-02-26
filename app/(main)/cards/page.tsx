@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CARD_RARITIES, CardRarity } from "@/lib/cards"
 import { Sparkles } from "@/components/icons"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 
 export default async function CardsPage() {
   const session = await auth()
@@ -15,6 +15,7 @@ export default async function CardsPage() {
   if (!session?.user) {
     redirect("/auth/signin")
   }
+  const t = createT(await getLocaleAsync())
 
   const allCards = await prisma.card.findMany({
     include: {

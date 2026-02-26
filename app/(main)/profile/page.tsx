@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Coins, CreditCard, History, Star, Settings, Play, PenTool, Video, Code } from "@/components/icons"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 import { isDeveloper } from "@/lib/developer"
 import prisma from "@/lib/prisma"
 
@@ -16,6 +16,7 @@ export default async function ProfilePage() {
   if (!session?.user) {
     redirect("/auth/signin")
   }
+  const t = createT(await getLocaleAsync())
 
   // 获取用户统计
   const userId = session.user.id as string
