@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import Link from "next/link"
 import { MODEL_PRICING } from "@/lib/model-pricing"
+import { RehearsalSection } from "@/components/rehearsal-section"
 
 interface VideoSegment {
   id: string
@@ -452,7 +453,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const currentModel = MODELS.find(m => m.id === model)
 
   // ── Main tab: call sheet or segments ──
-  const [mainTab, setMainTab] = useState<"callsheet" | "segments">("callsheet")
+  const [mainTab, setMainTab] = useState<"callsheet" | "segments" | "rehearsal">("callsheet")
 
   // ── Assets: collect visual references used in segment detail ──
   const characterAssets = useMemo(() =>
@@ -567,6 +568,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
       {([
         { id: "callsheet", label: "📋 Call Sheet" },
         { id: "segments", label: "◼ Segments" },
+        { id: "rehearsal", label: "🧪 Rehearsal" },
       ] as const).map(tab => (
         <button
           key={tab.id}
@@ -1557,6 +1559,13 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
         )}
       </div>
       </>}
+
+      {/* ── REHEARSAL VIEW ── */}
+      {mainTab === "rehearsal" && (
+        <div className="flex-1 overflow-y-auto dev-scrollbar p-4" style={{ background: "#F5F5F5" }}>
+          <RehearsalSection />
+        </div>
+      )}
     </div>
 
     {/* Generate confirm modal */}

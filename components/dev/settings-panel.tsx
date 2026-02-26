@@ -186,6 +186,31 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   </button>
                 </div>
               </div>
+
+              {/* Development Team */}
+              <div>
+                <label className="block text-[11px] font-medium mb-2" style={{ color: "#A0A0A8" }}>
+                  Development Team
+                </label>
+                <div className="rounded-lg overflow-hidden" style={{ background: "#2A2A2E", border: "1px solid #3A3A3E" }}>
+                  {[
+                    { role: "Lead Developer", name: "Jeff Lee, MPSE" },
+                    { role: "System Architect", name: "Nancy" },
+                    { role: "UI Designer", name: "Joey" },
+                    { role: "Software Engineer", name: "Mia" },
+                  ].map((member, i) => (
+                    <div
+                      key={member.name}
+                      className="flex items-center justify-between px-3 py-2"
+                      style={{ borderTop: i > 0 ? "1px solid #3A3A3E" : undefined }}
+                    >
+                      <span className="text-[11px]" style={{ color: "#888" }}>{member.role}</span>
+                      <span className="text-[11px] font-medium" style={{ color: "#D0D0D0" }}>{member.name}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[10px]" style={{ color: "#555" }}>OpenDrama v1.0.0</p>
+              </div>
             </div>
           )}
 
