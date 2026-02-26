@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import Link from "next/link"
 import { MODEL_PRICING } from "@/lib/model-pricing"
 import { RehearsalSection } from "@/components/rehearsal-section"
+import { t } from "@/lib/i18n"
 
 interface VideoSegment {
   id: string
@@ -76,6 +77,18 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
   generating: { bg: "#EDE9FE", color: "#6D28D9", label: "Generating" },
   done: { bg: "#D1FAE5", color: "#065F46", label: "Done" },
   failed: { bg: "#FEE2E2", color: "#991B1B", label: "Failed" },
+}
+
+const STATUS_I18N: Record<string, string> = {
+  pending: "dev.theater.statusPending",
+  reserved: "dev.theater.statusReserved",
+  submitted: "dev.theater.statusSubmitted",
+  generating: "dev.theater.statusGenerating",
+  done: "dev.theater.statusDone",
+  failed: "dev.theater.statusFailed",
+}
+function statusLabel(status: string): string {
+  return STATUS_I18N[status] ? t(STATUS_I18N[status]) : status
 }
 
 export function TheaterWorkspace({ script, initialBalance }: { script: Script; initialBalance: number }) {
@@ -209,7 +222,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
 
   // Submit generation (chain mode or batch mode)
   async function handleGenerate() {
-    if (epSegments.length === 0) { alert("No segments to generate. Run AI Plan first."); return }
+    if (epSegments.length === 0) { alert(t("dev.theater.alertNoSegments")); return }
     setIsSubmitting(true)
     try {
       const endpoint = useChainMode ? "/api/video/chain-submit" : "/api/video/submit"
@@ -233,10 +246,10 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
-      if (res.status === 402) { alert("Insufficient balance"); return }
+      if (res.status === 402) { alert(t("dev.theater.alertInsufficientBalance")); return }
       if (!res.ok) {
         const err = await res.json()
-        alert(err.error || "Failed to submit")
+        alert(err.error || t("dev.theater.alertSubmitFailed"))
         return
       }
       const data = await res.json()
@@ -268,7 +281,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
 
   // Reset all segments for episode
   async function handleResetAll() {
-    if (!confirm("Reset all segments for this episode? This will refund reserved tokens.")) return
+    if (!confirm(t("dev.theater.alertResetConfirm"))) return
     await fetch("/api/video/reset", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -281,7 +294,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
 
   // AI Plan: Enhanced split that includes transition analysis + Seedance 2.0 optimized prompts
   async function handleAIPlan() {
-    if (!confirm(`AI Plan Episode ${selectedEp}? This analyzes scenes, adds transitions, and generates Seedance-optimized video segments. Replaces existing segments.`)) return
+    if (!confirm(t("dev.theater.alertPlanConfirm").replace("{ep}", String(selectedEp)))) return
     setIsSplitting(true)
     try {
       const res = await fetch("/api/ai/split", {
@@ -297,9 +310,9 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
       if (!res.ok) {
         const err = await res.json()
         if (err.error === "insufficient_balance") {
-          alert(`Insufficient balance. Need ${err.required} coins, have ${err.balance}.`)
+          alert(t("dev.theater.alertPlanInsufficient").replace("{required}", String(err.required)).replace("{balance}", String(err.balance)))
         } else {
-          alert(err.error || "AI Plan failed")
+          alert(err.error || t("dev.theater.alertPlanFailed"))
         }
         return
       }
@@ -326,7 +339,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
       }
       await refreshBalance()
     } catch {
-      alert("AI Plan failed")
+      alert(t("dev.theater.alertPlanFailed"))
     } finally {
       setIsSplitting(false)
     }
@@ -350,8 +363,8 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           resolution,
         }),
       })
-      if (res.status === 402) { alert("Insufficient balance"); return }
-      if (!res.ok) { const err = await res.json(); alert(err.error || "Submit failed"); return }
+      if (res.status === 402) { alert(t("dev.theater.alertInsufficientBalance")); return }
+      if (!res.ok) { const err = await res.json(); alert(err.error || t("dev.theater.alertSubmitFailed")); return }
       const data = await res.json()
       if (data.segment) {
         setSegments(prev => prev.map(s => s.id === segmentId ? data.segment : s))
@@ -555,7 +568,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               borderTopColor: "#6366F1",
             }}
           />
-          <span className="text-[11px] font-medium" style={{ color: "#888" }}>Loading workspace...</span>
+          <span className="text-[11px] font-medium" style={{ color: "#888" }}>{t("dev.theater.loading")}</span>
         </div>
       </div>
     )
@@ -566,9 +579,9 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     {/* ── Main Tab Bar ── */}
     <div className="flex items-center px-3 gap-0 flex-shrink-0" style={{ background: "#E2E2E2", borderBottom: "1px solid #C8C8C8" }}>
       {([
-        { id: "callsheet", label: "📋 Call Sheet" },
-        { id: "rehearsal", label: "🧪 Rehearsal" },
-        { id: "segments", label: "◼ Action" },
+        { id: "callsheet", label: t("dev.theater.tabCallSheet") },
+        { id: "rehearsal", label: t("dev.theater.tabRehearsal") },
+        { id: "segments", label: t("dev.theater.tabAction") },
       ] as const).map(tab => (
         <button
           key={tab.id}
@@ -590,7 +603,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
       <div className="w-52 flex flex-col flex-shrink-0" style={{ background: "#EBEBEB", borderRight: "1px solid #C0C0C0" }}>
         {/* Header */}
         <div className="px-3 py-2.5" style={{ borderBottom: "1px solid #C8C8C8" }}>
-          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>Episodes</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>{t("dev.theater.episodes")}</span>
         </div>
 
         {/* Episode list */}
@@ -611,9 +624,9 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                 }}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium" style={{ color: isActive ? "#1A1A1A" : "#444" }}>Episode {ep}</p>
+                  <p className="text-xs font-medium" style={{ color: isActive ? "#1A1A1A" : "#444" }}>{t("dev.theater.epLabel").replace("{ep}", String(ep))}</p>
                   <p className="text-[10px]" style={{ color: "#AAA" }}>
-                    {epSegs.length > 0 ? `${epDone}/${epSegs.length} done` : "No segments"}
+                    {epSegs.length > 0 ? `${epDone}/${epSegs.length} ${t("dev.theater.statusDone").toLowerCase()}` : t("dev.theater.noSegsEmpty")}
                   </p>
                 </div>
                 {epActive > 0 && (
@@ -630,7 +643,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
         {/* Model selector */}
         <div className="px-3 py-3 space-y-2" style={{ borderTop: "1px solid #C8C8C8" }}>
           <div>
-            <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>Model</label>
+            <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>{t("dev.theater.model")}</label>
             <select
               value={model}
               onChange={e => { setModel(e.target.value); const m = MODELS.find(x => x.id === e.target.value); if (m && !m.res.includes(resolution)) setResolution(m.res[0]) }}
@@ -642,7 +655,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           </div>
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>Resolution</label>
+              <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>{t("dev.theater.resolution")}</label>
               <select
                 value={resolution}
                 onChange={e => setResolution(e.target.value)}
@@ -653,7 +666,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               </select>
             </div>
             <div className="flex-1">
-              <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>Max</label>
+              <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>{t("dev.theater.max")}</label>
               <div className="text-[11px] px-2 py-1 rounded" style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#444" }}>
                 {currentModel?.maxDur ?? 12}s
               </div>
@@ -667,11 +680,11 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
               </svg>
-              Sound ON
+              {t("dev.theater.soundOn")}
             </div>
           )}
           <div className="flex items-center justify-between">
-            <span className="text-[10px]" style={{ color: "#AAA" }}>Balance: {balance} coins</span>
+            <span className="text-[10px]" style={{ color: "#AAA" }}>{t("dev.theater.balanceCoins").replace("{n}", String(balance))}</span>
           </div>
         </div>
       </div>
@@ -683,14 +696,14 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           <div className="px-6 py-4" style={{ background: "#1A1A2E", color: "#E0E0FF" }}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[9px] font-semibold uppercase tracking-widest mb-1" style={{ color: "#6366F1" }}>CALL SHEET · PRODUCTION SCHEDULE</p>
+                <p className="text-[9px] font-semibold uppercase tracking-widest mb-1" style={{ color: "#6366F1" }}>{t("dev.theater.callSheetHeader")}</p>
                 <h2 className="text-lg font-bold" style={{ color: "#fff" }}>{script.title}</h2>
                 <p className="text-[11px] mt-0.5" style={{ color: "#8888CC" }}>
-                  Episode {selectedEp} of {episodes.length} · {epScenes.length} scenes · {epLocations.length} locations
+                  {t("dev.theater.epInfo").replace("{ep}", String(selectedEp)).replace("{total}", String(episodes.length)).replace("{scenes}", String(epScenes.length)).replace("{locs}", String(epLocations.length))}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[9px] uppercase tracking-wider" style={{ color: "#555" }}>Generated</p>
+                <p className="text-[9px] uppercase tracking-wider" style={{ color: "#555" }}>{t("dev.theater.generated")}</p>
                 <p className="text-[11px] font-mono" style={{ color: "#666" }}>{new Date().toLocaleDateString()}</p>
               </div>
             </div>
@@ -708,30 +721,30 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
                     <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                   </svg>
-                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Cast — Episode {selectedEp}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>{t("dev.theater.castHeader").replace("{ep}", String(selectedEp))}</span>
                 </div>
                 <Link href={`/dev/casting/${script.id}`} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#E8E4FF", color: "#4F46E5" }}>
-                  Edit Casting →
+                  {t("dev.theater.editCasting")}
                 </Link>
               </div>
 
               {script.roles.length === 0 ? (
                 <div className="px-4 py-6 text-center text-[11px]" style={{ color: "#CCC" }}>
-                  No cast defined yet.{" "}
-                  <Link href={`/dev/casting/${script.id}`} className="underline" style={{ color: "#4F46E5" }}>Go to Casting →</Link>
+                  {t("dev.theater.noCast")}{" "}
+                  <Link href={`/dev/casting/${script.id}`} className="underline" style={{ color: "#4F46E5" }}>{t("dev.theater.goToCasting")}</Link>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-[11px]">
                     <thead>
                       <tr style={{ background: "#FAFAFA", borderBottom: "1px solid #EEE" }}>
-                        <th className="text-left px-4 py-2 font-semibold w-8" style={{ color: "#AAA" }}>#</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Character</th>
-                        <th className="text-left px-3 py-2 font-semibold w-24" style={{ color: "#AAA" }}>Role</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Portrait</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Costume</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Scenes</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Notes</th>
+                        <th className="text-left px-4 py-2 font-semibold w-8" style={{ color: "#AAA" }}>{t("dev.theater.colHash")}</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>{t("dev.theater.colCharacter")}</th>
+                        <th className="text-left px-3 py-2 font-semibold w-24" style={{ color: "#AAA" }}>{t("dev.theater.colRole")}</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>{t("dev.theater.colPortrait")}</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>{t("dev.theater.colCostume")}</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>{t("dev.theater.colScenes")}</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>{t("dev.theater.colNotes")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -759,7 +772,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                 )}
                                 <div>
                                   <p className="font-semibold" style={{ color: "#1A1A1A" }}>{role.name}</p>
-                                  <p className="text-[9px]" style={{ color: "#4F46E5" }}>● Ep {selectedEp}</p>
+                                  <p className="text-[9px]" style={{ color: "#4F46E5" }}>{t("dev.theater.inEp").replace("{ep}", String(selectedEp))}</p>
                                 </div>
                               </div>
                             </td>
@@ -850,24 +863,24 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     <line x1="8" x2="8" y1="2" y2="6"/>
                     <line x1="3" x2="21" y1="10" y2="10"/>
                   </svg>
-                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Scene Schedule</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>{t("dev.theater.sceneSchedule")}</span>
                 </div>
-                <span className="text-[9px]" style={{ color: "#AAA" }}>{epScenes.length} scenes</span>
+                <span className="text-[9px]" style={{ color: "#AAA" }}>{t("dev.theater.scenesCount").replace("{n}", String(epScenes.length))}</span>
               </div>
 
               {epScenes.length === 0 ? (
-                <div className="px-4 py-6 text-center text-[11px]" style={{ color: "#CCC" }}>No scenes for this episode.</div>
+                <div className="px-4 py-6 text-center text-[11px]" style={{ color: "#CCC" }}>{t("dev.theater.noScenes")}</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-[11px]">
                     <thead>
                       <tr style={{ background: "#FAFAFA", borderBottom: "1px solid #EEE" }}>
-                        <th className="text-left px-4 py-2 font-semibold w-12" style={{ color: "#AAA" }}>Scene</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>Heading / Description</th>
-                        <th className="text-left px-3 py-2 font-semibold w-28" style={{ color: "#AAA" }}>Location</th>
-                        <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>Time</th>
-                        <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>Mood</th>
-                        <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>Segs</th>
+                        <th className="text-left px-4 py-2 font-semibold w-12" style={{ color: "#AAA" }}>{t("dev.theater.colScene")}</th>
+                        <th className="text-left px-3 py-2 font-semibold" style={{ color: "#AAA" }}>{t("dev.theater.colHeading")}</th>
+                        <th className="text-left px-3 py-2 font-semibold w-28" style={{ color: "#AAA" }}>{t("dev.theater.colLocation")}</th>
+                        <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>{t("dev.theater.colTime")}</th>
+                        <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>{t("dev.theater.colMood")}</th>
+                        <th className="text-left px-3 py-2 font-semibold w-20" style={{ color: "#AAA" }}>{t("dev.theater.colSegs")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -887,7 +900,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                             </td>
                             <td className="px-3 py-2.5">
                               <p className="font-medium" style={{ color: "#1A1A1A" }}>
-                                {scene.heading || `Scene ${scene.sceneNum}`}
+                                {scene.heading || t("dev.theater.sceneNum").replace("{n}", String(scene.sceneNum))}
                               </p>
                             </td>
                             <td className="px-3 py-2.5">
@@ -936,14 +949,14 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
                     <circle cx="12" cy="10" r="3"/>
                   </svg>
-                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Locations</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>{t("dev.theater.locations")}</span>
                 </div>
                 <Link href={`/dev/location/${script.id}`} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#FEE2E2", color: "#EF4444" }}>
-                  Edit Location →
+                  {t("dev.theater.editLocation")}
                 </Link>
               </div>
               {epLocations.length === 0 ? (
-                <div className="px-4 py-6 text-center text-[11px]" style={{ color: "#CCC" }}>No locations specified in scenes.</div>
+                <div className="px-4 py-6 text-center text-[11px]" style={{ color: "#CCC" }}>{t("dev.theater.noLocations")}</div>
               ) : (
                 <div className="grid grid-cols-3 gap-3 p-4">
                   {epLocations.map(loc => (
@@ -990,15 +1003,15 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     <polyline points="3.29 7 12 12 20.71 7"/>
                     <line x1="12" y1="22" x2="12" y2="12"/>
                   </svg>
-                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Props</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>{t("dev.theater.props")}</span>
                 </div>
                 <Link href={`/dev/props/${script.id}`} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#FEF3C7", color: "#D97706" }}>
-                  Edit Props →
+                  {t("dev.theater.editProps")}
                 </Link>
               </div>
               <div className="px-4 py-4 text-center text-[11px]" style={{ color: "#BBB" }}>
-                Props are managed in the Props module.{" "}
-                <Link href={`/dev/props/${script.id}`} className="underline" style={{ color: "#F59E0B" }}>Go to Props →</Link>
+                {t("dev.theater.propsManaged")}{" "}
+                <Link href={`/dev/props/${script.id}`} className="underline" style={{ color: "#F59E0B" }}>{t("dev.theater.goToProps")}</Link>
               </div>
             </div>
 
@@ -1009,16 +1022,16 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#6366F1" }}>
                     <polygon points="5 3 19 12 5 21 5 3"/>
                   </svg>
-                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>Production Status</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#1A1A1A" }}>{t("dev.theater.prodStatus")}</span>
                 </div>
                 <button onClick={() => setMainTab("segments")} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#EEF2FF", color: "#4F46E5" }}>
-                  Open Segments →
+                  {t("dev.theater.openSegments")}
                 </button>
               </div>
               <div className="p-4">
                 {epSegments.length === 0 ? (
                   <div className="text-center text-[11px] py-4" style={{ color: "#CCC" }}>
-                    No segments yet. <button onClick={() => setMainTab("segments")} className="underline" style={{ color: "#4F46E5" }}>Go to Segments to AI Split →</button>
+                    {t("dev.theater.noSegments")} <button onClick={() => setMainTab("segments")} className="underline" style={{ color: "#4F46E5" }}>{t("dev.theater.goToSegments")}</button>
                   </div>
                 ) : (
                   <div className="flex gap-3 flex-wrap">
@@ -1029,14 +1042,14 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                         <div key={status} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
                           style={{ background: style.bg, border: `1px solid ${style.color}33` }}>
                           <span className="text-[12px] font-bold" style={{ color: style.color }}>{count}</span>
-                          <span className="text-[10px]" style={{ color: style.color }}>{style.label}</span>
+                          <span className="text-[10px]" style={{ color: style.color }}>{statusLabel(status)}</span>
                         </div>
                       )
                     })}
                     <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
                       style={{ background: "#F0F0F5", border: "1px solid #D8D8E8" }}>
                       <span className="text-[10px] font-medium" style={{ color: "#6366F1" }}>
-                        {epSegments.reduce((a, s) => a + s.durationSec, 0)}s total
+                        {epSegments.reduce((a, s) => a + s.durationSec, 0)}{t("dev.theater.totalSecs")}
                       </span>
                     </div>
                   </div>
@@ -1056,10 +1069,10 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
         <div className="px-3 py-2 space-y-1.5" style={{ borderBottom: "1px solid #C8C8C8", background: "#EBEBEB" }}>
           {/* Row 1: Episode info + Generate button */}
           <div className="flex items-center gap-2">
-            <span className="text-[12px] font-semibold" style={{ color: "#333" }}>Ep {selectedEp}</span>
+            <span className="text-[12px] font-semibold" style={{ color: "#333" }}>{t("dev.theater.epLabel").replace("{ep}", String(selectedEp))}</span>
             {epSegments.length > 0 && (
               <span className="text-[10px]" style={{ color: "#AAA" }}>
-                {done}/{epSegments.length} · {totalDuration}s
+                {t("dev.theater.segProgress").replace("{done}", String(done)).replace("{total}", String(epSegments.length)).replace("{duration}", String(totalDuration))}
               </span>
             )}
             {active > 0 && (
@@ -1078,15 +1091,15 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                 border: `1px solid ${useChainMode ? "#E9D5FF" : "#DDD"}`,
               }}
               title={useChainMode
-                ? "Chain Mode ON: Visual continuity via last-frame"
-                : "Batch Mode: Independent generation (faster)"
+                ? t("dev.theater.chainModeDesc")
+                : t("dev.theater.batchModeDesc")
               }
             >
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
               </svg>
-              {useChainMode ? "Chain" : "Batch"}
+              {useChainMode ? t("dev.theater.chain") : t("dev.theater.batch")}
             </button>
             {/* Main Generate button with cost inline */}
             <button
@@ -1100,7 +1113,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               ) : (
                 <span>▶</span>
               )}
-              {isSubmitting ? "..." : done === epSegments.length && done > 0 ? "Re-generate" : "Generate"}
+              {isSubmitting ? "..." : done === epSegments.length && done > 0 ? t("dev.theater.regenerate") : t("dev.theater.generate")}
               {estimatedCost > 0 && !isSubmitting && (
                 <span className="text-[8px] opacity-70">{estimatedCost}🪙</span>
               )}
@@ -1124,11 +1137,11 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     <path d="M2 12l10 5 10-5"/>
                   </svg>
                 )}
-                {isSplitting ? "Planning..." : "Re-plan"}
+                {isSplitting ? t("dev.theater.planning") : t("dev.theater.replan")}
               </button>
               <span style={{ color: "#DDD" }}>·</span>
               <button onClick={handleResetAll} className="text-[9px] px-2 py-0.5 rounded transition-colors" style={{ color: "#999" }}>
-                Reset All
+                {t("dev.theater.resetAll")}
               </button>
             </div>
           )}
@@ -1142,8 +1155,8 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                 <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
                 <line x1="9" x2="9" y1="3" y2="21" />
               </svg>
-              <p className="text-xs">No segments</p>
-              <p className="text-[10px] mt-1" style={{ color: "#DDD" }}>Click "✦ AI Split" to generate from script</p>
+              <p className="text-xs">{t("dev.theater.noSegsEmpty")}</p>
+              <p className="text-[10px] mt-1" style={{ color: "#DDD" }}>{t("dev.theater.noSegsHint")}</p>
             </div>
           ) : (
             <div className="p-2 space-y-1.5">
@@ -1162,7 +1175,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="text-[10px] font-mono w-5 flex-shrink-0" style={{ color: "#AAA" }}>#{seg.segmentIndex + 1}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: ss.bg, color: ss.color }}>{ss.label}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: ss.bg, color: ss.color }}>{statusLabel(seg.status)}</span>
                       <span className="text-[10px] ml-auto" style={{ color: "#AAA" }}>{seg.durationSec}s</span>
                     </div>
                     <p className="text-[11px] leading-relaxed line-clamp-2" style={{ color: "#555", paddingLeft: 20 }}>
@@ -1192,7 +1205,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="mb-3 opacity-30">
               <polygon points="5 3 19 12 5 21 5 3" />
             </svg>
-            <p className="text-sm">Select a segment to preview</p>
+            <p className="text-sm">{t("dev.theater.selectSegment")}</p>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto dev-scrollbar p-4">
@@ -1217,7 +1230,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
             ) : (
               <div className="mb-4 rounded-lg flex items-center justify-center h-40" style={{ background: "#E0E0E0", border: "1px solid #C8C8C8" }}>
                 <span className="text-[11px]" style={{ color: "#AAA" }}>
-                  {["submitted", "generating"].includes(selectedSeg.status) ? "Generating..." : "No video yet"}
+                  {["submitted", "generating"].includes(selectedSeg.status) ? t("dev.theater.generating") : t("dev.theater.noVideo")}
                 </span>
               </div>
             )}
@@ -1227,7 +1240,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               <div className="flex items-center gap-2 flex-wrap px-1 py-1.5 rounded-lg text-[10px]" style={{ background: "#EBEBEB" }}>
                 <span className="font-semibold" style={{ color: "#1A1A1A" }}>#{selectedSeg.segmentIndex + 1}</span>
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-medium" style={STATUS_STYLE[selectedSeg.status] || STATUS_STYLE.pending}>
-                  {STATUS_STYLE[selectedSeg.status]?.label || selectedSeg.status}
+                  {statusLabel(selectedSeg.status)}
                 </span>
                 <span style={{ color: "#888" }}>{selectedSeg.durationSec}s</span>
                 <span style={{ color: "#CCC" }}>·</span>
@@ -1237,7 +1250,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                 {selectedSeg.tokenCost && <><span style={{ color: "#CCC" }}>·</span><span style={{ color: "#888" }}>{selectedSeg.tokenCost}🪙</span></>}
                 <div className="ml-auto flex items-center gap-1.5">
                   {(selectedSeg.status === "failed" || selectedSeg.status === "done") && (
-                    <button onClick={() => handleReset(selectedSeg.id)} className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#E0E0E0", color: "#888" }}>Reset</button>
+                    <button onClick={() => handleReset(selectedSeg.id)} className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "#E0E0E0", color: "#888" }}>{t("dev.theater.reset")}</button>
                   )}
                 </div>
               </div>
@@ -1246,14 +1259,14 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               <div className="space-y-3">
                 {/* Prompt header with re-generate button */}
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#999" }}>Prompt</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#999" }}>{t("dev.theater.prompt")}</label>
                   <button
                     onClick={() => handleRegenerate(selectedSeg.id)}
                     disabled={isSubmitting || ["submitted", "generating", "reserved"].includes(selectedSeg.status)}
                     className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded font-medium transition-colors disabled:opacity-40"
                     style={{ background: "#4F46E5", color: "#fff" }}
                   >
-                    {isSubmitting ? "Submitting..." : "▶ Re-generate"}
+                    {isSubmitting ? "..." : t("dev.theater.regenBtn")}
                   </button>
                 </div>
 
@@ -1283,7 +1296,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                           <path d="M12 5v14M5 12h14"/>
                         </svg>
-                        <span className="text-[11px] font-medium">Drop here to insert</span>
+                        <span className="text-[11px] font-medium">{t("dev.theater.dropHere")}</span>
                       </div>
                     </div>
                   )}
@@ -1331,7 +1344,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     rows={8}
                     className="relative z-10 w-full resize-none text-[13px] leading-relaxed p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     style={{ background: "transparent", color: "transparent", caretColor: "#333" }}
-                    placeholder="Enter video description, or drag assets here..."
+                    placeholder={t("dev.theater.promptPlaceholder")}
                   />
                 </div>
 
@@ -1340,9 +1353,9 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                   {/* Tab headers */}
                   <div className="flex" style={{ borderBottom: "1px solid #E8E8E8", background: "#F8F8F8" }}>
                     {([
-                      { id: "characters" as const, icon: "👤", label: "Characters" },
-                      { id: "locations" as const, icon: "🏞", label: "Locations" },
-                      { id: "materials" as const, icon: "🎬", label: "Materials" },
+                      { id: "characters" as const, icon: "👤", label: t("dev.theater.assetCharacters") },
+                      { id: "locations" as const, icon: "🏞", label: t("dev.theater.assetLocations") },
+                      { id: "materials" as const, icon: "🎬", label: t("dev.theater.assetMaterials") },
                     ]).map(tab => (
                       <button
                         key={tab.id}
@@ -1394,7 +1407,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                 onClick={() => insertAtCursor(selectedSeg.id, `@${role.name}`)}
                                 className="relative rounded-lg overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-lg transition-all select-none group"
                                 style={{ border: `2px solid ${isInScene ? "#818CF8" : "transparent"}` }}
-                                title={`Drag to prompt to insert @${role.name}`}
+                                title={t("dev.theater.dragHint").replace("{name}", role.name)}
                               >
                                 {role.referenceImages?.[0] ? (
                                   <img src={role.referenceImages[0]} alt={role.name}
@@ -1415,14 +1428,14 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                 {isInScene && (
                                   <div className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded text-[6px] font-semibold pointer-events-none"
                                     style={{ background: "rgba(99,102,241,0.85)", color: "#fff" }}>
-                                    IN
+                                    {t("dev.theater.inBadge")}
                                   </div>
                                 )}
                               </div>
                             )
                           })}
                         </div>
-                      ) : <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>No character data</div>
+                      ) : <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>{t("dev.theater.noCharacterData")}</div>
                     })()}
 
                     {/* ── Locations tab ── */}
@@ -1447,7 +1460,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                   onClick={() => insertAtCursor(selectedSeg.id, `@${loc.name}`)}
                                   className="relative rounded-lg overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-lg transition-all select-none group"
                                   style={{ border: `2px solid ${isCurrent ? "#34D399" : "transparent"}` }}
-                                  title={`Drag to prompt to insert @${loc.name}`}
+                                  title={t("dev.theater.dragHint").replace("{name}", loc.name)}
                                 >
                                   {photoUrl ? (
                                     <img src={photoUrl} alt={loc.name}
@@ -1470,14 +1483,14 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                   {isCurrent && (
                                     <div className="absolute top-1 right-1 px-1 py-0.5 rounded text-[7px] font-semibold pointer-events-none"
                                       style={{ background: "rgba(16,185,129,0.85)", color: "#fff" }}>
-                                      NOW
+                                      {t("dev.theater.nowBadge")}
                                     </div>
                                   )}
                                 </div>
                               )
                             })}
                         </div>
-                      ) : <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>No location data</div>
+                      ) : <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>{t("dev.theater.noLocationData")}</div>
                     })()}
 
                     {/* ── Materials tab ── */}
@@ -1499,7 +1512,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
                               </svg>
                               <span className="text-[8px]" style={{ color: "#C2410C" }}>
-                                Chain Mode uses the last frame of previous segment as visual reference
+                                {t("dev.theater.chainExplain")}
                               </span>
                             </div>
                           )}
@@ -1531,7 +1544,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                                   <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 pointer-events-none"
                                     style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.65))" }}>
                                     <span className="text-[8px] font-mono font-semibold text-white">
-                                      #{seg.segmentIndex + 1} {isPrev ? "Prev" : `${seg.durationSec}s`}
+                                      #{seg.segmentIndex + 1} {isPrev ? t("dev.theater.prevBadge") : `${seg.durationSec}s`}
                                     </span>
                                   </div>
                                 </div>
@@ -1541,7 +1554,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                         </div>
                       ) : (
                         <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>
-                          No other segment materials (generate other segments first)
+                          {t("dev.theater.noMaterials")}
                         </div>
                       )
                     })()}
@@ -1551,7 +1564,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
 
               {selectedSeg.errorMessage && (
                 <div className="p-2.5 rounded text-[11px] leading-relaxed" style={{ background: "#FEE2E2", color: "#991B1B" }}>
-                  <strong>Error:</strong> {selectedSeg.errorMessage}
+                  <strong>{t("dev.theater.error")}</strong> {selectedSeg.errorMessage}
                 </div>
               )}
             </div>
@@ -1586,25 +1599,25 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           onClick={e => e.stopPropagation()}
         >
           <div className="px-5 pt-5 pb-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>AI Feature Confirmation</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>{t("dev.theater.confirmTitle")}</span>
             <p className="text-sm font-semibold mt-1" style={{ color: "#1A1A1A" }}>
-              Generate {epSegments.length} Video Segment{epSegments.length !== 1 ? "s" : ""}
+              {t("dev.theater.confirmGenerate").replace("{n}", String(epSegments.length))}
             </p>
           </div>
           <div className="mx-5 mb-4 rounded-lg px-4 py-3" style={{ background: "#F0F0F0" }}>
             <div className="flex items-center justify-between">
-              <span className="text-[11px]" style={{ color: "#666" }}>Estimated Cost</span>
+              <span className="text-[11px]" style={{ color: "#666" }}>{t("dev.theater.estimatedCost")}</span>
               <span className="text-sm font-bold" style={{ color: "#4F46E5" }}>~{estimatedCost} 🪙</span>
             </div>
             <div className="flex items-center justify-between mt-1.5">
-              <span className="text-[11px]" style={{ color: "#666" }}>Current Balance</span>
+              <span className="text-[11px]" style={{ color: "#666" }}>{t("dev.theater.currentBalance")}</span>
               <span className="text-sm font-semibold" style={{ color: balance >= estimatedCost ? "#1A1A1A" : "#EF4444" }}>
                 {balance} 🪙
               </span>
             </div>
             {balance < estimatedCost && (
               <p className="text-[11px] pt-1.5" style={{ color: "#EF4444" }}>
-                Insufficient balance, need {estimatedCost - balance} 🪙 more. Please recharge
+                {t("dev.theater.insufficientHint").replace("{n}", String(estimatedCost - balance))}
               </p>
             )}
           </div>
@@ -1614,7 +1627,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               className="flex-1 h-9 rounded-lg text-[12px] font-medium transition-colors"
               style={{ background: "#E8E8E8", color: "#555" }}
             >
-              Cancel
+              {t("dev.theater.cancel")}
             </button>
             <button
               onClick={() => { setShowGenerateConfirm(false); handleGenerate() }}
@@ -1622,7 +1635,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               className="flex-1 h-9 rounded-lg text-[12px] font-semibold transition-colors disabled:opacity-40"
               style={{ background: "#4F46E5", color: "#fff" }}
             >
-              Confirm ~{estimatedCost} 🪙
+              {t("dev.theater.confirmCost").replace("{n}", String(estimatedCost))}
             </button>
           </div>
         </div>
