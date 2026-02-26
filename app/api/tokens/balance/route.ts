@@ -18,5 +18,7 @@ export async function GET() {
     available: (balance?.balance ?? 0) - (balance?.reserved ?? 0),
     totalPurchased: balance?.totalPurchased ?? 0,
     totalConsumed: balance?.totalConsumed ?? 0,
+    userName: session.user.name,
+    userImage: session.user.image,
   })
 }
