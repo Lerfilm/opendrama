@@ -20,39 +20,39 @@ const SYSTEM_USER_ID = "system"
 const CARD_PROMPTS = [
   {
     name: "card-common",
-    prompt: `A collectible character card for a short drama app. COMMON rarity tier.
-A beautiful young European woman with long flowing hair, wearing a stylish crop top and high-waisted jeans, toned athletic figure with visible abs. Standing casually in a sunlit urban rooftop setting. Confident, flirty smile.
-Card frame: simple elegant silver metallic border. Small "COMMON" text at bottom in silver.
-Professional fashion photography, real human, photorealistic, warm golden hour lighting, shallow depth of field. Card aspect ratio 3:4.
-Magazine cover quality, warm tones, soft bokeh background.
-No text other than "COMMON". Clean composition.`,
+    prompt: `一张短剧应用的收藏角色卡牌。COMMON 普通稀有度。
+画面构图：电影剧照风格，近景特写。一个年轻漂亮的欧美女性，精致妆容，侧脸转向镜头，眼神含情脉脉。她穿着简约的白衬衫，微微解开两颗扣子。背景是咖啡厅窗边，阳光洒在脸上，浅景深虚化。
+卡牌边框：简洁银色金属边框。底部小字"COMMON"银色。
+电影剧照质感，真人写实，暖色调，柔和自然光线，浅景深。竖版3:4比例。
+韩剧海报质感，唯美光影。
+除"COMMON"外无其他文字。`,
   },
   {
     name: "card-rare",
-    prompt: `A collectible character card for a short drama app. RARE rarity tier.
-A handsome muscular young European man, shirtless showing defined six-pack abs, wearing dark fitted trousers, dramatic pose with arms crossed. Intense blue eyes, short styled hair. Standing in a modern luxury penthouse with city lights at night behind him.
-Card frame: sleek blue metallic border with subtle electric blue glow at edges. "RARE" text at bottom in glowing blue.
-Professional fitness photography, real human, photorealistic, dramatic side lighting with cool blue rim light. Card aspect ratio 3:4.
-Cinematic moody lighting, deep contrast, GQ magazine quality.
-No text other than "RARE". Clean composition.`,
+    prompt: `一张短剧应用的收藏角色卡牌。RARE 稀有稀有度。
+画面构图：动作剧照风格，中近景。一个帅气的欧美年轻男性，穿着合身的黑色西装，衬衫微敞，展现健壮胸肌。他正从豪车旁走来，一手松着领带，表情冷峻而危险。夜晚城市霓虹灯光映在他脸上。
+卡牌边框：蓝色金属边框，边缘有微妙的电蓝色光芒。底部"RARE"蓝色发光字。
+电影剧照风格，真人写实，冷色调电影打光，侧面轮廓光。竖版3:4比例。
+悬疑剧海报质感，暗调高对比，电影感构图。
+除"RARE"外无其他文字。`,
   },
   {
     name: "card-epic",
-    prompt: `A collectible character card for a short drama app. EPIC rarity tier.
-A stunning European woman with smoky eye makeup, wearing an elegant revealing dark purple dress with a thigh-high slit, athletic toned body. Surrounded by subtle purple and violet atmospheric light effects. Mysterious, seductive expression. Wind blowing through her hair.
-Card frame: ornate purple and rose gold border with fine filigree and soft purple glow. "EPIC" text at bottom in luminous purple.
-Professional glamour photography, real human, photorealistic, dramatic purple and violet lighting. Card aspect ratio 3:4.
-High fashion editorial quality, ethereal atmosphere, deep contrast.
-No text other than "EPIC". Clean composition.`,
+    prompt: `一张短剧应用的收藏角色卡牌。EPIC 史诗稀有度。
+画面构图：极致近景特写，只拍脸部和肩部。一个绝美的欧美女性，烟熏妆，嘴唇微张，眼神挑衅又妩媚。她的手轻触嘴唇。紫色和玫瑰色的灯光打在她精致的五官上，头发被风吹起。
+卡牌边框：紫色和玫瑰金色华丽边框，带细腻花纹和柔和紫色光晕。底部"EPIC"紫色发光字。
+极致特写，真人写实，紫色戏剧性光线，仿佛悬疑爱情剧的关键场景截图。竖版3:4比例。
+高级时尚大片质感，氛围感强烈。
+除"EPIC"外无其他文字。`,
   },
   {
     name: "card-legendary",
-    prompt: `A collectible character card for a short drama app. LEGENDARY rarity tier.
-A powerful muscular European man, shirtless with chiseled physique and defined abs, wearing golden warrior-style lower armor/pants. Golden crown on his head, arms outstretched with golden energy radiating outward. Standing in a throne room with golden light rays streaming in.
-Card frame: luxurious gold border with diamond and amber gemstone inlays, holographic rainbow sheen. "LEGENDARY" text at bottom in brilliant gold.
-Professional cinematic photography, real human, photorealistic, epic golden lighting, lens flares, power pose. Card aspect ratio 3:4.
-Blockbuster movie poster quality, rich warm contrast, golden hour radiance.
-No text other than "LEGENDARY". Clean composition.`,
+    prompt: `一张短剧应用的收藏角色卡牌。LEGENDARY 传奇稀有度。
+画面构图：史诗级剧照全景+近景混合。一个气场强大的欧美男性，赤裸上身展现雕塑般的腹肌和胸肌，穿着金色战士风格的皮甲下装。他站在暴风雨中的悬崖边，雨水顺着他的肌肉线条流下，金色闪电照亮他坚毅的面容。仰拍角度，英雄感满满。
+卡牌边框：奢华金色边框镶嵌钻石和琥珀宝石，全息彩虹光泽。底部"LEGENDARY"金色辉煌字体。
+史诗电影级画面，真人写实，金色打光+闪电效果，英雄电影海报质感。竖版3:4比例。
+好莱坞大片海报质感，震撼视觉冲击。
+除"LEGENDARY"外无其他文字。`,
   },
 ]
 

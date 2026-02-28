@@ -129,10 +129,10 @@ function AnimatedSection({ children, className = "", delay = 0 }: { children: Re
 
 // ── AI-Generated Asset URLs ──
 const AI_CARDS = {
-  common: "/api/r2/covers/system/1772282438716-landing_card-common.png",
-  rare: "/api/r2/covers/system/1772282458135-landing_card-rare.png",
-  epic: "/api/r2/covers/system/1772282477430-landing_card-epic.png",
-  legendary: "/api/r2/covers/system/1772282495529-landing_card-legendary.png",
+  common: "/api/r2/covers/system/1772283498580-landing_card-common.png",
+  rare: "/api/r2/covers/system/1772283516618-landing_card-rare.png",
+  epic: "/api/r2/covers/system/1772283536267-landing_card-epic.png",
+  legendary: "/api/r2/covers/system/1772283557472-landing_card-legendary.png",
 }
 
 const AI_PIPELINE = {

@@ -63,6 +63,21 @@ const en: Record<string, string> = {
   "home.discoverTitle": "Discover",
   "home.discoverDesc": "Share your drama, grow your audience & earn coins",
 
+  // Home - Landing Page Features
+  "home.storyParagraph1": "When you had an idea for a short drama, making it felt impossible. Expensive equipment. Large crews. Months of work.",
+  "home.storyParagraph2": "Now, it feels like magic. Upload a script. AI generates every scene. From casting to final cut — in minutes, not months.",
+  "home.storyParagraph3": "OpenDrama is how storytellers bring their dramas to life, at last.",
+  "home.featureWatchTitle": "Binge-worthy short dramas. Finally!",
+  "home.featureWatchDesc": "Vertical dramas crafted for your phone. 1-2 minute episodes, swipe to advance. Get hooked in seconds.",
+  "home.featureAITitle": "Script to screen. AI does the rest.",
+  "home.featureAIDesc": "Upload a PDF script. AI casts characters, scouts locations, generates video segments — all automatically.",
+  "home.featureCardsTitle": "Collect character cards. Show them off.",
+  "home.featureCardsDesc": "Every drama has collectible character cards. Common, Rare, Epic, Legendary — unlock them by watching.",
+  "home.featureOSSTitle": "100% Open Source. Own your stories.",
+  "home.featureOSSDesc": "Built by filmmakers, for filmmakers. Self-host it. Modify it. No lock-in. Your dramas, your data, your platform.",
+  "home.ctaTitle": "Start your drama journey",
+  "home.ctaDesc": "Free to watch. Free to create. Forever.",
+
   // Home - Dev Tools
   "home.devToolsTitle": "Dev Studio",
   "home.devToolsDesc": "Professional filmmaking workspace — script, casting, theater & more",

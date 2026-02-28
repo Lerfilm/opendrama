@@ -63,6 +63,21 @@ const zh = {
   "home.discoverTitle": "发现",
   "home.discoverDesc": "分享短剧、吸引观众、赚取金币",
 
+  // Home - 首页功能板块
+  "home.storyParagraph1": "当你脑海中有一部短剧的灵感时，把它拍出来几乎不可能。昂贵的设备、庞大的团队、漫长的周期。",
+  "home.storyParagraph2": "现在，一切如同魔法。上传剧本，AI 自动生成每一个场景。从选角到成片——几分钟，而非几个月。",
+  "home.storyParagraph3": "OpenDrama，让创作者终于能将心中的故事变为现实。",
+  "home.featureWatchTitle": "让人欲罢不能的竖屏短剧，终于来了！",
+  "home.featureWatchDesc": "专为手机打造的竖屏短剧。每集 1-2 分钟，上滑切集。几秒钟就能上头。",
+  "home.featureAITitle": "从剧本到成片，AI 搞定一切。",
+  "home.featureAIDesc": "上传 PDF 剧本，AI 自动选角、勘景、生成视频片段——全程自动化。",
+  "home.featureCardsTitle": "收集角色卡牌，展示你的收藏。",
+  "home.featureCardsDesc": "每部剧都有可收集的角色卡牌。普通、稀有、史诗、传奇——追剧即可解锁。",
+  "home.featureOSSTitle": "100% 开源。你的故事，由你做主。",
+  "home.featureOSSDesc": "由影视人打造，为影视人服务。自行部署、自由修改、不受限制。你的剧集、你的数据、你的平台。",
+  "home.ctaTitle": "开启你的短剧之旅",
+  "home.ctaDesc": "免费观看，免费创作，永远如此。",
+
   // Home - Dev Tools
   "home.devToolsTitle": "开发工作室",
   "home.devToolsDesc": "专业影视制作工作台 — 剧本、选角、剧场等",
