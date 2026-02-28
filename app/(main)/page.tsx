@@ -3,15 +3,15 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Play, Coins, PenTool, Film, Sparkles, Compass, Code } from "@/components/icons"
+import { Play, Coins, PenTool, Sparkles, Compass, Code } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
 import { createT, getLocaleAsync } from "@/lib/i18n"
 import ContinueWatching from "@/components/continue-watching"
-import { StarParticles } from "@/components/star-particles"
 import { getGenreGradient } from "@/lib/genre-colors"
 import { resolveImageUrl } from "@/lib/storage"
-import HeroCarousel from "@/components/hero-carousel"
+import CinematicHero from "@/components/cinematic-hero"
+import FlightyLanding from "@/components/flighty-landing"
 import DailyCheckIn from "@/components/daily-checkin"
 
 export default async function HomePage() {
@@ -33,6 +33,7 @@ export default async function HomePage() {
     select: {
       id: true,
       title: true,
+      description: true,
       coverUrl: true,
       coverTall: true,
       coverWide: true,
@@ -41,6 +42,7 @@ export default async function HomePage() {
       description: true,
       viewCount: true,
       status: true,
+      viewCount: true,
       createdAt: true,
       episodes: {
         select: { id: true },
@@ -56,6 +58,10 @@ export default async function HomePage() {
     coverTall: resolveImageUrl(s.coverTall),
     coverWide: resolveImageUrl(s.coverWide),
     episodeCount: s.episodes.length,
+    // Resolve all image URLs through the R2 proxy so they work globally
+    coverUrl: resolveImageUrl(s.coverUrl),
+    coverTall: resolveImageUrl(s.coverTall),
+    coverWide: resolveImageUrl(s.coverWide),
   }))
 
   // Split into Hot Picks (has episodes) and Coming Soon (no episodes)
@@ -63,16 +69,21 @@ export default async function HomePage() {
   const comingSoon = seriesWithCount.filter((s) => s.episodeCount === 0)
 
   // Featured series for hero carousel (has cover + episodes)
+  // Prefer coverTall (AI-generated R2 poster) or only use coverWide if it's an R2 proxy URL
+  // (coverWide may still hold old Unsplash URLs from before the AI poster migration)
   const featured = seriesWithCount.filter(
     (s) => s.episodeCount > 0 && (s.coverTall || s.coverUrl || s.coverWide || s.genre)
-  ).slice(0, 5).map((s) => ({
-    id: s.id,
-    title: s.title,
-    coverWide: resolveImageUrl(s.coverWide || s.coverUrl),
-    coverUrl: resolveImageUrl(s.coverUrl),
-    genre: s.genre,
-    episodeCount: s.episodeCount,
-  }))
+  ).slice(0, 5).map((s) => {
+    const safeWide = s.coverWide?.startsWith("/api/r2/") ? s.coverWide : null
+    return {
+      id: s.id,
+      title: s.title,
+      coverWide: s.coverTall || safeWide || s.coverUrl,
+      coverUrl: s.coverUrl,
+      genre: s.genre,
+      episodeCount: s.episodeCount,
+    }
+  })
 
   // Featured cards (latest + rarest)
   const featuredCards = await prisma.card.findMany({
@@ -94,177 +105,114 @@ export default async function HomePage() {
   )
 
   return (
-    <div className="min-h-screen">
-      {/* ===== Hero ===== */}
-      <div className="hero-gradient relative overflow-hidden rounded-b-3xl md:rounded-b-[2.5rem]">
-        <StarParticles count={30} />
+    <div className="min-h-screen bg-background">
 
-        {/* Decorative glows */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 md:w-96 md:h-96 bg-orange-500/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-48 h-48 bg-amber-500/12 rounded-full blur-3xl" />
-        <div className="absolute top-0 left-0 w-32 h-32 bg-red-500/10 rounded-full blur-3xl" />
+      {/* ===== Flighty-Style Landing (Mobile) ===== */}
+      <div className="md:hidden">
+        <FlightyLanding
+          items={featured}
+          userName={session?.user?.name}
+          availableCoins={availableCoins}
+          isLoggedIn={!!session?.user}
+          hotPicks={hotPicks}
+        />
+      </div>
 
-        <div className="relative z-10 px-6 pt-12 pb-10 md:pt-16 md:pb-14 text-center">
-          {/* User status bar — mobile only (desktop has TopNav) */}
-          <div className="flex items-center justify-between mb-8 md:hidden">
-            <div className="text-left">
-              <h2 className="text-white/90 text-sm font-medium">OpenDrama</h2>
-              <p className="text-white/50 text-xs">
-                {session?.user
-                  ? t("home.greeting", { name: session.user?.name || "" })
-                  : t("home.welcomeGuest")}
-              </p>
-            </div>
-            {session?.user ? (
-              <Link href="/recharge">
-                <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur rounded-full px-3 py-1.5">
-                  <Coins className="w-4 h-4 text-yellow-400" />
-                  <span className="text-white text-sm font-semibold">{availableCoins}</span>
-                </div>
-              </Link>
-            ) : (
-              <Link href="/auth/signin">
-                <Button size="sm" variant="secondary" className="rounded-full text-xs px-4">
-                  {t("common.login")}
-                </Button>
-              </Link>
-            )}
-          </div>
-
-          {/* Slogan */}
-          <div className="animate-fade-up">
-            <h1 className="gradient-text text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight mb-3 md:mb-4">
-              {t("home.slogan")}
-            </h1>
-            <p className="text-white/60 text-sm sm:text-base md:text-lg mb-6 md:mb-8 max-w-xs md:max-w-md mx-auto">
-              {t("home.sloganSub")}
-            </p>
-          </div>
-
-          {/* CTA buttons */}
-          <div className="animate-fade-up-delay-1 flex items-center justify-center gap-3 md:gap-4 mb-4">
+      {/* ===== Desktop Layout ===== */}
+      <div className="hidden md:block">
+        {/* Desktop hero */}
+        <div className="hero-gradient relative overflow-hidden rounded-b-3xl px-8 pt-14 pb-10 text-center">
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-80 h-80 bg-orange-500/15 rounded-full blur-3xl" />
+          <h1 className="gradient-text text-4xl lg:text-5xl font-black tracking-tight mb-3">{t("home.slogan")}</h1>
+          <p className="text-white/55 text-base mb-6 max-w-md mx-auto">{t("home.sloganSub")}</p>
+          <div className="flex items-center justify-center gap-3">
             <Link href="/discover">
-              <Button className="rounded-full bg-white text-black hover:bg-white/90 px-6 md:px-8 md:h-11 font-semibold md:text-base">
-                <Play className="w-4 h-4 mr-1.5" />
-                {t("home.exploreNow")}
+              <Button className="rounded-full bg-white text-black hover:bg-white/90 px-7 h-10 font-semibold">
+                <Play className="w-4 h-4 mr-1.5" />{t("home.exploreNow")}
               </Button>
             </Link>
             <Link href="/studio">
-              <Button variant="outline" className="rounded-full border-white/60 text-white bg-white/10 hover:bg-white/20 px-6 md:px-8 md:h-11 font-semibold md:text-base">
-                <Sparkles className="w-4 h-4 mr-1.5" />
+              <Button variant="outline" className="rounded-full border-white/40 text-white bg-white/10 hover:bg-white/20 px-7 h-10 font-semibold">
                 {t("home.startCreate")}
               </Button>
             </Link>
           </div>
-
-          {/* Lerfilm brand */}
-          <div className="animate-fade-up-delay-2">
-            <p className="text-white/25 text-[10px] tracking-[0.2em] uppercase font-light">
-              {t("home.lerfilmProduction")}
-            </p>
-          </div>
+          <p className="text-white/20 text-[10px] tracking-[0.2em] uppercase font-light mt-6">{t("home.lerfilmProduction")}</p>
         </div>
-      </div>
 
-      {/* ===== Featured Series Carousel ===== */}
-      {featured.length > 0 && (
-        <div className="px-4 md:px-6 -mt-4 relative z-20 mb-4">
-          <HeroCarousel items={featured} />
-        </div>
-      )}
-
-      {/* ===== Feature Cards ===== */}
-      <div className={`px-4 md:px-6 ${featured.length > 0 ? "" : "-mt-6"} relative z-20`}>
-        <div className="grid grid-cols-3 gap-2.5 md:gap-4">
-          {[
-            { href: "/studio", icon: PenTool, color: "amber", title: t("home.aiStudioTitle"), desc: t("home.aiStudioDesc") },
-            { href: "/generate", icon: Film, color: "orange", title: t("home.theaterTitle"), desc: t("home.theaterDesc") },
-            { href: "/discover", icon: Compass, color: "rose", title: t("home.discoverTitle"), desc: t("home.discoverDesc") },
-          ].map(({ href, icon: Icon, color, title, desc }) => (
-            <Link key={href} href={href}>
-              <div className="ai-card rounded-2xl p-3 md:p-5 text-center shadow-lg border backdrop-blur-sm bg-card/90 hover:bg-card transition-all">
-                <div className={`w-9 h-9 md:w-11 md:h-11 mx-auto mb-2 rounded-xl flex items-center justify-center ${
-                  color === "amber" ? "bg-amber-500/10" : color === "orange" ? "bg-orange-500/10" : "bg-rose-500/10"
-                }`}>
-                  <Icon className={`w-4 h-4 md:w-5 md:h-5 ${
-                    color === "amber" ? "text-amber-600" : color === "orange" ? "text-orange-500" : "text-rose-500"
-                  }`} />
+        {/* Desktop Quick Access */}
+        <div className="px-4 md:px-6 mt-4">
+          <div className="grid grid-cols-2 gap-2.5">
+            <Link href="/discover">
+              <div className="relative overflow-hidden rounded-2xl p-4 flex items-center gap-3 bg-gradient-to-br from-orange-500/90 to-rose-600/90 hover:opacity-90 transition-opacity">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <Compass className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-[11px] md:text-sm font-bold mb-0.5 line-clamp-1">{title}</h3>
-                <p className="text-[9px] md:text-[11px] text-muted-foreground line-clamp-2 leading-tight hidden sm:block">{desc}</p>
+                <div>
+                  <p className="text-white font-bold text-sm leading-tight">{t("home.discoverTitle")}</p>
+                  <p className="text-white/70 text-[10px] mt-0.5">{t("home.discoverDesc")}</p>
+                </div>
               </div>
             </Link>
-          ))}
+            <Link href="/studio">
+              <div className="relative overflow-hidden rounded-2xl p-4 flex items-center gap-3 bg-gradient-to-br from-violet-600/90 to-indigo-700/90 hover:opacity-90 transition-opacity">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <PenTool className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-sm leading-tight">{t("home.aiStudioTitle")}</p>
+                  <p className="text-white/70 text-[10px] mt-0.5">{t("home.aiStudioDesc")}</p>
+                </div>
+              </div>
+            </Link>
+          </div>
         </div>
-      </div>
 
-      {/* ===== Top Up Banner ===== */}
-      <div className="px-4 md:px-6 mt-6">
-        <Link href="/recharge">
-          <div className="relative bg-gradient-to-r from-orange-600 to-amber-500 rounded-2xl p-5 md:p-6 overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-orange-500/10 transition-shadow">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-4 -translate-x-4" />
-            <div className="relative z-10 flex items-center justify-between">
-              <div>
-                <h3 className="text-white font-bold text-base mb-1">{t("home.recharge")}</h3>
-                <p className="text-white/70 text-xs md:text-sm">{t("home.rechargeDesc")}</p>
-              </div>
-              <Button variant="secondary" size="sm" className="rounded-full text-xs shrink-0">
-                {t("home.rechargeNow")}
-              </Button>
-            </div>
-          </div>
-        </Link>
-      </div>
+        {/* Desktop Daily Check-in */}
+        {session?.user && <DailyCheckIn />}
 
-      {/* ===== Daily Check-in (logged in users) ===== */}
-      {session?.user && <DailyCheckIn />}
+        {/* Desktop Continue Watching */}
+        {session?.user && <ContinueWatching />}
 
-      {/* ===== Continue Watching ===== */}
-      {session?.user && <ContinueWatching />}
-
-      {/* ===== Hot Picks (series with episodes) ===== */}
+      {/* ===== Hot Picks (series with episodes) - Desktop only ===== */}
       {hotPicks.length > 0 && (
-        <div className="px-4 md:px-6 mt-8 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg md:text-xl font-bold">{t("home.hotPicks")}</h2>
-            <Link href="/discover" className="text-xs text-muted-foreground hover:text-primary transition-colors">
-              {t("home.exploreNow")} &rarr;
+        <div className="mt-6 mb-2">
+          <div className="flex items-center justify-between mb-3 px-4 md:px-6">
+            <h2 className="text-base font-bold flex items-center gap-1.5">
+              <span className="text-primary">🔥</span> {t("home.hotPicks")}
+            </h2>
+            <Link href="/discover" className="text-[11px] text-muted-foreground hover:text-primary transition-colors font-medium">
+              {t("home.seeAll")} →
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-            {hotPicks.map((series) => (
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 px-4 md:px-6">
+            {hotPicks.slice(0, 9).map((series, index) => (
               <Link key={series.id} href={`/series/${series.id}`}>
-                <div className="group relative aspect-[9/16] rounded-2xl overflow-hidden bg-muted
-                                hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 hover:scale-[1.02]">
+                <div className="group relative aspect-[2/3] rounded-xl overflow-hidden bg-muted hover:shadow-lg transition-all duration-300 hover:scale-[1.03]">
                   {(series.coverTall || series.coverUrl) ? (
                     <Image
                       src={series.coverTall || series.coverUrl!}
                       alt={series.title}
                       fill
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                      sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 20vw"
                     />
                   ) : (
-                    <div className={`w-full h-full bg-gradient-to-br ${getGenreGradient(series.genre)} flex flex-col items-center justify-center gap-2 px-3`}>
-                      <Play className="w-8 h-8 text-white/40" />
-                      <span className="text-white/50 text-xs text-center font-medium line-clamp-2">{series.title}</span>
+                    <div className={`w-full h-full bg-gradient-to-br ${getGenreGradient(series.genre)} flex items-center justify-center`}>
+                      <Play className="w-6 h-6 text-white/40" />
                     </div>
                   )}
-                  <div className="absolute top-2 right-2">
-                    <Badge className="text-[10px] px-1.5 py-0.5 bg-black/50 text-white border-none backdrop-blur-sm">
-                      {series.status === "active" ? t("common.ongoing") : t("common.completed")}
-                    </Badge>
+                  {/* Rank badge top-left */}
+                  <div className="absolute top-1.5 left-1.5">
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black ${
+                      index < 3 ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow" : "bg-black/50 text-white/80 backdrop-blur-sm"
+                    }`}>
+                      {index + 1}
+                    </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0
-                                  bg-gradient-to-t from-black/80 via-black/40 to-transparent
-                                  px-3 pt-10 pb-3">
-                    <h3 className="text-white font-bold text-xs md:text-sm leading-tight line-clamp-2 mb-0.5">
-                      {series.title}
-                    </h3>
-                    <p className="text-white/60 text-[10px] md:text-xs">
-                      {t("home.episodeCount", { count: series.episodeCount })}
-                    </p>
+                  {/* Title overlay */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent px-2 pt-6 pb-2">
+                    <h3 className="text-white font-semibold text-[9px] leading-tight line-clamp-2">{series.title}</h3>
                   </div>
                 </div>
               </Link>
@@ -410,9 +358,9 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* ===== Dev Tools Banner (Desktop only) ===== */}
+      {/* ===== Dev Tools Banner ===== */}
       {session?.user && (
-        <div className="hidden md:block px-4 md:px-6 mt-6">
+        <div className="px-4 md:px-6 mt-6">
           <Link href="/developer">
             <div className="relative bg-gradient-to-r from-slate-800 to-slate-700 rounded-2xl p-4 overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-slate-500/10 transition-shadow group">
               <div className="relative z-10 flex items-center justify-between">
@@ -448,6 +396,8 @@ export default async function HomePage() {
           </p>
         </div>
       </div>
+
+      </div>{/* End desktop-only wrapper */}
     </div>
   )
 }
