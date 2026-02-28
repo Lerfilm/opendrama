@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Coins, CreditCard, History, Star, Settings, Play, PenTool, Video, Code } from "@/components/icons"
+import { Coins, CreditCard, History, Star, Settings, Play, PenTool, Code } from "@/components/icons"
 import { createT, getLocaleAsync } from "@/lib/i18n"
 // Developer mode is open to all logged-in users
 import prisma from "@/lib/prisma"
@@ -37,22 +37,35 @@ export default async function ProfilePage() {
   ])
   const availableCoins = userBalance ? userBalance.balance - userBalance.reserved : 0
 
-  const menuItems = [
-    { icon: Play, label: t("history.title"), href: "/history", badge: watchCount > 0 ? `${watchCount}` : null },
-    { icon: CreditCard, label: t("profile.rechargeCoins"), href: "/recharge" },
-    { icon: History, label: t("profile.purchaseHistory"), href: "/purchases" },
-    { icon: Star, label: t("profile.cardCollection"), href: "/cards", badge: cardCount > 0 ? `${cardCount}` : null },
-    { icon: PenTool, label: t("studio.myScripts"), href: "/studio", badge: scriptCount > 0 ? `${scriptCount}` : null },
-    { icon: Settings, label: t("profile.settings"), href: "/settings" },
+  const menuSections = [
+    {
+      title: t("profile.sectionWatching"),
+      items: [
+        { icon: Play, label: t("history.title"), href: "/history", badge: watchCount > 0 ? `${watchCount}` : null },
+        { icon: Star, label: t("profile.cardCollection"), href: "/cards", badge: cardCount > 0 ? `${cardCount}` : null },
+      ],
+    },
+    {
+      title: t("profile.sectionWallet"),
+      items: [
+        { icon: Coins, label: t("profile.rechargeCoins"), href: "/recharge", badge: null },
+        { icon: CreditCard, label: t("profile.purchaseHistory"), href: "/purchases", badge: null },
+      ],
+    },
+    {
+      title: t("profile.sectionCreation"),
+      items: [
+        { icon: PenTool, label: t("studio.myScripts"), href: "/studio", badge: scriptCount > 0 ? `${scriptCount}` : null },
+      ],
+    },
+    {
+      title: t("profile.sectionSettings"),
+      items: [
+        { icon: Settings, label: t("profile.settings"), href: "/settings", badge: null },
+        { icon: Code, label: t("profile.developerMode"), href: "/developer", badge: null },
+      ],
+    },
   ]
-
-  // Developer Mode entry — open to all users
-  menuItems.push({
-    icon: Code,
-    label: t("profile.developerMode"),
-    href: "/developer",
-    badge: null,
-  })
 
   return (
     <div className="p-4 space-y-6">
@@ -121,45 +134,52 @@ export default async function ProfilePage() {
         </Card>
       </div>
 
-      {/* 菜单列表 */}
-      <Card>
-        <CardContent className="p-0">
-          {menuItems.map(({ icon: Icon, label, href, badge }, index) => (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center justify-between p-4 hover:bg-accent transition-colors ${
-                index < menuItems.length - 1 ? "border-b" : ""
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Icon className="w-5 h-5 text-muted-foreground" />
-                <span className="font-medium">{label}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {badge && (
-                  <Badge variant="secondary" className="text-xs">
-                    {badge}
-                  </Badge>
-                )}
-                <svg
-                  className="w-5 h-5 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+      {/* 分组菜单 */}
+      {menuSections.map((section) => (
+        <div key={section.title}>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-2">
+            {section.title}
+          </h3>
+          <Card>
+            <CardContent className="p-0">
+              {section.items.map(({ icon: Icon, label, href, badge }, index) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center justify-between p-4 hover:bg-accent transition-colors ${
+                    index < section.items.length - 1 ? "border-b" : ""
+                  }`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </div>
-            </Link>
-          ))}
-        </CardContent>
-      </Card>
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-5 h-5 text-muted-foreground" />
+                    <span className="font-medium">{label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {badge && (
+                      <Badge variant="secondary" className="text-xs">
+                        {badge}
+                      </Badge>
+                    )}
+                    <svg
+                      className="w-5 h-5 text-muted-foreground"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </div>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      ))}
 
       <form
         action={async () => {

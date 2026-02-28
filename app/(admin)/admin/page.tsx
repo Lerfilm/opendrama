@@ -48,10 +48,10 @@ export default async function AdminDashboardPage() {
   ]
 
   const quickActions = [
-    { href: "/admin/series/new", label: "Create New Series", desc: "Add a new drama series with episodes", icon: "🎬" },
-    { href: "/admin/cards/new", label: "Create New Card", desc: "Add a collectible card to the pool", icon: "🃏" },
-    { href: "/admin/analytics", label: "View Analytics", desc: "User growth, revenue trends, funnel", icon: "📊" },
     { href: "/admin/series", label: "Manage Series", desc: "Publish, unpublish, or delete series", icon: "📺" },
+    { href: "/admin/cards", label: "Manage Cards", desc: "View and manage collectible cards", icon: "🃏" },
+    { href: "/admin/analytics", label: "View Analytics", desc: "User growth, revenue trends, funnel", icon: "📊" },
+    { href: "/admin/users", label: "Manage Users", desc: "Search users, grant tokens", icon: "👥" },
   ]
 
   return (

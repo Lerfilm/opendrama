@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Compass, PenTool, Play, User } from "@/components/icons"
+import { Home, Compass, PenTool, Sparkles, User } from "@/components/icons"
 import { t } from "@/lib/i18n"
 
 export function BottomNav() {
@@ -13,10 +13,10 @@ export function BottomNav() {
 
   const navItems = [
     { key: "home", href: "/", icon: Home, label: t("nav.home"), accent: false },
-    { key: "create", href: "/studio", icon: PenTool, label: t("nav.create"), accent: false },
-    { key: "watch", href: "/discover", icon: Play, label: t("nav.watch"), accent: true },
     { key: "discover", href: "/discover", icon: Compass, label: t("nav.discover"), accent: false },
-    { key: "profile", href: "/profile", icon: User, label: t("nav.profile"), accent: false },
+    { key: "create", href: "/studio", icon: PenTool, label: t("nav.create"), accent: true },
+    { key: "cards", href: "/cards", icon: Sparkles, label: t("nav.cards"), accent: false },
+    { key: "profile", href: "/profile", icon: User, label: t("nav.me"), accent: false },
   ]
 
   return (

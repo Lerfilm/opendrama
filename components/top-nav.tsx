@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Compass, PenTool, Film, Coins } from "@/components/icons"
+import { Home, Compass, PenTool, Film, Coins, Sparkles } from "@/components/icons"
 import { t } from "@/lib/i18n"
 
 const navKeys = [
   { href: "/", icon: Home, key: "nav.home" },
   { href: "/discover", icon: Compass, key: "nav.discover" },
   { href: "/studio", icon: PenTool, key: "nav.create" },
-  { href: "/generate", icon: Film, key: "nav.theater" },
+  { href: "/cards", icon: Sparkles, key: "nav.cards" },
 ]
 
 interface UserData {

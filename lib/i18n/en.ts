@@ -25,7 +25,16 @@ const en: Record<string, string> = {
   // Nav
   "nav.home": "Home",
   "nav.discover": "Discover",
+  "nav.create": "Create",
+  "nav.cards": "Cards",
+  "nav.me": "Me",
   "nav.profile": "Profile",
+
+  // Profile Sections
+  "profile.sectionWatching": "Watching",
+  "profile.sectionWallet": "Wallet",
+  "profile.sectionCreation": "Creation",
+  "profile.sectionSettings": "Settings",
 
   // Home
   "home.greeting": "Hello, {name}",
@@ -332,11 +341,6 @@ const en: Record<string, string> = {
   "rarity.epic": "Epic",
   "rarity.legendary": "Legendary",
   "rarity.limited": "Limited",
-
-  // Nav
-  "nav.create": "Create",
-  "nav.theater": "Theater",
-  "nav.watch": "Watch",
 
   // Discover
   "discover.search": "Search series...",

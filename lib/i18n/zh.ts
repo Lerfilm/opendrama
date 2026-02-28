@@ -25,7 +25,16 @@ const zh = {
   // Nav
   "nav.home": "首页",
   "nav.discover": "发现",
+  "nav.create": "创作",
+  "nav.cards": "卡牌",
+  "nav.me": "我的",
   "nav.profile": "我的",
+
+  // Profile Sections
+  "profile.sectionWatching": "观看",
+  "profile.sectionWallet": "钱包",
+  "profile.sectionCreation": "创作",
+  "profile.sectionSettings": "设置",
 
   // Home
   "home.greeting": "你好，{name}",
@@ -332,11 +341,6 @@ const zh = {
   "rarity.epic": "史诗",
   "rarity.legendary": "传说",
   "rarity.limited": "限定",
-
-  // Nav (新增)
-  "nav.create": "创作",
-  "nav.theater": "剧场",
-  "nav.watch": "看剧",
 
   // Discover (完善)
   "discover.search": "搜索剧集...",

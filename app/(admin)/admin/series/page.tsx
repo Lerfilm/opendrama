@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Edit, Trash2 } from "@/components/icons"
+import { Edit, Trash2 } from "@/components/icons"
 import Link from "next/link"
 import { t } from "@/lib/i18n"
 
@@ -80,17 +80,9 @@ export default function AdminSeriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">{t("admin.series.title")}</h1>
-          <p className="text-muted-foreground">{t("admin.series.desc")}</p>
-        </div>
-        <Link href="/admin/series/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            {t("admin.series.create")}
-          </Button>
-        </Link>
+      <div>
+        <h1 className="text-3xl font-bold mb-2">{t("admin.series.title")}</h1>
+        <p className="text-muted-foreground">{t("admin.series.desc")}</p>
       </div>
 
       {/* Search bar */}
