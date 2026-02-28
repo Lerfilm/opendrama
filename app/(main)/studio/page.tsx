@@ -4,7 +4,8 @@ import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Code } from "@/components/icons"
+import { CheckCircle, Code, Plus } from "@/components/icons"
+import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { createT, getLocaleAsync } from "@/lib/i18n"
 
@@ -42,6 +43,12 @@ export default async function StudioPage() {
     <div className="space-y-6 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t("studio.title")}</h1>
+        <Link href="/studio/script/new">
+          <Button size="sm" className="rounded-full">
+            <Plus className="w-4 h-4 mr-1" />
+            {t("studio.newScript")}
+          </Button>
+        </Link>
       </div>
 
       {/* Pro Workspace Banner (Desktop only) */}

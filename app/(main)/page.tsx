@@ -39,10 +39,8 @@ export default async function HomePage() {
       coverWide: true,
       genre: true,
       tags: true,
-      description: true,
       viewCount: true,
       status: true,
-      viewCount: true,
       createdAt: true,
       episodes: {
         select: { id: true },
@@ -54,9 +52,6 @@ export default async function HomePage() {
 
   const seriesWithCount = seriesList.map((s) => ({
     ...s,
-    coverUrl: resolveImageUrl(s.coverUrl),
-    coverTall: resolveImageUrl(s.coverTall),
-    coverWide: resolveImageUrl(s.coverWide),
     episodeCount: s.episodes.length,
     // Resolve all image URLs through the R2 proxy so they work globally
     coverUrl: resolveImageUrl(s.coverUrl),
