@@ -4,7 +4,7 @@ import { isAdmin } from "@/lib/admin"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Home, Film, Sparkles, BarChart3, Coins, Users, MessageCircle, Download } from "@/components/icons"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 
 export default async function AdminLayout({
   children,
@@ -20,13 +20,15 @@ export default async function AdminLayout({
     redirect("/")
   }
 
+  const t = createT(await getLocaleAsync())
+
   const navItems = [
     { href: "/admin", icon: Home, label: t("admin.overview") },
     { href: "/admin/series", icon: Film, label: t("admin.seriesManagement") },
     { href: "/admin/cards", icon: Sparkles, label: t("admin.cardManagement") },
     { href: "/admin/analytics", icon: BarChart3, label: t("admin.analytics") },
-    { href: "/admin/ai-pricing", icon: Coins, label: "AI Pricing" },
-    { href: "/admin/auto-twitter", icon: Download, label: "Auto-Twitter" },
+    { href: "/admin/ai-pricing", icon: Coins, label: t("admin.aiPricing") },
+    { href: "/admin/auto-twitter", icon: Download, label: t("admin.autoTwitter") },
     { href: "/admin/users", icon: Users, label: t("admin.userManagement") },
     { href: "/admin/feedback", icon: MessageCircle, label: t("admin.feedbackManagement") },
   ]

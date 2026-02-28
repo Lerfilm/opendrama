@@ -145,7 +145,7 @@ export default async function SettingsPage() {
                 <p className="text-xs text-muted-foreground">{t("settings.devToolsDesc")}</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-medium uppercase tracking-wider">Desktop</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-medium uppercase tracking-wider">{t("settings.desktop")}</span>
                 <span className="text-sm text-primary">→</span>
               </div>
             </div>

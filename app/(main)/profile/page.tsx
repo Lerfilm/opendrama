@@ -61,14 +61,14 @@ export default async function ProfilePage() {
       title: t("profile.sectionCreation"),
       items: [
         { icon: PenTool, label: t("studio.myScripts"), href: "/studio", badge: scriptCount > 0 ? `${scriptCount}` : null },
-        ...(devModeOn ? [{ icon: Monitor, label: "Dev Dashboard", href: "/dev", badge: null }] : []),
+        ...(devModeOn ? [{ icon: Monitor, label: t("profile.devDashboard"), href: "/dev", badge: null }] : []),
       ],
     },
     // Admin section — only visible to admins
     ...(userIsAdmin ? [{
-      title: "Admin",
+      title: t("profile.adminSection"),
       items: [
-        { icon: Shield, label: "Admin Panel", href: "/admin", badge: null },
+        { icon: Shield, label: t("profile.adminPanel"), href: "/admin", badge: null },
       ],
     }] : []),
     {

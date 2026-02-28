@@ -41,14 +41,14 @@ export default function AdminSeriesPage() {
   useEffect(() => { fetchSeries() }, [])
 
   async function handleDelete(id: string, title: string) {
-    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return
+    if (!confirm(t("admin.series.deleteConfirm", { title }))) return
     setDeletingId(id)
     try {
       const res = await fetch(`/api/admin/series/${id}`, { method: "DELETE" })
       if (res.ok) {
         setSeriesList(prev => prev.filter(s => s.id !== id))
       } else {
-        alert("Delete failed")
+        alert(t("admin.series.deleteFailed"))
       }
     } finally {
       setDeletingId(null)
@@ -67,7 +67,7 @@ export default function AdminSeriesPage() {
       if (res.ok) {
         setSeriesList(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
       } else {
-        alert("Update failed")
+        alert(t("admin.series.updateFailed"))
       }
     } finally {
       setTogglingId(null)
@@ -91,19 +91,19 @@ export default function AdminSeriesPage() {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search series by title..."
+          placeholder={t("admin.series.searchPlaceholder")}
           className="h-9 px-3 rounded-md border text-sm focus:outline-none focus:ring-1 focus:ring-primary"
           style={{ minWidth: 260 }}
         />
-        <span className="text-sm text-muted-foreground">{filtered.length} series</span>
+        <span className="text-sm text-muted-foreground">{t("admin.series.seriesCount", { count: filtered.length })}</span>
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-muted-foreground text-sm">Loading...</div>
+        <div className="py-12 text-center text-muted-foreground text-sm">{t("common.loading")}</div>
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center text-muted-foreground">
-            {search ? `No series matching "${search}"` : t("admin.series.noSeries")}
+            {search ? t("admin.series.noMatch", { query: search }) : t("admin.series.noSeries")}
           </CardContent>
         </Card>
       ) : (
@@ -139,7 +139,7 @@ export default function AdminSeriesPage() {
                       onClick={() => handleToggleStatus(series.id, series.status)}
                       disabled={togglingId === series.id}
                     >
-                      {togglingId === series.id ? "..." : series.status === "active" ? "Unpublish" : "Publish"}
+                      {togglingId === series.id ? "..." : series.status === "active" ? t("admin.series.unpublish") : t("admin.series.publish")}
                     </Button>
                     <Link href={`/admin/series/${series.id}`}>
                       <Button variant="outline" size="sm">

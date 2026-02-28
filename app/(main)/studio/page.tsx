@@ -40,7 +40,7 @@ export default async function StudioPage() {
               <Sparkles className="w-5 h-5 text-violet-400" />
               {t("studio.title")}
             </h1>
-            <p className="text-white/40 text-xs mt-0.5">Script → Video in minutes</p>
+            <p className="text-white/40 text-xs mt-0.5">{t("studio.tagline")}</p>
           </div>
           <Link href="/studio/script/new">
             <div className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-lg shadow-violet-500/20">
@@ -76,10 +76,10 @@ export default async function StudioPage() {
         {/* Pipeline Visualization */}
         <div className="mb-6 flex items-center justify-between px-2">
           {[
-            { icon: PenTool, label: "Script", done: true },
-            { icon: Users, label: "Cast", done: true },
-            { icon: Video, label: "Video", done: false },
-            { icon: Send, label: "Publish", done: false },
+            { icon: PenTool, label: t("studio.pipelineScript"), done: true },
+            { icon: Users, label: t("studio.pipelineCast"), done: true },
+            { icon: Video, label: t("studio.pipelineVideo"), done: false },
+            { icon: Send, label: t("studio.pipelinePublish"), done: false },
           ].map((step, i) => (
             <div key={i} className="flex items-center gap-1">
               <div className="flex flex-col items-center gap-1">

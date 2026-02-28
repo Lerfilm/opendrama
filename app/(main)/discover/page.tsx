@@ -183,7 +183,7 @@ export default async function DiscoverPage({
           <div className="mb-8">
             <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
               <span>✨</span>
-              <span>{t("home.newArrivals") !== "home.newArrivals" ? t("home.newArrivals") : "New Arrivals"}</span>
+              <span>{t("home.newArrivals")}</span>
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {finalNewArrivals.map((series) => {

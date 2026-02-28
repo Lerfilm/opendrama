@@ -2,10 +2,12 @@ export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Film, Users, Coins, Sparkles } from "@/components/icons"
-import { t } from "@/lib/i18n"
+import { createT, getLocaleAsync } from "@/lib/i18n"
 import Link from "next/link"
 
 export default async function AdminDashboardPage() {
+  const t = createT(await getLocaleAsync())
+
   const stats = await Promise.all([
     prisma.series.count(),
     prisma.episode.count(),
@@ -48,10 +50,10 @@ export default async function AdminDashboardPage() {
   ]
 
   const quickActions = [
-    { href: "/admin/series", label: "Manage Series", desc: "Publish, unpublish, or delete series", icon: "📺" },
-    { href: "/admin/cards", label: "Manage Cards", desc: "View and manage collectible cards", icon: "🃏" },
-    { href: "/admin/analytics", label: "View Analytics", desc: "User growth, revenue trends, funnel", icon: "📊" },
-    { href: "/admin/users", label: "Manage Users", desc: "Search users, grant tokens", icon: "👥" },
+    { href: "/admin/series", label: t("admin.manageSeriesLabel"), desc: t("admin.manageSeriesDesc"), icon: "📺" },
+    { href: "/admin/cards", label: t("admin.manageCardsLabel"), desc: t("admin.manageCardsDesc"), icon: "🃏" },
+    { href: "/admin/analytics", label: t("admin.viewAnalyticsLabel"), desc: t("admin.viewAnalyticsDesc"), icon: "📊" },
+    { href: "/admin/users", label: t("admin.manageUsersLabel"), desc: t("admin.manageUsersDesc"), icon: "👥" },
   ]
 
   return (

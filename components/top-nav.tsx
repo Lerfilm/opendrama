@@ -88,12 +88,12 @@ export function TopNav() {
               </Link>
             )}
             {userData.isDevMode && (
-              <Link href="/dev" className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors" title="Dev Dashboard">
+              <Link href="/dev" className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors" title={t("profile.devDashboard")}>
                 <Monitor className="w-4 h-4 text-emerald-500" />
               </Link>
             )}
             {userData.isAdmin && (
-              <Link href="/admin" className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/10 hover:bg-blue-500/20 transition-colors" title="Admin Panel">
+              <Link href="/admin" className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/10 hover:bg-blue-500/20 transition-colors" title={t("profile.adminPanel")}>
                 <Shield className="w-4 h-4 text-blue-500" />
               </Link>
             )}
