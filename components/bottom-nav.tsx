@@ -8,6 +8,9 @@ import { t } from "@/lib/i18n"
 export function BottomNav() {
   const pathname = usePathname()
 
+  // Dark pages use transparent dark nav
+  const isDarkPage = pathname === "/discover" || pathname.startsWith("/discover") || pathname === "/studio" || pathname.startsWith("/studio")
+
   const navItems = [
     { key: "home", href: "/", icon: Home, label: t("nav.home"), accent: false },
     { key: "create", href: "/studio", icon: PenTool, label: t("nav.create"), accent: false },
@@ -17,7 +20,11 @@ export function BottomNav() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t border-border/50 safe-area-inset-bottom z-50 md:hidden">
+    <nav className={`fixed bottom-0 left-0 right-0 backdrop-blur-md border-t safe-area-inset-bottom z-50 md:hidden ${
+      isDarkPage
+        ? "bg-black/70 border-white/5"
+        : "bg-background/80 border-border/50"
+    }`}>
       <div className="flex items-center justify-around h-16 max-w-screen-lg mx-auto">
         {navItems.map(({ key, href, icon: Icon, label, accent }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href))
@@ -26,18 +33,26 @@ export function BottomNav() {
               key={key}
               href={href}
               className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-                accent && !isActive
-                  ? "text-primary/70 hover:text-primary"
-                  : isActive
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
+                isDarkPage
+                  ? isActive
+                    ? "text-purple-400"
+                    : "text-white/30 hover:text-white/60"
+                  : accent && !isActive
+                    ? "text-primary/70 hover:text-primary"
+                    : isActive
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {accent ? (
                 <div className={`p-2 rounded-full -mt-5 ${
-                  isActive
-                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
-                    : "bg-primary/10 text-primary animate-pulse-glow"
+                  isDarkPage
+                    ? isActive
+                      ? "bg-purple-500 text-white shadow-lg shadow-purple-500/30"
+                      : "bg-purple-500/20 text-purple-300"
+                    : isActive
+                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                      : "bg-primary/10 text-primary animate-pulse-glow"
                 }`}>
                   <Icon className="w-5 h-5" />
                 </div>
@@ -45,7 +60,7 @@ export function BottomNav() {
                 <div className="relative flex flex-col items-center">
                   <Icon className="w-5 h-5 mb-1" />
                   {isActive && (
-                    <span className="absolute -bottom-1 w-1 h-1 rounded-full bg-primary" />
+                    <span className={`absolute -bottom-1 w-1 h-1 rounded-full ${isDarkPage ? "bg-purple-400" : "bg-primary"}`} />
                   )}
                 </div>
               )}

@@ -44,7 +44,7 @@ export default function HeroCarousel({ items }: { items: FeaturedSeries[] }) {
   const heroImage = series.coverWide || series.coverUrl
 
   return (
-    <div className="relative w-full aspect-[16/9] sm:aspect-[2/1] max-h-[280px] sm:max-h-[320px] rounded-2xl overflow-hidden group">
+    <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] max-h-[240px] sm:max-h-[300px] rounded-2xl overflow-hidden group">
       {/* Background image or gradient */}
       {heroImage ? (
         <Image

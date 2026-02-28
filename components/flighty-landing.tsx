@@ -127,23 +127,38 @@ function AnimatedSection({ children, className = "", delay = 0 }: { children: Re
   )
 }
 
+// ── AI-Generated Asset URLs ──
+const AI_CARDS = {
+  common: "/api/r2/covers/system/1772282438716-landing_card-common.png",
+  rare: "/api/r2/covers/system/1772282458135-landing_card-rare.png",
+  epic: "/api/r2/covers/system/1772282477430-landing_card-epic.png",
+  legendary: "/api/r2/covers/system/1772282495529-landing_card-legendary.png",
+}
+
+const AI_PIPELINE = {
+  script: "/api/r2/covers/system/1772282057601-landing_pipeline-script.png",
+  cast: "/api/r2/covers/system/1772282070972-landing_pipeline-cast.png",
+  video: "/api/r2/covers/system/1772282084856-landing_pipeline-video.png",
+  publish: "/api/r2/covers/system/1772282101279-landing_pipeline-publish.png",
+}
+
 // ── Pipeline Step Icon ──
-function PipelineIcon({ icon: Icon, label, done, active }: {
-  icon: React.ComponentType<{ className?: string }>
+function PipelineIcon({ imgSrc, label, done, active }: {
+  imgSrc: string
   label: string
   done: boolean
   active: boolean
 }) {
   return (
     <div className="flex-1 flex flex-col items-center gap-1.5">
-      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+      <div className={`w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-500 ${
         done
-          ? "bg-violet-500/30 border-2 border-violet-400/50 shadow-lg shadow-violet-500/20"
+          ? "border-2 border-violet-400/50 shadow-lg shadow-violet-500/20"
           : active
-            ? "bg-violet-500/20 border-2 border-violet-500/30 animate-pulse"
-            : "bg-white/5 border border-white/10"
+            ? "border-2 border-violet-500/30 animate-pulse"
+            : "border border-white/10 opacity-50"
       }`}>
-        <Icon className={`w-5 h-5 ${done ? "text-violet-300" : active ? "text-violet-400" : "text-white/30"}`} />
+        <Image src={imgSrc} alt={label} width={48} height={48} className="w-full h-full object-cover" />
       </div>
       <span className={`text-[9px] font-semibold ${done ? "text-violet-300" : "text-white/40"}`}>{label}</span>
     </div>
@@ -586,15 +601,15 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
             <p className="text-white/35 text-sm leading-relaxed mb-6">
               {t("home.featureAIDesc") !== "home.featureAIDesc" ? t("home.featureAIDesc") : "Upload a PDF script. AI casts characters, scouts locations, generates video segments — all automatically."}
             </p>
-            {/* Pipeline visualization with SVG icons */}
+            {/* Pipeline visualization with AI-generated icons */}
             <div className="flex items-start justify-between">
-              <PipelineIcon icon={PenTool} label="Script" done={true} active={false} />
+              <PipelineIcon imgSrc={AI_PIPELINE.script} label="Script" done={true} active={false} />
               <PipelineArrow />
-              <PipelineIcon icon={Users} label="Cast" done={true} active={false} />
+              <PipelineIcon imgSrc={AI_PIPELINE.cast} label="Cast" done={true} active={false} />
               <PipelineArrow />
-              <PipelineIcon icon={Video} label="Video" done={false} active={true} />
+              <PipelineIcon imgSrc={AI_PIPELINE.video} label="Video" done={false} active={true} />
               <PipelineArrow />
-              <PipelineIcon icon={Send} label="Publish" done={false} active={false} />
+              <PipelineIcon imgSrc={AI_PIPELINE.publish} label="Publish" done={false} active={false} />
             </div>
           </div>
         </AnimatedSection>
@@ -614,32 +629,19 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
             <p className="text-white/35 text-sm leading-relaxed mb-5">
               {t("home.featureCardsDesc") !== "home.featureCardsDesc" ? t("home.featureCardsDesc") : "Every drama has collectible character cards. Common, Rare, Epic, Legendary — unlock them by watching."}
             </p>
-            {/* Card rarity showcase */}
+            {/* Card rarity showcase — AI-generated images */}
             <div className="flex gap-2.5">
               {[
-                { rarity: "Common", from: "from-slate-400", to: "to-slate-600", border: "border-slate-400/30", shadow: "shadow-slate-400/10" },
-                { rarity: "Rare", from: "from-blue-400", to: "to-blue-600", border: "border-blue-400/30", shadow: "shadow-blue-400/10" },
-                { rarity: "Epic", from: "from-purple-400", to: "to-purple-600", border: "border-purple-400/30", shadow: "shadow-purple-400/10" },
-                { rarity: "Legend", from: "from-amber-400", to: "to-orange-500", border: "border-amber-400/30", shadow: "shadow-amber-400/20" },
+                { rarity: "Common", src: AI_CARDS.common, border: "border-slate-400/30", shadow: "shadow-slate-400/10" },
+                { rarity: "Rare", src: AI_CARDS.rare, border: "border-blue-400/30", shadow: "shadow-blue-400/10" },
+                { rarity: "Epic", src: AI_CARDS.epic, border: "border-purple-400/30", shadow: "shadow-purple-400/10" },
+                { rarity: "Legend", src: AI_CARDS.legendary, border: "border-amber-400/30", shadow: "shadow-amber-400/20" },
               ].map((card, i) => (
                 <div key={i} className="flex-1">
-                  <div className={`aspect-[3/4] rounded-xl bg-gradient-to-br ${card.from} ${card.to} border ${card.border} shadow-lg ${card.shadow} flex flex-col items-center justify-center relative overflow-hidden`}>
-                    {/* Shine effect */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent opacity-50" />
-                    {/* Inner content */}
-                    <div className="relative z-10 flex flex-col items-center">
-                      {i === 3 ? (
-                        <Crown className="w-5 h-5 text-white drop-shadow-lg" />
-                      ) : i === 2 ? (
-                        <Sparkles className="w-5 h-5 text-white drop-shadow-lg" />
-                      ) : i === 1 ? (
-                        <Star className="w-5 h-5 text-white drop-shadow-lg" />
-                      ) : (
-                        <Heart className="w-5 h-5 text-white drop-shadow-lg" />
-                      )}
-                    </div>
-                    {/* Bottom glow */}
-                    <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/30 to-transparent" />
+                  <div className={`aspect-[3/4] rounded-xl border ${card.border} shadow-lg ${card.shadow} relative overflow-hidden`}>
+                    <Image src={card.src} alt={card.rarity} fill className="object-cover" sizes="25vw" />
+                    {/* Shine overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-50" />
                   </div>
                   <p className="text-white/30 text-[8px] text-center mt-1.5 font-semibold">{card.rarity}</p>
                 </div>
