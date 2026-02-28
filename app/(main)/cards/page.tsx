@@ -2,13 +2,12 @@ export const dynamic = "force-dynamic";
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CARD_RARITIES, CardRarity } from "@/lib/cards"
 import { Sparkles } from "@/components/icons"
 import { createT, getLocaleAsync } from "@/lib/i18n"
-import { EmptyState } from "@/components/empty-state"
+import Link from "next/link"
+import { CardsTabs } from "./cards-tabs"
 
 export default async function CardsPage() {
   const session = await auth()
@@ -50,150 +49,117 @@ export default async function CardsPage() {
     return acc
   }, {} as Record<CardRarity, typeof userCards>)
 
+  // Rarity counts for stats
+  const rarityCounts = Object.entries(CARD_RARITIES).map(([rarity, info]) => ({
+    rarity,
+    name: info.name,
+    dotColor: info.dotColor,
+    count: (cardsByRarity[rarity as CardRarity] || []).length,
+  }))
+
+  const collectionPercent = allCards.length > 0
+    ? Math.round((userCards.length / allCards.length) * 100)
+    : 0
+
   return (
-    <div className="p-4 pb-20">
-      <div className="max-w-screen-sm mx-auto space-y-6">
-        <Card className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
+    <div className="-mx-4 md:-mx-6 -mt-4 md:-mt-6 min-h-screen bg-gradient-to-b from-purple-950 via-[#1a0a2e] to-black text-white">
+      <div className="px-4 pt-4 pb-24 md:px-6 md:pt-6 max-w-screen-lg mx-auto">
+
+        {/* Header Stats */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Sparkles className="w-6 h-6 text-purple-300" />
+            <h1 className="text-xl font-bold">{t("cards.collection")}</h1>
+          </div>
+
+          {/* Stats Banner */}
+          <div className="rounded-2xl bg-white/5 ring-1 ring-white/10 p-4">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-sm opacity-90 mb-1">{t("cards.myCollection")}</p>
+                <p className="text-xs text-white/50 mb-0.5">{t("cards.myCollection")}</p>
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-8 h-8" />
-                  <span className="text-4xl font-bold">
-                    {userCards.length}
-                  </span>
+                  <span className="text-3xl font-bold">{userCards.length}</span>
+                  <span className="text-sm text-white/40">/ {allCards.length}</span>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs opacity-75">{t("cards.collectionProgress")}</p>
-                <p className="text-2xl font-bold">
-                  {allCards.length > 0
-                    ? Math.round(
-                        (userCards.length / allCards.length) * 100
-                      )
-                    : 0}
-                  %
-                </p>
+                <p className="text-xs text-white/50 mb-0.5">{t("cards.collectionProgress")}</p>
+                <p className="text-2xl font-bold text-purple-300">{collectionPercent}%</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Tabs defaultValue="collection" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="collection">{t("cards.collection")}</TabsTrigger>
-            <TabsTrigger value="gallery">{t("cards.gallery")}</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="collection" className="space-y-4 mt-4">
-            {userCards.length === 0 ? (
-              <EmptyState
-                icon={<Sparkles className="w-8 h-8" />}
-                title={t("cards.noCards")}
-                description={t("cards.noCardsHint")}
-                action={{ label: t("home.startWatch"), href: "/discover" }}
+            {/* Progress bar */}
+            <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all"
+                style={{ width: `${collectionPercent}%` }}
               />
-            ) : (
-              Object.entries(CARD_RARITIES).map(([rarity, info]) => {
-                const cards = cardsByRarity[rarity as CardRarity] || []
-                if (cards.length === 0) return null
-
-                return (
-                  <div key={rarity}>
-                    <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                      <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: info.dotColor }} /> {info.name} ({cards.length})
-                    </h3>
-                    <div className="grid grid-cols-3 gap-3">
-                      {cards.map((uc) => (
-                        <div key={uc.id} className="relative">
-                          <Card
-                            className={`overflow-hidden border-2 ${info.borderColor}`}
-                          >
-                            <CardContent className="p-0">
-                              <div className="relative aspect-[3/4]">
-                                <img
-                                  src={uc.card.imageUrl}
-                                  alt={uc.card.name}
-                                  className="w-full h-full object-cover"
-                                />
-                                <Badge
-                                  className={`absolute top-1 right-1 text-xs ${info.color}`}
-                                >
-                                  x{uc.quantity}
-                                </Badge>
-                              </div>
-                              <div className="p-2">
-                                <p className="text-xs font-medium line-clamp-1">
-                                  {uc.card.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground line-clamp-1">
-                                  {uc.card.series.title}
-                                </p>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </TabsContent>
-
-          <TabsContent value="gallery" className="mt-4">
-            <div className="grid grid-cols-3 gap-3">
-              {allCards.map((card) => {
-                const isOwned = userCardIds.has(card.id)
-                const rarityInfo =
-                  CARD_RARITIES[card.rarity as CardRarity]
-
-                return (
-                  <div key={card.id} className="relative">
-                    <Card
-                      className={`overflow-hidden border-2 ${
-                        rarityInfo?.borderColor
-                      } ${!isOwned ? "opacity-50" : ""}`}
-                    >
-                      <CardContent className="p-0">
-                        <div className="relative aspect-[3/4]">
-                          <img
-                            src={card.imageUrl}
-                            alt={card.name}
-                            className={`w-full h-full object-cover ${
-                              !isOwned ? "grayscale" : ""
-                            }`}
-                          />
-                          {rarityInfo && (
-                            <Badge
-                              className={`absolute top-1 right-1 text-xs ${rarityInfo.color}`}
-                            >
-                              <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: rarityInfo.dotColor }} />
-                            </Badge>
-                          )}
-                          {!isOwned && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs">
-                              {t("cards.notObtained")}
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-2">
-                          <p className="text-xs font-medium line-clamp-1">
-                            {card.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {card.series.title}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )
-              })}
             </div>
-          </TabsContent>
-        </Tabs>
+
+            {/* Rarity breakdown */}
+            <div className="flex items-center gap-4 mt-3">
+              {rarityCounts.map((rc) => (
+                <div key={rc.rarity} className="flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: rc.dotColor }} />
+                  <span className="text-[10px] text-white/50">{rc.name}</span>
+                  <span className="text-[10px] font-semibold text-white/80">{rc.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs: Collection / Gallery */}
+        <CardsTabs
+          userCards={userCards.map(uc => ({
+            id: uc.id,
+            quantity: uc.quantity,
+            card: {
+              id: uc.card.id,
+              name: uc.card.name,
+              rarity: uc.card.rarity,
+              imageUrl: uc.card.imageUrl,
+              seriesTitle: uc.card.series.title,
+            },
+          }))}
+          allCards={allCards.map(c => ({
+            id: c.id,
+            name: c.name,
+            rarity: c.rarity,
+            imageUrl: c.imageUrl,
+            seriesTitle: c.series.title,
+            isOwned: userCardIds.has(c.id),
+          }))}
+          cardsByRarity={Object.fromEntries(
+            Object.entries(CARD_RARITIES).map(([rarity, info]) => [
+              rarity,
+              {
+                name: info.name,
+                dotColor: info.dotColor,
+                borderColor: info.borderColor,
+                color: info.color,
+                cards: (cardsByRarity[rarity as CardRarity] || []).map(uc => ({
+                  id: uc.id,
+                  quantity: uc.quantity,
+                  card: {
+                    id: uc.card.id,
+                    name: uc.card.name,
+                    imageUrl: uc.card.imageUrl,
+                    seriesTitle: uc.card.series.title,
+                  },
+                })),
+              },
+            ])
+          )}
+          translations={{
+            collection: t("cards.collection"),
+            gallery: t("cards.gallery"),
+            noCards: t("cards.noCards"),
+            noCardsHint: t("cards.noCardsHint"),
+            startWatch: t("home.startWatch"),
+            notObtained: t("cards.notObtained"),
+          }}
+        />
       </div>
     </div>
   )
