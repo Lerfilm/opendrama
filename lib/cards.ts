@@ -1,3 +1,10 @@
+import { randomInt } from "crypto"
+
+// Cryptographically secure random float in [0, 1)
+function secureRandom(): number {
+  return randomInt(0, 2_147_483_647) / 2_147_483_647
+}
+
 // 卡牌稀有度配置
 export const CARD_RARITIES = {
   common: {
@@ -41,7 +48,7 @@ export type CardRarity = keyof typeof CARD_RARITIES
 
 // 根据掉率随机选择稀有度
 export function getRandomRarity(): CardRarity {
-  const rand = Math.random()
+  const rand = secureRandom()
   let cumulative = 0
 
   const rarities: CardRarity[] = [

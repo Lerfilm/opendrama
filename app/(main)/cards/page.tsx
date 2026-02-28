@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CARD_RARITIES, CardRarity } from "@/lib/cards"
 import { Sparkles } from "@/components/icons"
 import { createT, getLocaleAsync } from "@/lib/i18n"
+import { EmptyState } from "@/components/empty-state"
 
 export default async function CardsPage() {
   const session = await auth()
@@ -87,13 +88,12 @@ export default async function CardsPage() {
 
           <TabsContent value="collection" className="space-y-4 mt-4">
             {userCards.length === 0 ? (
-              <Card>
-                <CardContent className="p-12 text-center text-muted-foreground">
-                  <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>{t("cards.noCards")}</p>
-                  <p className="text-sm mt-2">{t("cards.noCardsHint")}</p>
-                </CardContent>
-              </Card>
+              <EmptyState
+                icon={<Sparkles className="w-8 h-8" />}
+                title={t("cards.noCards")}
+                description={t("cards.noCardsHint")}
+                action={{ label: t("home.startWatch"), href: "/discover" }}
+              />
             ) : (
               Object.entries(CARD_RARITIES).map(([rarity, info]) => {
                 const cards = cardsByRarity[rarity as CardRarity] || []

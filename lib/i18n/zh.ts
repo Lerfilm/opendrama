@@ -38,6 +38,15 @@ const zh = {
   "home.noSeries": "暂无剧集，敬请期待",
   "home.startWatch": "开始观看",
   "home.episodeCount": "{count} 集",
+  "home.newArrivals": "新剧上线",
+  "home.comingSoon": "即将上线",
+  "home.comingSoonBadge": "预告",
+  "home.new": "新",
+  "home.seeAll": "查看全部",
+  "home.watchNow": "立即观看",
+  "home.featured": "精选推荐",
+  "home.collectCards": "收集稀有卡牌",
+  "home.viewAllCards": "查看全部卡牌",
 
   // Home - Hero & Slogan
   "home.slogan": "每一秒，都是一个元宇宙",
@@ -53,6 +62,31 @@ const zh = {
   "home.theaterDesc": "Seedance 2.0 将剧本变成电影级视频",
   "home.discoverTitle": "发现",
   "home.discoverDesc": "分享短剧、吸引观众、赚取金币",
+
+  // Home - Dev Tools
+  "home.devToolsTitle": "开发工作室",
+  "home.devToolsDesc": "专业影视制作工作台 — 剧本、选角、剧场等",
+
+  // 每日签到
+  "checkin.title": "每日签到",
+  "checkin.subtitle": "每天签到领免费金币！",
+  "checkin.button": "签到",
+  "checkin.claimed": "已签到！",
+  "checkin.reward": "+{amount} 金币",
+  "checkin.streak": "连续 {count} 天",
+  "checkin.streakBonus": "连续签到奖励更多！",
+  "checkin.day": "第 {num} 天",
+  "checkin.todayReward": "今日奖励",
+  "checkin.success": "签到成功！",
+  "recharge.firstChargeBonus": "首充双倍奖励！",
+  "recharge.firstChargeBonusDesc": "首次充值获得双倍金币",
+
+  // 弹幕
+  "danmaku.send": "发送",
+  "danmaku.placeholder": "发送一条弹幕...",
+  "danmaku.toggle": "弹幕",
+  "danmaku.on": "开",
+  "danmaku.off": "关",
 
   // Home - Lerfilm 品牌
   "home.lerfilmProduction": "A Lerfilm.com Production",
@@ -109,6 +143,7 @@ const zh = {
   "recharge.info2": "前5集永久免费观看",
   "recharge.info3": "金币永不过期",
   "recharge.info4": "支持信用卡、借记卡支付",
+  "recharge.pricingNote": "每集通常 1-3 分钟，精品长集可能需要更多金币",
   "recharge.failed": "充值失败，请重试",
 
   // Recharge success
@@ -175,6 +210,47 @@ const zh = {
   "admin.cardManagement": "卡牌管理",
   "admin.videoUpload": "视频上传",
   "admin.analytics": "数据分析",
+  "admin.userManagement": "用户",
+  "admin.feedbackManagement": "反馈",
+
+  // Admin users
+  "admin.users.title": "用户管理",
+  "admin.users.desc": "搜索用户并发放代币",
+  "admin.users.search": "搜索邮箱或用户名...",
+  "admin.users.noUsers": "未找到用户",
+  "admin.users.balance": "余额",
+  "admin.users.reserved": "冻结",
+  "admin.users.totalPurchased": "累计充值",
+  "admin.users.totalConsumed": "累计消耗",
+  "admin.users.grantTokens": "发放代币",
+  "admin.users.grantAmount": "数量",
+  "admin.users.grantNote": "备注（选填）",
+  "admin.users.grantConfirm": "确认发放",
+  "admin.users.grantSuccess": "已向 {name} 发放 {amount} 金币",
+  "admin.users.joined": "注册时间",
+
+  // Admin feedback
+  "admin.feedback.title": "反馈管理",
+  "admin.feedback.desc": "查看和管理测试者反馈",
+  "admin.feedback.new": "新反馈",
+  "admin.feedback.read": "已读",
+  "admin.feedback.resolved": "已解决",
+  "admin.feedback.all": "全部",
+  "admin.feedback.noFeedback": "暂无反馈",
+  "admin.feedback.markRead": "标记已读",
+  "admin.feedback.markResolved": "标记已解决",
+  "admin.feedback.adminNote": "管理员备注",
+  "admin.feedback.addNote": "添加备注...",
+  "admin.feedback.saveNote": "保存备注",
+  "admin.feedback.briefNew": "新反馈",
+  "admin.feedback.briefPending": "待处理",
+  "admin.feedback.briefToday": "今日",
+  "admin.feedback.category.general": "一般",
+  "admin.feedback.category.bug": "Bug",
+  "admin.feedback.category.feature": "功能建议",
+  "admin.feedback.from": "来自",
+  "admin.feedback.anonymous": "匿名",
+  "admin.feedback.page": "页面",
 
   // Admin series
   "admin.series.title": "剧集管理",
@@ -217,6 +293,7 @@ const zh = {
   // Nav (新增)
   "nav.create": "创作",
   "nav.theater": "剧场",
+  "nav.watch": "看剧",
 
   // Discover (完善)
   "discover.search": "搜索剧集...",
@@ -226,14 +303,23 @@ const zh = {
   "discover.romance": "爱情",
   "discover.thriller": "悬疑",
   "discover.fantasy": "奇幻",
+  "discover.horror": "恐怖",
+  "discover.action": "动作",
+  "discover.mystery": "悬疑",
   "discover.trending": "热门排行",
   "discover.topRated": "好评榜",
   "discover.latest": "最新上线",
   "discover.noResults": "没有找到相关剧集",
   "discover.viewCount": "{count} 次观看",
+  "discover.viewCountSingular": "1 次观看",
+  "discover.weeklyTop": "周榜 Top 10",
+  "discover.featured": "编辑精选",
 
   // 创作端 - 编剧工坊
   "studio.title": "创作中心",
+  "studio.proWorkspace": "想要更多控制？试试专业工作台",
+  "studio.proWorkspaceDesc": "高级选角、场景、剪辑等全套工具",
+  "studio.backToStudio": "← 返回创作中心",
   "studio.myScripts": "我的剧本",
   "studio.newScript": "新建剧本",
   "studio.textToVideo": "文生视频",
@@ -321,11 +407,23 @@ const zh = {
   "settings.version": "版本",
   "settings.terms": "服务条款",
   "settings.privacy": "隐私政策",
+  "settings.devTools": "开发者工具",
+  "settings.devToolsToggle": "开发工作室",
+  "settings.devToolsDesc": "专业影视制作工作台（推荐在桌面端使用）",
   "settings.devTeam": "开发团队",
   "settings.leadDev": "首席开发者",
   "settings.sysArch": "系统架构与质量保证",
   "settings.uiDesign": "UI / UX 设计",
   "settings.softwareEng": "软件工程",
+  "settings.programDesign": "程序设计",
+  "settings.consultant": "顾问",
+  "settings.aiModels": "AI 模型",
+  "settings.modelTheater": "剧场（专业工作台）",
+  "settings.modelStudio": "工作室（移动端）",
+  "settings.modelAudio": "音频",
+  "settings.modelUnavailable": "不可用",
+  "settings.modelMaxDur": "最长 {n}秒",
+  "settings.resolution": "分辨率",
 
   // 观看历史
   "history.title": "观看历史",
@@ -363,6 +461,21 @@ const zh = {
   "subscribe.feature.t2vFree": "文生视频免费",
   "subscribe.feature.annualBadge": "专属年卡徽章 + 限定卡牌",
   "subscribe.feature.yearlyDiscount": "比月卡节省 14%",
+
+  // 订阅对比
+  "subscribe.comparison": "免费 vs VIP",
+  "subscribe.cmp.dailyFree": "每日免费集数",
+  "subscribe.cmp.dailyCoins": "每日赠送金币",
+  "subscribe.cmp.aiScripts": "AI 剧本额度",
+  "subscribe.cmp.cardDrop": "卡牌掉落倍率",
+  "subscribe.cmp.t2v": "文生视频",
+  "subscribe.cmp.badge": "会员徽章",
+  "subscribe.cmp.unlimited": "不限",
+  "subscribe.cmp.day": "天",
+  "subscribe.cmp.month": "月",
+  "subscribe.cmp.fullPrice": "原价",
+  "subscribe.cmp.halfOff": "半价",
+  "subscribe.cmp.free": "免费",
 
   // 创作者
   "creator.publish": "发布为剧集",
@@ -432,6 +545,20 @@ const zh = {
   "player.next": "下一集",
   "player.episode": "第{num}集",
   "player.noVideo": "视频暂不可用",
+
+  // 滑动播放器
+  "watch.nextEp": "下一集",
+  "watch.prevEp": "上一集",
+  "watch.locked": "已锁定",
+  "watch.unlockToWatch": "解锁观看",
+  "watch.rechargeToWatch": "充值观看",
+  "watch.balance": "余额: {count} 金币",
+  "watch.comment": "评论",
+  "watch.swipeHint": "上滑看下一集",
+
+  // 分享
+  "share.template": "正在看《{title}》第{num}集，快来一起追剧！",
+  "share.seriesTemplate": "推荐你看《{title}》，快来 OpenDrama 一起追剧！",
 
   // 创作中心 (Phase 1 增强)
   "studio.ready": "就绪",
@@ -768,6 +895,58 @@ const zh = {
   "dev.settings.ks.confirm": "生成 / 确认",
   "dev.settings.ks.close": "关闭面板 / 取消",
 
+  // Dev 反馈组件
+  "dev.feedback.button": "反馈",
+  "dev.feedback.title": "提交反馈",
+  "dev.feedback.categoryGeneral": "一般",
+  "dev.feedback.categoryBug": "Bug 报告",
+  "dev.feedback.categoryFeature": "功能建议",
+  "dev.feedback.placeholder": "告诉我们你的想法...",
+  "dev.feedback.submit": "提交",
+  "dev.feedback.submitting": "发送中...",
+  "dev.feedback.success": "感谢你的反馈！",
+  "dev.feedback.error": "发送失败，请重试。",
+
+  // Dev 剪辑工作区
+  "dev.editing.noClips": "暂无片段",
+  "dev.editing.clickToPreview": "点击片段预览",
+  "dev.editing.playAll": "全部播放",
+  "dev.editing.stopSequence": "停止",
+  "dev.editing.videoTrack": "对白/音效",
+  "dev.editing.audioTrack": "配乐",
+  "dev.editing.zoomIn": "放大",
+  "dev.editing.zoomOut": "缩小",
+  "dev.editing.fitToScreen": "适配",
+  "dev.editing.exportEDL": "剪辑决定列表",
+  "dev.editing.exportCSV": "逗号分隔值",
+  "dev.editing.downloadAll": "全部下载",
+  "dev.editing.editRegenerate": "编辑并重新生成",
+  "dev.editing.quickRegenerate": "快速重新生成",
+  "dev.editing.download": "下载",
+  "dev.editing.sourcePanel": "素材",
+  "dev.editing.scenes": "场景",
+  "dev.editing.shots": "镜头",
+  "dev.editing.newShot": "+ 新镜头",
+  "dev.editing.addedToTimeline": "已在时间线",
+  "dev.editing.dragToReorder": "拖拽排序",
+  "dev.editing.saveOrder": "保存顺序",
+  "dev.editing.orderSaved": "顺序已保存",
+  "dev.editing.trimIn": "入点裁剪",
+  "dev.editing.trimOut": "出点裁剪",
+  "dev.editing.replaceShot": "替换镜头",
+  "dev.editing.insertShot": "插入镜头",
+  "dev.editing.preloading": "加载视频中...",
+  "dev.editing.promptPlaceholder": "描述镜头内容... 从右侧拖拽角色/场景，或输入 @名字",
+  "dev.editing.duration": "时长",
+  "dev.editing.shotType": "景别",
+  "dev.editing.cameraMove": "运镜",
+  "dev.editing.generateReplace": "生成并替换",
+  "dev.editing.createGenerate": "创建镜头",
+  "dev.editing.composerCharacters": "角色",
+  "dev.editing.composerLocations": "场景",
+  "dev.editing.composerProps": "道具",
+  "dev.editing.composerMaterials": "素材",
+
   // Dev 剧场工作区
   "dev.theater.loading": "加载工作区...",
   "dev.theater.tabCallSheet": "📋 通告单",
@@ -840,6 +1019,8 @@ const zh = {
   "dev.theater.assetCharacters": "角色",
   "dev.theater.assetLocations": "场地",
   "dev.theater.assetMaterials": "素材",
+  "dev.theater.assetProps": "道具",
+  "dev.theater.noPropsData": "暂无道具数据",
   "dev.theater.noCharacterData": "暂无角色数据",
   "dev.theater.noLocationData": "暂无场地数据",
   "dev.theater.chainExplain": "链式模式使用上一片段末帧作为视觉参考",
@@ -873,6 +1054,41 @@ const zh = {
   "dev.theater.alertPlanFailed": "AI 规划失败",
   "dev.theater.aiPlan": "✦ AI 规划",
   "dev.theater.aiPlanHint": "分析场景并生成视频片段",
+
+  // Theater tooltips (Phase 4.2)
+  "dev.theater.tooltipCallSheet": "拍摄计划：列出每场戏的演员、场地、时间安排",
+  "dev.theater.tooltipRehearsal": "排练场：正式制作前测试和预览各个镜头的提示词",
+  "dev.theater.tooltipAction": "生成视频片段并管理制作流程",
+
+  // Video progress guide (Phase 4.3)
+  "dev.theater.guideStep1": "编写场景",
+  "dev.theater.guideStep1Desc": "创建包含对白和动作的剧本",
+  "dev.theater.guideStep2": "选角 & 场地",
+  "dev.theater.guideStep2Desc": "分配演员并勘景",
+  "dev.theater.guideStep3": "生成视频",
+  "dev.theater.guideStep3Desc": "AI 将剧本转化为视频（约5分钟/场）",
+
+  // Dev sidebar (Phase 4.4)
+  "dev.nav.selectProject": "选择项目",
+  "dev.nav.recentProjects": "最近项目",
+  "dev.nav.noProjects": "暂无项目",
+
+  // Mobile redirect (Phase 4.5)
+  "dev.mobile.title": "推荐使用桌面端",
+  "dev.mobile.desc": "Dev 工作区针对大屏幕优化。为获得最佳体验，请使用桌面浏览器。",
+  "dev.mobile.openStudio": "打开 Studio（移动版）",
+  "dev.mobile.continueAnyway": "仍然继续",
+
+  // Prompt 工具栏 (Phase 9)
+  "dev.promptToolbar.save": "保存",
+  "dev.promptToolbar.saved": "已保存",
+  "dev.promptToolbar.saving": "保存中...",
+  "dev.promptToolbar.translate": "翻译",
+  "dev.promptToolbar.translating": "翻译中...",
+  "dev.promptToolbar.translateZhToEn": "中→EN",
+  "dev.promptToolbar.translateEnToZh": "EN→中",
+  "dev.promptToolbar.copy": "复制",
+  "dev.promptToolbar.copied": "已复制",
 } as const
 
 export type TranslationKey = keyof typeof zh

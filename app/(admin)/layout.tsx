@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { isAdmin } from "@/lib/admin"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Home, Film, Sparkles, Upload, BarChart3, Coins } from "@/components/icons"
+import { Home, Film, Sparkles, Upload, BarChart3, Coins, Users, MessageCircle } from "@/components/icons"
 import { t } from "@/lib/i18n"
 
 export default async function AdminLayout({
@@ -24,6 +24,8 @@ export default async function AdminLayout({
     { href: "/admin/upload", icon: Upload, label: t("admin.videoUpload") },
     { href: "/admin/analytics", icon: BarChart3, label: t("admin.analytics") },
     { href: "/admin/ai-pricing", icon: Coins, label: "AI Pricing" },
+    { href: "/admin/users", icon: Users, label: t("admin.userManagement") },
+    { href: "/admin/feedback", icon: MessageCircle, label: t("admin.feedbackManagement") },
   ]
 
   return (

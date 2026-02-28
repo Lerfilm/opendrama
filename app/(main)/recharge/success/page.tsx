@@ -91,7 +91,7 @@ async function fulfillPayment(sessionId: string, userId: string) {
           type: "purchase",
           amount: coins,
           balanceAfter: newBalance,
-          description: `Stripe 充值 ${coins} 金币（${sessionId}）`,
+          description: `Stripe purchase: ${coins} coins (${sessionId})`,
           metadata: {
             stripeSessionId: sessionId,
             packageId,
@@ -100,6 +100,38 @@ async function fulfillPayment(sessionId: string, userId: string) {
           },
         },
       })
+
+      // 5. First charge bonus: double coins on first purchase
+      const balanceRecord = await tx.userBalance.findUnique({
+        where: { userId },
+      })
+      if (balanceRecord && !balanceRecord.firstChargeBonusUsed) {
+        await tx.userBalance.update({
+          where: { userId },
+          data: {
+            balance: { increment: coins },
+            totalPurchased: { increment: coins },
+            firstChargeBonusUsed: true,
+          },
+        })
+        await tx.user.update({
+          where: { id: userId },
+          data: { coins: { increment: coins } },
+        })
+        await tx.tokenTransaction.create({
+          data: {
+            userId,
+            type: "bonus",
+            amount: coins,
+            balanceAfter: newBalance + coins,
+            description: `First charge bonus: ${coins} coins`,
+            metadata: {
+              stripeSessionId: sessionId,
+              source: "first_charge_bonus",
+            },
+          },
+        })
+      }
 
       return p
     })

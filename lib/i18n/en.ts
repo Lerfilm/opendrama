@@ -38,6 +38,15 @@ const en: Record<string, string> = {
   "home.noSeries": "No series yet, stay tuned",
   "home.startWatch": "Start Watching",
   "home.episodeCount": "{count} episodes",
+  "home.newArrivals": "New Arrivals",
+  "home.comingSoon": "Coming Soon",
+  "home.comingSoonBadge": "Soon",
+  "home.new": "NEW",
+  "home.seeAll": "See All",
+  "home.watchNow": "Watch Now",
+  "home.featured": "Featured",
+  "home.collectCards": "Collect Rare Cards",
+  "home.viewAllCards": "View All Cards",
 
   // Home - Hero & Slogan
   "home.slogan": "Every Second, A Universe",
@@ -53,6 +62,31 @@ const en: Record<string, string> = {
   "home.theaterDesc": "Seedance 2.0 turns your script into cinematic video",
   "home.discoverTitle": "Discover",
   "home.discoverDesc": "Share your drama, grow your audience & earn coins",
+
+  // Home - Dev Tools
+  "home.devToolsTitle": "Dev Studio",
+  "home.devToolsDesc": "Professional filmmaking workspace — script, casting, theater & more",
+
+  // Check-in
+  "checkin.title": "Daily Check-in",
+  "checkin.subtitle": "Check in daily to earn free coins!",
+  "checkin.button": "Check In",
+  "checkin.claimed": "Claimed!",
+  "checkin.reward": "+{amount} Coins",
+  "checkin.streak": "Day {count} streak",
+  "checkin.streakBonus": "Keep your streak for bigger rewards!",
+  "checkin.day": "Day {num}",
+  "checkin.todayReward": "Today's reward",
+  "checkin.success": "Check-in successful!",
+  "recharge.firstChargeBonus": "First charge double bonus!",
+  "recharge.firstChargeBonusDesc": "Get 2x coins on your first purchase",
+
+  // Danmaku
+  "danmaku.send": "Send",
+  "danmaku.placeholder": "Send a bullet comment...",
+  "danmaku.toggle": "Danmaku",
+  "danmaku.on": "ON",
+  "danmaku.off": "OFF",
 
   // Home - Lerfilm Brand
   "home.lerfilmProduction": "A Lerfilm.com Production",
@@ -109,6 +143,7 @@ const en: Record<string, string> = {
   "recharge.info2": "First 5 episodes are always free",
   "recharge.info3": "Coins never expire",
   "recharge.info4": "Supports credit and debit cards",
+  "recharge.pricingNote": "Episodes are typically 1-3 min. Premium episodes may cost more coins",
   "recharge.failed": "Top up failed, please retry",
 
   // Recharge success
@@ -175,6 +210,47 @@ const en: Record<string, string> = {
   "admin.cardManagement": "Cards",
   "admin.videoUpload": "Upload",
   "admin.analytics": "Analytics",
+  "admin.userManagement": "Users",
+  "admin.feedbackManagement": "Feedback",
+
+  // Admin users
+  "admin.users.title": "User Management",
+  "admin.users.desc": "Search users and manage token grants",
+  "admin.users.search": "Search by email or name...",
+  "admin.users.noUsers": "No users found",
+  "admin.users.balance": "Balance",
+  "admin.users.reserved": "Reserved",
+  "admin.users.totalPurchased": "Total Purchased",
+  "admin.users.totalConsumed": "Total Consumed",
+  "admin.users.grantTokens": "Grant Tokens",
+  "admin.users.grantAmount": "Amount",
+  "admin.users.grantNote": "Note (optional)",
+  "admin.users.grantConfirm": "Confirm Grant",
+  "admin.users.grantSuccess": "Granted {amount} coins to {name}",
+  "admin.users.joined": "Joined",
+
+  // Admin feedback
+  "admin.feedback.title": "Feedback Management",
+  "admin.feedback.desc": "View and manage tester feedback",
+  "admin.feedback.new": "New",
+  "admin.feedback.read": "Read",
+  "admin.feedback.resolved": "Resolved",
+  "admin.feedback.all": "All",
+  "admin.feedback.noFeedback": "No feedback yet",
+  "admin.feedback.markRead": "Mark as Read",
+  "admin.feedback.markResolved": "Mark as Resolved",
+  "admin.feedback.adminNote": "Admin Note",
+  "admin.feedback.addNote": "Add note...",
+  "admin.feedback.saveNote": "Save Note",
+  "admin.feedback.briefNew": "New",
+  "admin.feedback.briefPending": "Pending",
+  "admin.feedback.briefToday": "Today",
+  "admin.feedback.category.general": "General",
+  "admin.feedback.category.bug": "Bug",
+  "admin.feedback.category.feature": "Feature",
+  "admin.feedback.from": "From",
+  "admin.feedback.anonymous": "Anonymous",
+  "admin.feedback.page": "Page",
 
   // Admin series
   "admin.series.title": "Series Management",
@@ -217,6 +293,7 @@ const en: Record<string, string> = {
   // Nav
   "nav.create": "Create",
   "nav.theater": "Theater",
+  "nav.watch": "Watch",
 
   // Discover
   "discover.search": "Search series...",
@@ -226,14 +303,23 @@ const en: Record<string, string> = {
   "discover.romance": "Romance",
   "discover.thriller": "Thriller",
   "discover.fantasy": "Fantasy",
+  "discover.horror": "Horror",
+  "discover.action": "Action",
+  "discover.mystery": "Mystery",
   "discover.trending": "Trending",
   "discover.topRated": "Top Rated",
   "discover.latest": "Latest",
   "discover.noResults": "No series found",
   "discover.viewCount": "{count} views",
+  "discover.viewCountSingular": "1 view",
+  "discover.weeklyTop": "Weekly Top 10",
+  "discover.featured": "Editor's Picks",
 
   // Studio
   "studio.title": "Studio",
+  "studio.proWorkspace": "Want more control? Try Pro Workspace",
+  "studio.proWorkspaceDesc": "Advanced tools for casting, locations, editing & more",
+  "studio.backToStudio": "← Back to Studio",
   "studio.myScripts": "My Scripts",
   "studio.newScript": "New Script",
   "studio.textToVideo": "Text to Video",
@@ -319,11 +405,23 @@ const en: Record<string, string> = {
   "settings.version": "Version",
   "settings.terms": "Terms of Service",
   "settings.privacy": "Privacy Policy",
+  "settings.devTools": "Developer Tools",
+  "settings.devToolsToggle": "Dev Studio",
+  "settings.devToolsDesc": "Professional filmmaking workspace (desktop recommended)",
   "settings.devTeam": "Development Team",
   "settings.leadDev": "Lead Developer",
   "settings.sysArch": "System Architecture & QA",
   "settings.uiDesign": "UI / UX Design",
   "settings.softwareEng": "Software Engineering",
+  "settings.programDesign": "Program Design",
+  "settings.consultant": "Consultant",
+  "settings.aiModels": "AI Models",
+  "settings.modelTheater": "Theater (Pro Workspace)",
+  "settings.modelStudio": "Studio (Mobile)",
+  "settings.modelAudio": "Audio",
+  "settings.modelUnavailable": "Unavailable",
+  "settings.modelMaxDur": "Max {n}s",
+  "settings.resolution": "Resolution",
 
   // Watch History
   "history.title": "Watch History",
@@ -361,6 +459,21 @@ const en: Record<string, string> = {
   "subscribe.feature.t2vFree": "Free text-to-video",
   "subscribe.feature.annualBadge": "Annual badge + limited edition card",
   "subscribe.feature.yearlyDiscount": "Save 14% compared to monthly",
+
+  // Subscribe comparison
+  "subscribe.comparison": "Free vs VIP",
+  "subscribe.cmp.dailyFree": "Daily Free Episodes",
+  "subscribe.cmp.dailyCoins": "Daily Free Coins",
+  "subscribe.cmp.aiScripts": "AI Script Credits",
+  "subscribe.cmp.cardDrop": "Card Drop Rate",
+  "subscribe.cmp.t2v": "Text-to-Video",
+  "subscribe.cmp.badge": "Member Badge",
+  "subscribe.cmp.unlimited": "Unlimited",
+  "subscribe.cmp.day": "day",
+  "subscribe.cmp.month": "month",
+  "subscribe.cmp.fullPrice": "Full Price",
+  "subscribe.cmp.halfOff": "50% Off",
+  "subscribe.cmp.free": "Free",
 
   // Creator
   "creator.publish": "Publish as Series",
@@ -430,6 +543,20 @@ const en: Record<string, string> = {
   "player.next": "Next",
   "player.episode": "E{num}",
   "player.noVideo": "Video not available",
+
+  // Swipe Player
+  "watch.nextEp": "Next episode",
+  "watch.prevEp": "Previous",
+  "watch.locked": "Locked",
+  "watch.unlockToWatch": "Unlock & Watch",
+  "watch.rechargeToWatch": "Recharge to Watch",
+  "watch.balance": "Balance: {count} coins",
+  "watch.comment": "Comment",
+  "watch.swipeHint": "Swipe up for next episode",
+
+  // Share
+  "share.template": "Watching {title} Episode {num} — come watch with me!",
+  "share.seriesTemplate": "Check out {title} on OpenDrama!",
 
   // Studio (Phase 1 enhancements)
   "studio.ready": "Ready",
@@ -766,6 +893,58 @@ const en: Record<string, string> = {
   "dev.settings.ks.confirm": "Generate / confirm",
   "dev.settings.ks.close": "Close panel / cancel",
 
+  // Dev Feedback Widget
+  "dev.feedback.button": "Feedback",
+  "dev.feedback.title": "Send Feedback",
+  "dev.feedback.categoryGeneral": "General",
+  "dev.feedback.categoryBug": "Bug Report",
+  "dev.feedback.categoryFeature": "Feature Request",
+  "dev.feedback.placeholder": "Tell us what you think...",
+  "dev.feedback.submit": "Submit",
+  "dev.feedback.submitting": "Sending...",
+  "dev.feedback.success": "Thanks for your feedback!",
+  "dev.feedback.error": "Failed to send. Please try again.",
+
+  // Dev Editing Workspace
+  "dev.editing.noClips": "No clips generated yet",
+  "dev.editing.clickToPreview": "Click a clip to preview",
+  "dev.editing.playAll": "Play All",
+  "dev.editing.stopSequence": "Stop",
+  "dev.editing.videoTrack": "Dialogue/SFX",
+  "dev.editing.audioTrack": "BGM",
+  "dev.editing.zoomIn": "Zoom In",
+  "dev.editing.zoomOut": "Zoom Out",
+  "dev.editing.fitToScreen": "Fit",
+  "dev.editing.exportEDL": "Edit Decision List",
+  "dev.editing.exportCSV": "Comma Separated Values",
+  "dev.editing.downloadAll": "Download All",
+  "dev.editing.insertShot": "Insert Shot",
+  "dev.editing.preloading": "Loading videos...",
+  "dev.editing.editRegenerate": "Edit & Regenerate",
+  "dev.editing.quickRegenerate": "Quick Regenerate",
+  "dev.editing.download": "Download",
+  "dev.editing.sourcePanel": "Source",
+  "dev.editing.scenes": "Scenes",
+  "dev.editing.shots": "Shots",
+  "dev.editing.newShot": "+ New Shot",
+  "dev.editing.addedToTimeline": "On Timeline",
+  "dev.editing.dragToReorder": "Drag to reorder",
+  "dev.editing.saveOrder": "Save Order",
+  "dev.editing.orderSaved": "Order saved",
+  "dev.editing.trimIn": "Trim In",
+  "dev.editing.trimOut": "Trim Out",
+  "dev.editing.replaceShot": "Replace Shot",
+  "dev.editing.promptPlaceholder": "Describe the shot... Drag characters/locations from the right panel or type @Name",
+  "dev.editing.duration": "Duration",
+  "dev.editing.shotType": "Shot",
+  "dev.editing.cameraMove": "Camera",
+  "dev.editing.generateReplace": "Generate & Replace",
+  "dev.editing.createGenerate": "Create Shot",
+  "dev.editing.composerCharacters": "Characters",
+  "dev.editing.composerLocations": "Locations",
+  "dev.editing.composerProps": "Props",
+  "dev.editing.composerMaterials": "Materials",
+
   // Dev Theater Workspace
   "dev.theater.loading": "Loading workspace...",
   "dev.theater.tabCallSheet": "📋 Call Sheet",
@@ -838,6 +1017,8 @@ const en: Record<string, string> = {
   "dev.theater.assetCharacters": "Characters",
   "dev.theater.assetLocations": "Locations",
   "dev.theater.assetMaterials": "Materials",
+  "dev.theater.assetProps": "Props",
+  "dev.theater.noPropsData": "No props data",
   "dev.theater.noCharacterData": "No character data",
   "dev.theater.noLocationData": "No location data",
   "dev.theater.chainExplain": "Chain Mode uses the last frame of previous segment as visual reference",
@@ -871,6 +1052,41 @@ const en: Record<string, string> = {
   "dev.theater.alertPlanFailed": "AI Plan failed",
   "dev.theater.aiPlan": "✦ AI Plan",
   "dev.theater.aiPlanHint": "Analyze scenes & generate segments",
+
+  // Theater tooltips (Phase 4.2)
+  "dev.theater.tooltipCallSheet": "Production schedule: actors, scenes, locations & timing for each episode",
+  "dev.theater.tooltipRehearsal": "Test & preview individual prompts before full production",
+  "dev.theater.tooltipAction": "Generate video segments and manage production pipeline",
+
+  // Video progress guide (Phase 4.3)
+  "dev.theater.guideStep1": "Write Scenes",
+  "dev.theater.guideStep1Desc": "Create your script with dialogue and action",
+  "dev.theater.guideStep2": "Cast & Locations",
+  "dev.theater.guideStep2Desc": "Assign actors and scout locations",
+  "dev.theater.guideStep3": "Generate Video",
+  "dev.theater.guideStep3Desc": "AI turns your script into video (~5 min/scene)",
+
+  // Dev sidebar (Phase 4.4)
+  "dev.nav.selectProject": "Select a project",
+  "dev.nav.recentProjects": "Recent Projects",
+  "dev.nav.noProjects": "No projects yet",
+
+  // Mobile redirect (Phase 4.5)
+  "dev.mobile.title": "Desktop Recommended",
+  "dev.mobile.desc": "Dev Workspace is optimized for larger screens. For the best experience, use a desktop browser.",
+  "dev.mobile.openStudio": "Open Studio (Mobile)",
+  "dev.mobile.continueAnyway": "Continue Anyway",
+
+  // Prompt Toolbar (Phase 9)
+  "dev.promptToolbar.save": "Save",
+  "dev.promptToolbar.saved": "Saved",
+  "dev.promptToolbar.saving": "Saving...",
+  "dev.promptToolbar.translate": "Translate",
+  "dev.promptToolbar.translating": "Translating...",
+  "dev.promptToolbar.translateZhToEn": "CN→EN",
+  "dev.promptToolbar.translateEnToZh": "EN→CN",
+  "dev.promptToolbar.copy": "Copy",
+  "dev.promptToolbar.copied": "Copied",
 }
 
 export default en

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Coins, CreditCard, History, Star, Settings, Play, PenTool, Video, Code } from "@/components/icons"
 import { createT, getLocaleAsync } from "@/lib/i18n"
-import { isDeveloper } from "@/lib/developer"
+// Developer mode is open to all logged-in users
 import prisma from "@/lib/prisma"
 
 export default async function ProfilePage() {
@@ -46,15 +46,13 @@ export default async function ProfilePage() {
     { icon: Settings, label: t("profile.settings"), href: "/settings" },
   ]
 
-  // 开发者模式入口（仅白名单邮箱可见）
-  if (isDeveloper(session.user?.email)) {
-    menuItems.push({
-      icon: Code,
-      label: t("profile.developerMode"),
-      href: "/developer",
-      badge: null,
-    })
-  }
+  // Developer Mode entry — open to all users
+  menuItems.push({
+    icon: Code,
+    label: t("profile.developerMode"),
+    href: "/developer",
+    badge: null,
+  })
 
   return (
     <div className="p-4 space-y-6">

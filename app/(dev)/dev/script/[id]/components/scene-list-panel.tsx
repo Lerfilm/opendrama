@@ -38,6 +38,42 @@ interface SceneListPanelProps {
   targetEpisodes: number
 }
 
+/** Mood-based color for storyboard visual indicator */
+const MOOD_COLORS: Record<string, string> = {
+  tense: "#EF4444",
+  suspense: "#DC2626",
+  romantic: "#EC4899",
+  tender: "#F472B6",
+  melancholic: "#6366F1",
+  sad: "#818CF8",
+  happy: "#F59E0B",
+  joyful: "#FBBF24",
+  mysterious: "#8B5CF6",
+  dark: "#374151",
+  calm: "#06B6D4",
+  peaceful: "#22D3EE",
+  comedic: "#F97316",
+  dramatic: "#7C3AED",
+  action: "#DC2626",
+  horror: "#1F2937",
+  angry: "#B91C1C",
+  hopeful: "#10B981",
+  neutral: "#9CA3AF",
+}
+
+function getMoodColor(mood?: string | null): string {
+  if (!mood) return "#D1D5DB"
+  const key = mood.toLowerCase().trim()
+  for (const [k, v] of Object.entries(MOOD_COLORS)) {
+    if (key.includes(k)) return v
+  }
+  // Generate a consistent color from mood string
+  let hash = 0
+  for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash)
+  const hue = Math.abs(hash % 360)
+  return `hsl(${hue}, 60%, 55%)`
+}
+
 /** Count characters in a scene's text content (action + dialogue + stageDirection) */
 function countSceneChars(scene: Scene): number {
   let count = 0
@@ -238,13 +274,20 @@ export function SceneListPanel({
                   className="w-full text-left px-3 py-2 flex items-start gap-2 transition-colors"
                   style={{
                     background: isSelected ? "#DCE0F5" : "transparent",
-                    borderLeft: isSelected ? "2px solid #4F46E5" : "2px solid transparent",
+                    borderLeft: isSelected ? "3px solid #4F46E5" : "3px solid transparent",
                   }}
                 >
-                  {/* Scene number */}
-                  <span className="text-[10px] font-mono mt-0.5 flex-shrink-0 w-6" style={{ color: "#AAA" }}>
-                    S{scene.sceneNum}
-                  </span>
+                  {/* Mood color strip (storyboard indicator) */}
+                  <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-0.5">
+                    <div
+                      className="w-2 h-8 rounded-full"
+                      style={{ background: getMoodColor(scene.mood), opacity: 0.8 }}
+                      title={scene.mood || "No mood set"}
+                    />
+                    <span className="text-[9px] font-mono" style={{ color: "#AAA" }}>
+                      {scene.sceneNum}
+                    </span>
+                  </div>
 
                   <div className="min-w-0 flex-1">
                     {/* Heading */}
@@ -252,16 +295,18 @@ export function SceneListPanel({
                       {scene.heading || "Untitled scene"}
                     </p>
 
+                    {/* Meta line: location + time */}
+                    {(scene.location || scene.timeOfDay) && (
+                      <p className="text-[9px] truncate mt-0.5" style={{ color: "#999" }}>
+                        {scene.location}{scene.location && scene.timeOfDay ? " · " : ""}{scene.timeOfDay}
+                      </p>
+                    )}
+
                     {/* Badges + word count */}
                     <div className="flex items-center gap-1 mt-1 flex-wrap">
                       {scene.mood && (
-                        <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "#DDD", color: "#777" }}>
+                        <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: `${getMoodColor(scene.mood)}22`, color: getMoodColor(scene.mood) }}>
                           {scene.mood}
-                        </span>
-                      )}
-                      {scene.location && (
-                        <span className="text-[9px] px-1 py-0.5 rounded truncate max-w-[70px]" style={{ background: "#DDD", color: "#777" }}>
-                          {scene.location}
                         </span>
                       )}
                       {charCount > 0 && (

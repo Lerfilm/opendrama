@@ -73,6 +73,37 @@ interface Suggestion {
   sceneNumber?: number
 }
 
+// ─── Parse JSON action blocks into readable text ─────────────────────────────
+// The dev editor stores action as JSON: [{type:"action",text:"..."},{type:"dialogue",character:"X",line:"..."}]
+// The studio editor should display it as readable plain text.
+function formatActionForDisplay(raw: string | null | undefined): string {
+  if (!raw) return ""
+  const trimmed = raw.trim()
+  if (!trimmed.startsWith("[")) return trimmed
+  try {
+    const blocks = JSON.parse(trimmed)
+    if (!Array.isArray(blocks) || blocks.length === 0 || !("type" in blocks[0])) {
+      return trimmed
+    }
+    return blocks
+      .map((b: { type: string; text?: string; character?: string; parenthetical?: string; line?: string }) => {
+        if (b.type === "action") return b.text || ""
+        if (b.type === "dialogue") {
+          const parts: string[] = []
+          if (b.character) parts.push(b.character.toUpperCase())
+          if (b.parenthetical) parts.push(`(${b.parenthetical})`)
+          if (b.line) parts.push(`"${b.line}"`)
+          return parts.join(" ")
+        }
+        return b.text || ""
+      })
+      .filter(Boolean)
+      .join("\n")
+  } catch {
+    return trimmed
+  }
+}
+
 interface PolishResult {
   original: Partial<Scene>
   polished: Partial<Scene>
@@ -317,7 +348,10 @@ export function ScriptEditor({ script: initial }: { script: Script }) {
     if (editing && field in editing) {
       return (editing[field] as string) || ""
     }
-    return (scene[field] as string) || ""
+    const raw = (scene[field] as string) || ""
+    // Auto-format JSON action blocks to readable text
+    if (field === "action") return formatActionForDisplay(raw)
+    return raw
   }, [editingScenes])
 
   // Save scene to server

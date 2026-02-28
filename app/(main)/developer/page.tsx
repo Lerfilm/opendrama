@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
-import { isDeveloper } from "@/lib/developer"
+// Developer mode is open to all logged-in users
 import { createT, getLocaleAsync } from "@/lib/i18n"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -18,10 +18,7 @@ export default async function DeveloperPage() {
     redirect("/auth/signin")
   }
 
-  // 权限检查：仅白名单开发者可访问
-  if (!isDeveloper(session.user.email)) {
-    redirect("/profile")
-  }
+  // Dev mode is now open to all logged-in users
   const t = createT(await getLocaleAsync())
 
   const cookieStore = await cookies()

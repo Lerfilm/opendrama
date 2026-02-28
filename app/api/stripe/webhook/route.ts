@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
-import { stripe } from "@/lib/stripe"
+import { stripe, COIN_PACKAGES } from "@/lib/stripe"
 import prisma from "@/lib/prisma"
 import Stripe from "stripe"
 
@@ -31,12 +31,26 @@ export async function POST(req: NextRequest) {
 
     const userId = session.metadata?.userId
     const packageId = session.metadata?.packageId
-    const coins = parseInt(session.metadata?.coins || "0")
 
-    if (!userId || !coins) {
+    if (!userId || !packageId) {
       console.error("Missing metadata in session:", session.id)
       return NextResponse.json({ error: "Missing metadata" }, { status: 400 })
     }
+
+    // SECURITY: Validate coins from server-side COIN_PACKAGES, never trust client metadata
+    const pkg = COIN_PACKAGES.find((p) => p.id === packageId)
+    if (!pkg) {
+      console.error("Invalid packageId in webhook:", packageId, session.id)
+      return NextResponse.json({ error: "Invalid package" }, { status: 400 })
+    }
+
+    // Verify the payment amount strictly matches the expected package price
+    if (!session.amount_total || session.amount_total !== pkg.price) {
+      console.error("Amount mismatch:", session.amount_total, "expected:", pkg.price, session.id)
+      return NextResponse.json({ error: "Amount mismatch" }, { status: 400 })
+    }
+
+    const coins = pkg.coins
 
     try {
       // 检查是否已处理
@@ -86,14 +100,14 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        // 4. 写入交易记录
+        // 4. Token transaction log
         await tx.tokenTransaction.create({
           data: {
             userId,
             type: "purchase",
             amount: coins,
             balanceAfter: newBalance,
-            description: `Stripe 充值 ${coins} 金币（${session.id}）`,
+            description: `Stripe purchase: ${coins} coins (${session.id})`,
             metadata: {
               stripeSessionId: session.id,
               packageId,
@@ -101,6 +115,38 @@ export async function POST(req: NextRequest) {
             },
           },
         })
+
+        // 5. First charge bonus: double coins on first purchase
+        const balanceRecord = await tx.userBalance.findUnique({
+          where: { userId },
+        })
+        if (balanceRecord && !balanceRecord.firstChargeBonusUsed) {
+          await tx.userBalance.update({
+            where: { userId },
+            data: {
+              balance: { increment: coins },
+              totalPurchased: { increment: coins },
+              firstChargeBonusUsed: true,
+            },
+          })
+          await tx.user.update({
+            where: { id: userId },
+            data: { coins: { increment: coins } },
+          })
+          await tx.tokenTransaction.create({
+            data: {
+              userId,
+              type: "bonus",
+              amount: coins,
+              balanceAfter: newBalance + coins,
+              description: `First charge bonus: ${coins} coins`,
+              metadata: {
+                stripeSessionId: session.id,
+                source: "first_charge_bonus",
+              },
+            },
+          })
+        }
       })
 
       // Payment processed successfully

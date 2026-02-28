@@ -5,6 +5,9 @@ import Link from "next/link"
 import { MODEL_PRICING } from "@/lib/model-pricing"
 import { RehearsalSection } from "@/components/rehearsal-section"
 import { t } from "@/lib/i18n"
+import { useModelPreference } from "@/hooks/use-model-preference"
+import { SignalIcon } from "@/components/signal-icon"
+import { PromptToolbar } from "@/components/dev/prompt-toolbar"
 
 interface VideoSegment {
   id: string
@@ -54,6 +57,16 @@ interface LocationData {
   photos: { url: string; note?: string }[]
 }
 
+interface Prop {
+  id: string
+  name: string
+  category: string
+  photoUrl: string | null
+  description: string | null
+  isKey: boolean
+  sceneKeys: string[]
+}
+
 interface Script {
   id: string
   title: string
@@ -61,14 +74,11 @@ interface Script {
   scenes: Scene[]
   roles: Role[]
   locations: LocationData[]
+  props: Prop[]
   videoSegments: VideoSegment[]
 }
 
-const MODELS = [
-  { id: "seedance_2_0", name: "Seedance 2.0", res: ["720p", "480p"], maxDur: 15, audio: true },
-  { id: "seedance_1_5_pro", name: "Seedance 1.5 Pro", res: ["1080p", "720p"], maxDur: 12, audio: true },
-  { id: "seedance_1_0_pro", name: "Seedance 1.0 Pro", res: ["1080p", "720p"], maxDur: 12, audio: false },
-]
+// Models now configured in Settings → lib/model-config.ts
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   pending: { bg: "#F3F4F6", color: "#6B7280", label: "Pending" },
@@ -149,8 +159,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const [selectedEp, setSelectedEp] = useState(episodes[0] ?? 1)
   const [segments, setSegments] = useState<VideoSegment[]>(script.videoSegments)
   const [selectedSegId, setSelectedSegId] = useState<string | null>(null)
-  const [model, setModel] = useState("seedance_2_0")
-  const [resolution, setResolution] = useState("720p")
+  const { modelId: model, resolution, model: currentModel } = useModelPreference("theater")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSplitting, setIsSplitting] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
@@ -160,7 +169,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
   const [useChainMode, setUseChainMode] = useState(true) // chain mode = visual continuity via last-frame extraction
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
-  const [assetTab, setAssetTab] = useState<"characters" | "locations" | "materials">("characters")
+  const [assetTab, setAssetTab] = useState<"characters" | "locations" | "props" | "materials">("characters")
   const promptRef = useRef<HTMLTextAreaElement>(null)
   const dropPosRef = useRef<number>(0) // tracks caret position during drag for accurate drop insertion
 
@@ -463,8 +472,6 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     return parts
   }
 
-  const currentModel = MODELS.find(m => m.id === model)
-
   // ── Main tab: call sheet or segments ──
   const [mainTab, setMainTab] = useState<"callsheet" | "segments" | "rehearsal">("callsheet")
 
@@ -579,13 +586,14 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
     {/* ── Main Tab Bar ── */}
     <div className="flex items-center px-3 gap-0 flex-shrink-0" style={{ background: "#E2E2E2", borderBottom: "1px solid #C8C8C8" }}>
       {([
-        { id: "callsheet", label: t("dev.theater.tabCallSheet") },
-        { id: "rehearsal", label: t("dev.theater.tabRehearsal") },
-        { id: "segments", label: t("dev.theater.tabAction") },
+        { id: "callsheet", label: t("dev.theater.tabCallSheet"), tooltip: t("dev.theater.tooltipCallSheet") },
+        { id: "rehearsal", label: t("dev.theater.tabRehearsal"), tooltip: t("dev.theater.tooltipRehearsal") },
+        { id: "segments", label: t("dev.theater.tabAction"), tooltip: t("dev.theater.tooltipAction") },
       ] as const).map(tab => (
         <button
           key={tab.id}
           onClick={() => setMainTab(tab.id)}
+          title={tab.tooltip}
           className="px-4 py-2 text-[11px] font-medium relative transition-colors"
           style={{ color: mainTab === tab.id ? "#1A1A1A" : "#888" }}
         >
@@ -640,39 +648,16 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           })}
         </div>
 
-        {/* Model selector */}
-        <div className="px-3 py-3 space-y-2" style={{ borderTop: "1px solid #C8C8C8" }}>
-          <div>
-            <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>{t("dev.theater.model")}</label>
-            <select
-              value={model}
-              onChange={e => { setModel(e.target.value); const m = MODELS.find(x => x.id === e.target.value); if (m && !m.res.includes(resolution)) setResolution(m.res[0]) }}
-              className="w-full text-[11px] rounded px-2 py-1 focus:outline-none"
-              style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#444" }}
-            >
-              {MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+        {/* Model info (configured in Settings) */}
+        <div className="px-3 py-3 space-y-1.5" style={{ borderTop: "1px solid #C8C8C8" }}>
+          <div className="flex items-center gap-2">
+            {currentModel && <SignalIcon signal={currentModel.signal} available={currentModel.available} size={12} />}
+            <span className="text-[11px] font-medium" style={{ color: "#444" }}>{currentModel?.name ?? model}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#E0E0E0", color: "#666" }}>{resolution}</span>
+            {currentModel?.maxDuration && (
+              <span className="text-[10px]" style={{ color: "#999" }}>{t("dev.theater.max")} {currentModel.maxDuration}s</span>
+            )}
           </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>{t("dev.theater.resolution")}</label>
-              <select
-                value={resolution}
-                onChange={e => setResolution(e.target.value)}
-                className="w-full text-[11px] rounded px-2 py-1 focus:outline-none"
-                style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#444" }}
-              >
-                {(currentModel?.res || ["720p"]).map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="text-[9px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: "#AAA" }}>{t("dev.theater.max")}</label>
-              <div className="text-[11px] px-2 py-1 rounded" style={{ background: "#E0E0E0", border: "1px solid #C0C0C0", color: "#444" }}>
-                {currentModel?.maxDur ?? 12}s
-              </div>
-            </div>
-          </div>
-          {/* Audio badge */}
           {currentModel?.audio && (
             <div className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded" style={{ background: "#F0FDF4", color: "#166534", border: "1px solid #BBF7D0" }}>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -685,6 +670,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
           )}
           <div className="flex items-center justify-between">
             <span className="text-[10px]" style={{ color: "#AAA" }}>{t("dev.theater.balanceCoins").replace("{n}", String(balance))}</span>
+            <a href="/settings" target="_blank" className="text-[10px] underline" style={{ color: "#888" }}>{t("settings.aiModels")}</a>
           </div>
         </div>
       </div>
@@ -1030,8 +1016,60 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
               </div>
               <div className="p-4">
                 {epSegments.length === 0 ? (
-                  <div className="text-center text-[11px] py-4" style={{ color: "#CCC" }}>
-                    {t("dev.theater.noSegments")} <button onClick={() => setMainTab("segments")} className="underline" style={{ color: "#4F46E5" }}>{t("dev.theater.goToSegments")}</button>
+                  <div className="py-4">
+                    {/* 3-step production guide */}
+                    <div className="flex items-start gap-3">
+                      {[
+                        {
+                          step: 1,
+                          label: t("dev.theater.guideStep1"),
+                          desc: t("dev.theater.guideStep1Desc"),
+                          done: epScenes.length > 0,
+                          icon: "📝",
+                        },
+                        {
+                          step: 2,
+                          label: t("dev.theater.guideStep2"),
+                          desc: t("dev.theater.guideStep2Desc"),
+                          done: script.roles.length > 0,
+                          icon: "🎭",
+                        },
+                        {
+                          step: 3,
+                          label: t("dev.theater.guideStep3"),
+                          desc: t("dev.theater.guideStep3Desc"),
+                          done: false,
+                          icon: "🎬",
+                        },
+                      ].map((s, i) => (
+                        <div key={i} className="flex-1 text-center">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-1.5 text-base"
+                            style={{
+                              background: s.done ? "#D1FAE5" : i === 0 ? "#EEF2FF" : "#F9FAFB",
+                              border: s.done ? "2px solid #34D399" : "2px solid #E5E7EB",
+                            }}
+                          >
+                            {s.done ? "✅" : s.icon}
+                          </div>
+                          <p className="text-[10px] font-semibold" style={{ color: s.done ? "#065F46" : "#1A1A1A" }}>
+                            {s.label}
+                          </p>
+                          <p className="text-[9px] mt-0.5" style={{ color: "#999" }}>
+                            {s.desc}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-center mt-3">
+                      <button
+                        onClick={() => setMainTab("segments")}
+                        className="text-[10px] px-4 py-1.5 rounded-lg font-semibold"
+                        style={{ background: "#4F46E5", color: "#fff" }}
+                      >
+                        {t("dev.theater.goToSegments")}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex gap-3 flex-wrap">
@@ -1276,17 +1314,33 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
 
               {/* ── Enhanced Prompt Editor with Drag & Drop Asset Tray ── */}
               <div className="space-y-3">
-                {/* Prompt header with re-generate button */}
+                {/* Prompt header with toolbar + re-generate button */}
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#999" }}>{t("dev.theater.prompt")}</label>
-                  <button
-                    onClick={() => handleRegenerate(selectedSeg.id)}
-                    disabled={isSubmitting || ["submitted", "generating", "reserved"].includes(selectedSeg.status)}
-                    className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded font-medium transition-colors disabled:opacity-40"
-                    style={{ background: "#4F46E5", color: "#fff" }}
-                  >
-                    {isSubmitting ? "..." : t("dev.theater.regenBtn")}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <PromptToolbar
+                      value={editingPrompts[selectedSeg.id] ?? selectedSeg.prompt ?? ""}
+                      onValueChange={(v) => setEditingPrompts(prev => ({ ...prev, [selectedSeg.id]: v }))}
+                      onSave={async () => {
+                        const prompt = editingPrompts[selectedSeg.id]
+                        if (prompt === undefined) return
+                        await fetch("/api/video/segment", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ segmentId: selectedSeg.id, prompt }),
+                        })
+                      }}
+                      theme="light"
+                    />
+                    <button
+                      onClick={() => handleRegenerate(selectedSeg.id)}
+                      disabled={isSubmitting || ["submitted", "generating", "reserved"].includes(selectedSeg.status)}
+                      className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded font-medium transition-colors disabled:opacity-40"
+                      style={{ background: "#4F46E5", color: "#fff" }}
+                    >
+                      {isSubmitting ? "..." : t("dev.theater.regenBtn")}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Scene heading badge */}
@@ -1374,6 +1428,7 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                     {([
                       { id: "characters" as const, icon: "👤", label: t("dev.theater.assetCharacters") },
                       { id: "locations" as const, icon: "🏞", label: t("dev.theater.assetLocations") },
+                      { id: "props" as const, icon: "🎭", label: t("dev.theater.assetProps") },
                       { id: "materials" as const, icon: "🎬", label: t("dev.theater.assetMaterials") },
                     ]).map(tab => (
                       <button
@@ -1510,6 +1565,43 @@ export function TheaterWorkspace({ script, initialBalance }: { script: Script; i
                             })}
                         </div>
                       ) : <div className="py-4 text-center text-[10px]" style={{ color: "#CCC" }}>{t("dev.theater.noLocationData")}</div>
+                    })()}
+
+                    {/* ── Props tab ── */}
+                    {assetTab === "props" && (() => {
+                      const propsData = script.props || []
+                      return propsData.length > 0 ? (
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {propsData.map(prop => (
+                            <div
+                              key={prop.id}
+                              draggable
+                              onDragStart={e => {
+                                e.dataTransfer.setData("text/plain", `@${prop.name}`)
+                                e.dataTransfer.effectAllowed = "copy"
+                              }}
+                              className="relative rounded overflow-hidden cursor-grab active:cursor-grabbing group"
+                              style={{ aspectRatio: "1", background: "#F0F0F0", border: "1px solid #E0E0E0" }}
+                            >
+                              {prop.photoUrl ? (
+                                <img src={prop.photoUrl} alt={prop.name} className="absolute inset-0 w-full h-full object-cover" />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="text-xl">🎭</span>
+                                </div>
+                              )}
+                              <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70 to-transparent">
+                                <p className="text-[9px] font-medium text-white truncate">{prop.name}</p>
+                              </div>
+                              {prop.isKey && (
+                                <div className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded text-[7px] font-bold" style={{ background: "#F59E0B", color: "#fff" }}>KEY</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-center py-4" style={{ color: "#999" }}>{t("dev.theater.noPropsData")}</p>
+                      )
                     })()}
 
                     {/* ── Materials tab ── */}

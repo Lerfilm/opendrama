@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { cookies } from "next/headers"
+import { ModelSettingsCard } from "@/components/model-settings-card"
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -89,6 +90,9 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* AI 模型设置 */}
+      <ModelSettingsCard />
+
       {/* 通知设置 */}
       <Card>
         <CardHeader>
@@ -128,6 +132,27 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Developer Tools */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("settings.devTools")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Link href="/developer">
+            <div className="flex justify-between items-center p-3 -mx-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
+              <div>
+                <p className="text-sm font-medium">{t("settings.devToolsToggle")}</p>
+                <p className="text-xs text-muted-foreground">{t("settings.devToolsDesc")}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-medium uppercase tracking-wider">Desktop</span>
+                <span className="text-sm text-primary">→</span>
+              </div>
+            </div>
+          </Link>
+        </CardContent>
+      </Card>
+
       {/* 开发团队 */}
       <Card>
         <CardHeader>
@@ -148,7 +173,11 @@ export default async function SettingsPage() {
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">{t("settings.softwareEng")}</span>
-            <span className="text-sm font-medium">Mia</span>
+            <span className="text-sm font-medium">Mia, Shao Shuai, Charlie</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">{t("settings.consultant")}</span>
+            <span className="text-sm font-medium">Sun Yao</span>
           </div>
         </CardContent>
       </Card>

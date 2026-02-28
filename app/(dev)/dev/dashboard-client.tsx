@@ -447,6 +447,13 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
   return (
     <div className="h-full overflow-y-auto p-6 dev-scrollbar" style={{ background: "#F0F0F0" }}>
       <div className="max-w-5xl mx-auto">
+        {/* Back to Studio link */}
+        <div className="mb-3">
+          <Link href="/studio" className="inline-flex items-center gap-1 text-xs font-medium hover:underline" style={{ color: "#6366F1" }}>
+            ← Back to Studio
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -494,7 +501,7 @@ export function DevDashboardClient({ scripts: initialScripts, trashedScripts: in
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowModal(true)}
-                className="flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded transition-colors"
+                className="flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded transition-colors shrink-0 whitespace-nowrap"
                 style={{ background: "#4F46E5", color: "#fff" }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>

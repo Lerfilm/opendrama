@@ -1,11 +1,12 @@
 export const dynamic = "force-dynamic"
 import prisma from "@/lib/prisma"
-import { Star, Compass } from "@/components/icons"
+import { Star, Compass, Play } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
 import { createT, getLocaleAsync } from "@/lib/i18n"
 import { DiscoverSearch } from "./discover-search"
+import { getGenreGradient } from "@/lib/genre-colors"
 
 const GENRES = [
   { key: "all", label: "discover.allGenres" },
@@ -14,12 +15,16 @@ const GENRES = [
   { key: "romance", label: "discover.romance" },
   { key: "thriller", label: "discover.thriller" },
   { key: "fantasy", label: "discover.fantasy" },
+  { key: "horror", label: "discover.horror" },
+  { key: "action", label: "discover.action" },
+  { key: "mystery", label: "discover.mystery" },
 ]
 
 const TABS = [
   { key: "trending", label: "discover.trending" },
   { key: "topRated", label: "discover.topRated" },
   { key: "latest", label: "discover.latest" },
+  { key: "weeklyTop", label: "discover.weeklyTop" },
 ]
 
 export default async function DiscoverPage({
@@ -98,6 +103,10 @@ export default async function DiscoverPage({
     sorted = sorted
       .filter(s => (ratingMap[s.id]?.count || 0) >= 1)
       .sort((a, b) => (ratingMap[b.id]?.avg || 0) - (ratingMap[a.id]?.avg || 0))
+  } else if (tab === "weeklyTop") {
+    // Weekly top: sort by viewCount, limit to 10
+    sorted.sort((a, b) => b.viewCount - a.viewCount)
+    sorted = sorted.slice(0, 10)
   }
 
   return (
@@ -151,8 +160,9 @@ export default async function DiscoverPage({
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-          {sorted.map((series) => {
+          {sorted.map((series, index) => {
             const rating = ratingMap[series.id]
+            const showRank = tab === "weeklyTop"
 
             return (
               <Link key={series.id} href={`/series/${series.id}`}>
@@ -167,8 +177,21 @@ export default async function DiscoverPage({
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-stone-800 to-stone-900 flex items-center justify-center text-white/30 text-sm">
-                      {t("common.noCover")}
+                    <div className={`w-full h-full bg-gradient-to-br ${getGenreGradient(series.genre)} flex flex-col items-center justify-center gap-2 px-3`}>
+                      <Play className="w-8 h-8 text-white/40" />
+                      <span className="text-white/50 text-xs text-center font-medium line-clamp-2">{series.title}</span>
+                    </div>
+                  )}
+                  {/* Ranking number overlay */}
+                  {showRank && (
+                    <div className="absolute top-2 left-2">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-sm ${
+                        index < 3
+                          ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg"
+                          : "bg-black/60 text-white/90 backdrop-blur-sm"
+                      }`}>
+                        {index + 1}
+                      </div>
                     </div>
                   )}
                   {/* Bottom gradient + title + stats */}
@@ -180,7 +203,9 @@ export default async function DiscoverPage({
                     </h3>
                     <div className="flex items-center justify-between">
                       <p className="text-white/60 text-[10px] md:text-xs">
-                        {t("discover.viewCount", { count: series.viewCount })}
+                        {series.viewCount === 1
+                          ? t("discover.viewCountSingular")
+                          : t("discover.viewCount", { count: series.viewCount })}
                       </p>
                       {rating && rating.count > 0 && (
                         <div className="flex items-center gap-0.5">

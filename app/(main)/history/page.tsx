@@ -4,9 +4,10 @@ import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Play } from "@/components/icons"
+import { Play, Clock } from "@/components/icons"
 import Link from "next/link"
 import { createT, getLocaleAsync } from "@/lib/i18n"
+import { EmptyState } from "@/components/empty-state"
 
 export default async function WatchHistoryPage() {
   const session = await auth()
@@ -66,13 +67,12 @@ export default async function WatchHistoryPage() {
       </div>
 
       {uniqueHistory.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <p className="text-lg mb-2">{t("history.noHistory")}</p>
-          <p className="text-sm mb-4">{t("history.noHistoryHint")}</p>
-          <Link href="/discover">
-            <Button>{t("history.goDiscover")}</Button>
-          </Link>
-        </div>
+        <EmptyState
+          icon={<Clock className="w-8 h-8" />}
+          title={t("history.noHistory")}
+          description={t("history.noHistoryHint")}
+          action={{ label: t("history.goDiscover"), href: "/discover" }}
+        />
       ) : (
         <div className="space-y-3">
           {uniqueHistory.map((event) => {

@@ -1,14 +1,61 @@
 "use client"
 
-import { useState } from "react"
-import { usePathname } from "next/navigation"
+import { useState, useEffect, useRef } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import { t } from "@/lib/i18n"
 import { SettingsPanel } from "./settings-panel"
 
+interface RecentProject {
+  id: string
+  title: string
+}
+
 export function LeftNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const [showSettings, setShowSettings] = useState(false)
+  const [pickerModule, setPickerModule] = useState<string | null>(null)
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
+  const [projectsLoaded, setProjectsLoaded] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!pickerModule) return
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerModule(null)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [pickerModule])
+
+  // Load recent projects on demand
+  const openPicker = async (moduleId: string) => {
+    setPickerModule(moduleId)
+    if (!projectsLoaded) {
+      try {
+        const res = await fetch("/api/scripts?limit=5")
+        if (res.ok) {
+          const data = await res.json()
+          setRecentProjects(
+            (data.scripts || []).slice(0, 5).map((s: { id: string; title: string }) => ({
+              id: s.id,
+              title: s.title,
+            }))
+          )
+        }
+      } catch { /* ignore */ }
+      setProjectsLoaded(true)
+    }
+  }
+
+  const selectProject = (moduleId: string, projectId: string) => {
+    setPickerModule(null)
+    router.push(`/dev/${moduleId}/${projectId}`)
+  }
 
   // Extract scriptId from any of the module paths:
   // /dev/script/[id], /dev/casting/[id], /dev/theater/[id], /dev/editing/[id], /dev/finishing/[id], /dev/media/[id]
@@ -152,19 +199,47 @@ export function LeftNav() {
               <span className="text-[9px] mt-0.5 font-medium tracking-wide">{item.label}</span>
             </Link>
           ) : (
-            <div
-              className="relative flex flex-col items-center justify-center w-14 h-12 cursor-not-allowed"
-              style={{ color: "#3A3A40" }}
-            >
-              {item.icon}
-              <span className="text-[9px] mt-0.5 font-medium tracking-wide">{item.label}</span>
-              {/* Tooltip */}
-              <div
-                className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50"
-                style={{ background: "#2C2C30", color: "#AAA", border: "1px solid #3A3A3E" }}
+            <div className="relative">
+              <button
+                onClick={() => openPicker(item.id)}
+                className="relative flex flex-col items-center justify-center w-14 h-12 cursor-pointer hover:opacity-80 transition-opacity"
+                style={{ color: pickerModule === item.id ? "#8888CC" : "#3A3A40" }}
               >
-                {t("dev.nav.openProject")}
-              </div>
+                {item.icon}
+                <span className="text-[9px] mt-0.5 font-medium tracking-wide">{item.label}</span>
+              </button>
+              {/* Project picker popover */}
+              {pickerModule === item.id && (
+                <div
+                  ref={pickerRef}
+                  className="absolute left-full top-0 ml-1 w-48 rounded-lg shadow-xl overflow-hidden z-50"
+                  style={{ background: "#2C2C30", border: "1px solid #3A3A3E" }}
+                >
+                  <div className="px-3 py-2" style={{ borderBottom: "1px solid #3A3A3E" }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#777" }}>
+                      {t("dev.nav.recentProjects")}
+                    </p>
+                  </div>
+                  {recentProjects.length === 0 ? (
+                    <div className="px-3 py-4 text-center">
+                      <p className="text-[11px]" style={{ color: "#666" }}>{t("dev.nav.noProjects")}</p>
+                    </div>
+                  ) : (
+                    <div className="py-1">
+                      {recentProjects.map((proj) => (
+                        <button
+                          key={proj.id}
+                          onClick={() => selectProject(item.id, proj.id)}
+                          className="w-full text-left px-3 py-2 text-[11px] truncate hover:bg-white/5 transition-colors"
+                          style={{ color: "#CCC" }}
+                        >
+                          {proj.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

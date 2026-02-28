@@ -2,6 +2,10 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { directDeduction } from "@/lib/tokens"
+
+// Configurable free episode threshold (env override or default 5)
+const FREE_EPISODE_COUNT = parseInt(process.env.FREE_EPISODE_COUNT || "5", 10)
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -40,8 +44,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Already unlocked" }, { status: 400 })
     }
 
-    // 前5集免费
-    if (episode.episodeNum <= 5) {
+    // Free episodes (configurable via FREE_EPISODE_COUNT env var, default 5)
+    if (episode.episodeNum <= FREE_EPISODE_COUNT) {
       await prisma.episodeUnlock.create({
         data: {
           userId: session.user.id,
@@ -53,33 +57,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
-    // 检查金币余额
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { coins: true },
-    })
+    // Atomic balance check + deduction using directDeduction()
+    // Updates UserBalance, creates TokenTransaction audit, and syncs User.coins
+    const charged = await directDeduction(
+      session.user.id,
+      episode.unlockCost,
+      {
+        type: "episode_unlock",
+        episodeId,
+        episodeNum: episode.episodeNum,
+      }
+    )
 
-    if (!user || user.coins < episode.unlockCost) {
+    if (!charged) {
       return NextResponse.json(
         { error: "Insufficient coins" },
         { status: 400 }
       )
     }
 
-    // 扣除金币并解锁
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: session.user.id },
-        data: { coins: { decrement: episode.unlockCost } },
-      }),
-      prisma.episodeUnlock.create({
-        data: {
-          userId: session.user.id,
-          episodeId,
-          coinsCost: episode.unlockCost,
-        },
-      }),
-    ])
+    // Create unlock record
+    await prisma.episodeUnlock.create({
+      data: {
+        userId: session.user.id,
+        episodeId,
+        coinsCost: episode.unlockCost,
+      },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

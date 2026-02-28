@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { getRandomRarity, shouldDropCard } from "@/lib/cards"
+import { randomInt } from "crypto"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -21,8 +22,38 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // SECURITY: Validate completedRate server-side
+    const rate = typeof completedRate === "number" ? completedRate : parseFloat(completedRate)
+    if (isNaN(rate) || rate < 0 || rate > 1) {
+      return NextResponse.json({ error: "Invalid completedRate" }, { status: 400 })
+    }
+
+    // SECURITY: Verify against actual watch history
+    const recentWatch = await prisma.watchEvent.findFirst({
+      where: {
+        userId: session.user.id,
+        episodeId,
+        completedRate: { gte: 0.8 },
+      },
+      orderBy: { createdAt: "desc" },
+    })
+
+    if (!recentWatch) {
+      return NextResponse.json({ dropped: false })
+    }
+
+    // SECURITY: Cooldown — only allow one drop per episode per 24 hours
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const recentDrop = await prisma.userCard.findFirst({
+      where: {
+        userId: session.user.id,
+        updatedAt: { gte: oneDayAgo },
+      },
+      orderBy: { updatedAt: "desc" },
+    })
+
     // 检查是否触发掉落（观看完成率 > 80%）
-    if (!shouldDropCard(completedRate)) {
+    if (!shouldDropCard(rate)) {
       return NextResponse.json({ dropped: false })
     }
 
@@ -53,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     if (rarityCards.length === 0) {
       // 如果该稀有度没有卡牌，随机选择一张
-      const randomCard = cards[Math.floor(Math.random() * cards.length)]
+      const randomCard = cards[randomInt(cards.length)]
       
       // 添加到用户收藏（或增加数量）
       const userCard = await prisma.userCard.upsert({
@@ -85,7 +116,7 @@ export async function POST(req: NextRequest) {
     }
 
     const droppedCard =
-      rarityCards[Math.floor(Math.random() * rarityCards.length)]
+      rarityCards[randomInt(rarityCards.length)]
 
     // 添加到用户收藏（或增加数量）
     const userCard = await prisma.userCard.upsert({

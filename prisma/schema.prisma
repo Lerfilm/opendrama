@@ -38,6 +38,9 @@ model User {
   achievementCards  AchievementCard[]
   series            Series[]
   rehearsals        Rehearsal[]
+  dailyCheckIns     DailyCheckIn[]
+  danmakus          Danmaku[]
+  feedback          Feedback[]
 
   @@map("users")
 }
@@ -107,6 +110,7 @@ model Series {
   coverUrl    String?
   coverTall   String?               // 竖版海报 (3:4)
   coverWide   String?               // 横版封面 (16:9)
+  trailerMuxPlaybackId String?     // 预告片 Mux 播放 ID
   genre       String?   // romance, thriller, fantasy, comedy, drama, horror, action, mystery
   tags        String?   @db.Text  // JSON: ["Love Triangle", "Hidden Identity", "Billionaire"]
   viewCount   Int       @default(0) // 总浏览量
@@ -212,6 +216,7 @@ model Episode {
   series         Series          @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   episodeUnlocks EpisodeUnlock[]
   watchEvents    WatchEvent[]
+  danmakus       Danmaku[]
 
   @@unique([seriesId, episodeNum])
   @@index([seriesId])
@@ -517,16 +522,49 @@ model VideoSegment {
 
 // 用户金币余额
 model UserBalance {
-  id             String @id @default(cuid())
-  userId         String @unique
-  balance        Int    @default(0)     // 当前可用余额
-  reserved       Int    @default(0)     // 预扣冻结
-  totalPurchased Int    @default(0)     // 累计充值
-  totalConsumed  Int    @default(0)     // 累计消耗
+  id                    String  @id @default(cuid())
+  userId                String  @unique
+  balance               Int     @default(0)     // 当前可用余额
+  reserved              Int     @default(0)     // 预扣冻结
+  totalPurchased        Int     @default(0)     // 累计充值
+  totalConsumed         Int     @default(0)     // 累计消耗
+  firstChargeBonusUsed  Boolean @default(false) // 首充双倍是否已使用
 
   user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_balances")
+}
+
+// 每日签到
+model DailyCheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // "2026-02-27" 格式，确保每天一次
+  reward    Int      // 奖励金币数
+  streak    Int      @default(1) // 连续签到天数
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("daily_checkins")
+}
+
+// 弹幕
+model Danmaku {
+  id        String   @id @default(cuid())
+  episodeId String
+  userId    String
+  content   String   @db.VarChar(100) // 限制 100 字
+  timestamp Float    // 视频时间点（秒）
+  color     String   @default("#FFFFFF")
+  createdAt DateTime @default(now())
+
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([episodeId, timestamp])
+  @@map("danmaku")
 }
 
 // 金币交易记录
@@ -646,4 +684,26 @@ model Rehearsal {
   @@index([userId, createdAt])
   @@index([status])
   @@map("rehearsals")
+}
+
+// ============================================
+// 测试者反馈系统
+// ============================================
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String?
+  category  String   @default("general") // general | bug | feature
+  content   String   @db.Text
+  page      String?
+  status    String   @default("new") // new | read | resolved
+  adminNote String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("feedback")
 }

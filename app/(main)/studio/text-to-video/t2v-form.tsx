@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Sparkles, ImageIcon, Loader2, Coins } from "@/components/icons"
 import { t } from "@/lib/i18n"
+import { PromptToolbar } from "@/components/dev/prompt-toolbar"
 
 const STYLES = [
   { id: "auto", label: "t2v.styleAuto", color: "from-gray-400 to-gray-600" },
@@ -82,6 +83,12 @@ export function TextToVideoForm({ userCoins }: { userCoins: number }) {
             placeholder={t("t2v.promptPlaceholder")}
             rows={4}
             className="w-full p-4 bg-transparent border-0 resize-none text-sm focus:outline-none focus:ring-0 placeholder:text-muted-foreground/60"
+          />
+          <PromptToolbar
+            value={prompt}
+            onValueChange={(v) => setPrompt(v)}
+            theme="light"
+            className="mt-1 px-4"
           />
           <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-t border-border">
             <span className="text-xs text-muted-foreground">

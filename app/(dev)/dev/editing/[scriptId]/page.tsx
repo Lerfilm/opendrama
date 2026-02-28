@@ -14,6 +14,9 @@ export default async function EditingPage({ params }: { params: Promise<{ script
     include: {
       scenes: { orderBy: [{ episodeNum: "asc" }, { sortOrder: "asc" }] },
       videoSegments: { orderBy: [{ episodeNum: "asc" }, { segmentIndex: "asc" }] },
+      roles: { select: { id: true, name: true, role: true, avatarUrl: true, referenceImages: true, description: true } },
+      locations: { select: { id: true, name: true, type: true, photoUrl: true, description: true, sceneKeys: true } },
+      props: { select: { id: true, name: true, category: true, photoUrl: true, description: true, isKey: true, sceneKeys: true } },
     },
   })
 

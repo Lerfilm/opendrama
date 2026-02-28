@@ -146,6 +146,34 @@ export default function SubscribePage() {
         </Button>
       </div>
 
+      {/* VIP vs Free comparison */}
+      <div className="rounded-xl border overflow-hidden">
+        <div className="bg-muted/50 px-4 py-2.5">
+          <h3 className="text-sm font-semibold">{t("subscribe.comparison")}</h3>
+        </div>
+        <div className="divide-y text-xs">
+          {([
+            { feature: t("subscribe.cmp.dailyFree"), free: "5", vip: t("subscribe.cmp.unlimited") },
+            { feature: t("subscribe.cmp.dailyCoins"), free: "0", vip: "200-250" },
+            { feature: t("subscribe.cmp.aiScripts"), free: "3 / " + t("subscribe.cmp.day"), vip: "500-1000 / " + t("subscribe.cmp.month") },
+            { feature: t("subscribe.cmp.cardDrop"), free: "1x", vip: "1.5x" },
+            { feature: t("subscribe.cmp.t2v"), free: t("subscribe.cmp.fullPrice"), vip: t("subscribe.cmp.halfOff") },
+            { feature: t("subscribe.cmp.badge"), free: "—", vip: "⭐" },
+          ]).map((row, i) => (
+            <div key={i} className="flex items-center px-4 py-2.5">
+              <span className="flex-1 text-muted-foreground">{row.feature}</span>
+              <span className="w-16 text-center text-muted-foreground">{row.free}</span>
+              <span className="w-20 text-center font-semibold text-amber-600">{row.vip}</span>
+            </div>
+          ))}
+          <div className="flex items-center px-4 py-1.5 bg-muted/30 text-[10px]">
+            <span className="flex-1" />
+            <span className="w-16 text-center text-muted-foreground">{t("subscribe.cmp.free")}</span>
+            <span className="w-20 text-center text-amber-600 font-medium">VIP</span>
+          </div>
+        </div>
+      </div>
+
       <div className="text-xs text-muted-foreground space-y-1 px-2">
         <p>• {t("subscribe.info1")}</p>
         <p>• {t("subscribe.info2")}</p>

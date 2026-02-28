@@ -47,9 +47,8 @@ export default function EpisodeListClient({
 
   function handleEpisodeClick(ep: Episode) {
     if (isAccessible(ep)) {
-      // Can play directly
-      setActiveEpisode(ep)
-      setShowPlayer(true)
+      // Navigate to swipe player for immersive viewing
+      router.push(`/watch/${seriesId}?ep=${ep.episodeNum}`)
     } else {
       // Need to unlock
       if (!userId) {

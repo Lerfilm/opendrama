@@ -11,6 +11,9 @@ import {
 import Link from "next/link"
 import { t } from "@/lib/i18n"
 import { MODEL_PRICING } from "@/lib/model-pricing"
+import { useModelPreference } from "@/hooks/use-model-preference"
+import { SignalIcon } from "@/components/signal-icon"
+import { PromptToolbar } from "@/components/dev/prompt-toolbar"
 
 // ─── Types ────────────────────────────────────────
 
@@ -76,14 +79,7 @@ interface SegmentsTabProps {
 
 // ─── Constants ────────────────────────────────────
 
-const MODELS = [
-  { id: "seedance_1_5_pro",      name: "Seedance 1.5 Pro",       resolutions: ["1080p", "720p"] },
-  { id: "seedance_1_0_pro",      name: "Seedance 1.0 Pro",       resolutions: ["1080p", "720p"] },
-  { id: "seedance_1_0_pro_fast", name: "Seedance 1.0 Pro Fast",  resolutions: ["1080p", "720p"] },
-  { id: "jimeng_3_0_pro",        name: "Jimeng 3.0 Pro",         resolutions: ["1080p"] },
-  { id: "jimeng_3_0",            name: "Jimeng 3.0",             resolutions: ["1080p", "720p"] },
-  { id: "jimeng_s2_pro",         name: "Jimeng S2 Pro",          resolutions: ["720p"] },
-]
+// Models now configured in Settings → lib/model-config.ts
 
 const SHOT_TYPES = ["wide", "medium", "close-up", "extreme-close-up"]
 const CAMERA_MOVES = ["static", "pan", "tilt", "dolly", "tracking", "orbit"]
@@ -91,9 +87,8 @@ const CAMERA_MOVES = ["static", "pan", "tilt", "dolly", "tracking", "orbit"]
 // ─── Component ────────────────────────────────────
 
 export function SegmentsTab({ script, selectedEpisode, onDataChanged }: SegmentsTabProps) {
-  // Model & resolution
-  const [selectedModel, setSelectedModel] = useState("seedance_1_5_pro")
-  const [selectedResolution, setSelectedResolution] = useState("720p")
+  // Model & resolution (from Settings)
+  const { modelId: selectedModel, resolution: selectedResolution, model: selectedModelInfo } = useModelPreference("studio")
 
   // AI Split state
   const [isSplitting, setIsSplitting] = useState(false)
@@ -166,9 +161,8 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
     [script.scenes, selectedEpisode]
   )
 
-  // Active model info
-  const modelInfo = MODELS.find(m => m.id === selectedModel)
-  const availableResolutions = modelInfo?.resolutions || ["720p"]
+  // Active model info (from Settings hook)
+  const availableResolutions = selectedModelInfo?.resolutions || ["720p"]
 
   // Are we working with generated (unsaved) or existing (saved) segments?
   const activeSegments = generatedSegments.length > 0 ? generatedSegments : []
@@ -386,6 +380,12 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
                 <label className="text-xs font-medium text-muted-foreground block mb-1">
                   {t("studio.segmentPrompt")}
                 </label>
+                <PromptToolbar
+                  value={prompt}
+                  onValueChange={isEditable ? (v) => setEditingPrompts(prev => ({ ...prev, [idx]: v })) : undefined}
+                  theme="light"
+                  className="mb-1"
+                />
                 <textarea
                   value={prompt}
                   onChange={e => isEditable && setEditingPrompts(prev => ({ ...prev, [idx]: e.target.value }))}
@@ -465,45 +465,18 @@ export function SegmentsTab({ script, selectedEpisode, onDataChanged }: Segments
 
   return (
     <div className="space-y-4">
-      {/* A. Model & Resolution selector */}
+      {/* A. Model info (configured in Settings) */}
       <Card>
-        <CardContent className="p-3 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">
-                {t("studio.selectModel")}
-              </label>
-              <select
-                value={selectedModel}
-                onChange={e => {
-                  const m = e.target.value
-                  setSelectedModel(m)
-                  const info = MODELS.find(x => x.id === m)
-                  if (info && !info.resolutions.includes(selectedResolution)) {
-                    setSelectedResolution(info.resolutions[0])
-                  }
-                }}
-                className="w-full text-sm px-2 py-1.5 rounded-md border bg-background"
-              >
-                {MODELS.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
+        <CardContent className="p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {selectedModelInfo && <SignalIcon signal={selectedModelInfo.signal} available={selectedModelInfo.available} size={14} />}
+              <span className="text-sm font-medium">{selectedModelInfo?.name ?? selectedModel}</span>
+              <Badge variant="secondary" className="text-xs">{selectedResolution}</Badge>
             </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">
-                {t("studio.selectResolution")}
-              </label>
-              <select
-                value={selectedResolution}
-                onChange={e => setSelectedResolution(e.target.value)}
-                className="w-full text-sm px-2 py-1.5 rounded-md border bg-background"
-              >
-                {availableResolutions.map(r => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
+            <Link href="/settings" className="text-xs text-muted-foreground underline">
+              {t("settings.aiModels")}
+            </Link>
           </div>
         </CardContent>
       </Card>

@@ -2,28 +2,28 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Compass, PenTool, Film, User } from "@/components/icons"
+import { Home, Compass, PenTool, Play, User } from "@/components/icons"
 import { t } from "@/lib/i18n"
 
 export function BottomNav() {
   const pathname = usePathname()
 
   const navItems = [
-    { href: "/", icon: Home, label: t("nav.home"), accent: false },
-    { href: "/studio", icon: PenTool, label: t("nav.create"), accent: false },
-    { href: "/generate", icon: Film, label: t("nav.theater"), accent: true },
-    { href: "/discover", icon: Compass, label: t("nav.discover"), accent: false },
-    { href: "/profile", icon: User, label: t("nav.profile"), accent: false },
+    { key: "home", href: "/", icon: Home, label: t("nav.home"), accent: false },
+    { key: "create", href: "/studio", icon: PenTool, label: t("nav.create"), accent: false },
+    { key: "watch", href: "/discover", icon: Play, label: t("nav.watch"), accent: true },
+    { key: "discover", href: "/discover", icon: Compass, label: t("nav.discover"), accent: false },
+    { key: "profile", href: "/profile", icon: User, label: t("nav.profile"), accent: false },
   ]
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t border-border/50 safe-area-inset-bottom z-50 md:hidden">
       <div className="flex items-center justify-around h-16 max-w-screen-lg mx-auto">
-        {navItems.map(({ href, icon: Icon, label, accent }) => {
+        {navItems.map(({ key, href, icon: Icon, label, accent }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href))
           return (
             <Link
-              key={href}
+              key={key}
               href={href}
               className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
                 accent && !isActive

@@ -16,6 +16,7 @@ import SeriesViewTracker from "./view-tracker"
 import EpisodeListClient from "@/components/episode-list-client"
 import ExpandableSynopsis from "@/components/expandable-synopsis"
 import CastSection from "@/components/cast-section"
+import { getGenreGradient } from "@/lib/genre-colors"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -29,14 +30,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     select: {
       title: true, description: true, synopsis: true,
       coverUrl: true, coverWide: true,
+      genre: true,
       user: { select: { name: true } },
+      _count: { select: { episodes: true } },
     },
   })
 
   if (!series) return { title: t("series.notFound") }
 
   const desc = series.synopsis || series.description || t("series.watchAt", { title: series.title })
+  // Use uploaded cover, or fallback to dynamic OG image generator
   const ogImage = series.coverWide || series.coverUrl
+    || `/api/og?title=${encodeURIComponent(series.title)}&genre=${encodeURIComponent(series.genre || "")}&episodes=${series._count.episodes}`
 
   return {
     title: `${series.title}${series.user?.name ? ` · ${series.user.name}` : ""}`,
@@ -44,13 +49,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: series.title,
       description: desc,
-      images: ogImage ? [{ url: ogImage }] : [],
+      images: [{ url: ogImage, width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
       title: series.title,
       description: desc,
-      images: ogImage ? [ogImage] : [],
+      images: [ogImage],
     },
   }
 }
@@ -167,7 +172,7 @@ export default async function SeriesDetailPage({ params }: Props) {
             priority
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-stone-900 to-stone-950" />
+          <div className={`w-full h-full bg-gradient-to-br ${getGenreGradient(series.genre)}`} />
         )}
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
@@ -241,6 +246,7 @@ export default async function SeriesDetailPage({ params }: Props) {
       <div className="px-4 md:px-6">
         <SeriesActions
           seriesId={id}
+          seriesTitle={series.title}
           initialLiked={!!userLike}
           initialFavorited={!!userFavorite}
           initialLikeCount={likeCount}

@@ -7,6 +7,7 @@ import { t } from "@/lib/i18n"
 
 interface SeriesActionsProps {
   seriesId: string
+  seriesTitle?: string
   initialLiked: boolean
   initialFavorited: boolean
   initialLikeCount: number
@@ -22,6 +23,7 @@ function formatCount(n: number): string {
 
 export default function SeriesActions({
   seriesId,
+  seriesTitle,
   initialLiked,
   initialFavorited,
   initialLikeCount,
@@ -82,12 +84,14 @@ export default function SeriesActions({
 
   const handleShare = async () => {
     const url = `${window.location.origin}/series/${seriesId}`
+    const shareTitle = seriesTitle || "OpenDrama"
+    const shareText = t("share.seriesTemplate", { title: shareTitle })
     if (navigator.share) {
       try {
-        await navigator.share({ url })
+        await navigator.share({ title: shareTitle, text: shareText, url })
       } catch {}
     } else {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(`${shareText}\n${url}`)
     }
   }
 

@@ -12,6 +12,10 @@ export default function SeriesTags({ genre, tags }: SeriesTagsProps) {
     if (tags) tagList = JSON.parse(tags)
   } catch {}
 
+  // Filter out tags that duplicate the genre (case-insensitive)
+  const genreLower = genre?.toLowerCase() || ""
+  tagList = tagList.filter(tag => tag.toLowerCase() !== genreLower)
+
   if (!genre && tagList.length === 0) return null
 
   return (

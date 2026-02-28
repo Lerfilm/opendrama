@@ -78,13 +78,18 @@ export default async function EpisodePage({ params }: Props) {
     },
   })
 
-  const isFreeEpisode = episode.episodeNum <= 5
+  const FREE_EPISODE_COUNT = parseInt(process.env.FREE_EPISODE_COUNT || "5", 10)
+  const isFreeEpisode = episode.episodeNum <= FREE_EPISODE_COUNT
   const isUnlocked = !!unlock || isFreeEpisode
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { coins: true },
+  // Read from UserBalance (authoritative) instead of legacy User.coins
+  const userBalance = await prisma.userBalance.findUnique({
+    where: { userId },
+    select: { balance: true, reserved: true },
   })
+  const availableCoins = userBalance
+    ? userBalance.balance - userBalance.reserved
+    : 0
 
   return (
     <div className="min-h-screen bg-black">
@@ -139,10 +144,10 @@ export default async function EpisodePage({ params }: Props) {
             </div>
             <div className="flex items-center justify-between mb-6">
               <span className="text-sm text-muted-foreground">{t("episode.currentBalance")}</span>
-              <span className="font-semibold">{t("recharge.coinsAmount", { coins: user?.coins || 0 })}</span>
+              <span className="font-semibold">{t("recharge.coinsAmount", { coins: availableCoins })}</span>
             </div>
 
-            {(user?.coins || 0) >= episode.unlockCost ? (
+            {availableCoins >= episode.unlockCost ? (
               <UnlockButton
                 episodeId={episode.id}
                 cost={episode.unlockCost}

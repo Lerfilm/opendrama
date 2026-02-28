@@ -25,6 +25,9 @@ export default async function TheaterPage({ params }: { params: Promise<{ script
       locations: {
         select: { name: true, photoUrl: true, photos: true },
       },
+      props: {
+        select: { id: true, name: true, category: true, photoUrl: true, description: true, isKey: true, sceneKeys: true },
+      },
       videoSegments: { orderBy: [{ episodeNum: "asc" }, { segmentIndex: "asc" }] },
     },
   })
@@ -48,6 +51,10 @@ export default async function TheaterPage({ params }: { params: Promise<{ script
         photos: photos.map(p => ({ ...p, url: p.url ? resolveImageUrl(p.url) : p.url })),
       }
     }),
+    props: script.props.map(p => ({
+      ...p,
+      photoUrl: p.photoUrl ? resolveImageUrl(p.photoUrl) : p.photoUrl,
+    })),
     videoSegments: script.videoSegments.map(s => ({
       ...s,
       thumbnailUrl: s.thumbnailUrl ? resolveImageUrl(s.thumbnailUrl) : s.thumbnailUrl,

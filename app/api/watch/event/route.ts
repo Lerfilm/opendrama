@@ -21,13 +21,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // SECURITY: Validate and clamp all numeric fields to prevent data poisoning
+    const safePosition = Math.max(0, Math.min(Number(watchPosition) || 0, 36000)) // max 10h
+    const safeDuration = Math.max(0, Math.min(Number(watchDuration) || 0, 36000))
+    const safeRate = Math.max(0, Math.min(Number(completedRate) || 0, 1))
+
     await prisma.watchEvent.create({
       data: {
         userId: session.user.id,
         episodeId,
-        watchPosition,
-        watchDuration: watchDuration || 0,
-        completedRate: completedRate || 0,
+        watchPosition: safePosition,
+        watchDuration: safeDuration,
+        completedRate: safeRate,
         source: "web",
       },
     })

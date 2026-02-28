@@ -19,15 +19,33 @@ export default async function RechargePage() {
 
   const userBalance = await prisma.userBalance.findUnique({
     where: { userId: session.user.id },
-    select: { balance: true, reserved: true },
+    select: { balance: true, reserved: true, firstChargeBonusUsed: true },
   })
   const availableCoins = userBalance ? userBalance.balance - userBalance.reserved : 0
+  const showFirstChargeBonus = !userBalance?.firstChargeBonusUsed
 
   const icons = [Coins, Sparkles, Zap, Crown]
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 p-4 pb-20">
       <div className="max-w-screen-sm mx-auto space-y-6">
+        {/* First Charge Bonus Banner */}
+        {showFirstChargeBonus && (
+          <div className="relative bg-gradient-to-r from-rose-500 to-pink-600 rounded-2xl p-4 overflow-hidden">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full -translate-y-4 translate-x-4" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                <span className="text-lg">🎁</span>
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-sm">{t("recharge.firstChargeBonus")}</h3>
+                <p className="text-white/70 text-xs">{t("recharge.firstChargeBonusDesc")}</p>
+              </div>
+              <Badge className="ml-auto bg-white/20 text-white border-none shrink-0 text-xs">2x</Badge>
+            </div>
+          </div>
+        )}
+
         <Card className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -121,6 +139,7 @@ export default async function RechargePage() {
               <li>• {t("recharge.info2")}</li>
               <li>• {t("recharge.info3")}</li>
               <li>• {t("recharge.info4")}</li>
+              <li>• {t("recharge.pricingNote")}</li>
             </ul>
           </CardContent>
         </Card>

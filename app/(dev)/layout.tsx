@@ -1,12 +1,14 @@
 export const dynamic = "force-dynamic"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { isDeveloper, isDevModeActive } from "@/lib/developer"
+import { isDevModeActive } from "@/lib/developer"
 import { TopBar } from "@/components/dev/top-bar"
 import { LeftNav } from "@/components/dev/left-nav"
 import prisma from "@/lib/prisma"
 import { AITaskProvider } from "@/lib/ai-task-context"
 import { GlobalTaskPanel } from "@/components/dev/global-task-panel"
+import { MobileRedirect } from "@/components/dev/mobile-redirect"
+import { FeedbackWidget } from "@/components/dev/feedback-widget"
 
 export default async function DevLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -15,13 +17,8 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     redirect("/auth/signin")
   }
 
-  const isDev = process.env.NODE_ENV === "development"
-
-  if (!isDev && !isDeveloper(session.user.email)) {
-    redirect("/")
-  }
-
-  if (!isDev && !(await isDevModeActive())) {
+  // Dev mode: require devMode cookie (any logged-in user can enable it)
+  if (!(await isDevModeActive())) {
     redirect("/developer")
   }
 
@@ -47,6 +44,8 @@ export default async function DevLayout({ children }: { children: React.ReactNod
         <main className="overflow-hidden" style={{ background: "#E8E8E8" }}>{children}</main>
       </div>
       <GlobalTaskPanel />
+      <MobileRedirect />
+      <FeedbackWidget />
     </AITaskProvider>
   )
 }

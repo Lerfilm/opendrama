@@ -154,13 +154,14 @@ async function kickNextReservedSegment(scriptId: string, episodeNum: number, use
     console.log(`[VideoStatus] Sequential: segment ${next.id} submitted as task ${taskId}`)
   } catch (err) {
     console.error(`[VideoStatus] Sequential: segment ${next.id} failed to submit:`, err)
-    if (next.tokenCost && userId) {
+    // SECURITY: Atomic status check to prevent double-refund
+    const { count: failCount } = await prisma.videoSegment.updateMany({
+      where: { id: next.id, status: "reserved" },
+      data: { status: "failed", errorMessage: String(err) },
+    }).catch(() => ({ count: 0 }))
+    if (failCount > 0 && next.tokenCost && userId) {
       await refundReservation(userId, next.tokenCost, `Refund: sequential segment ${next.id} failed`).catch(() => {})
     }
-    await prisma.videoSegment.update({
-      where: { id: next.id },
-      data: { status: "failed", errorMessage: String(err) },
-    }).catch(() => {})
   }
 }
 

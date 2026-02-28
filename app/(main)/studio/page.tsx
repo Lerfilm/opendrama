@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle } from "@/components/icons"
+import { CheckCircle, Code } from "@/components/icons"
 import Link from "next/link"
 import { createT, getLocaleAsync } from "@/lib/i18n"
 
@@ -42,6 +42,29 @@ export default async function StudioPage() {
     <div className="space-y-6 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t("studio.title")}</h1>
+      </div>
+
+      {/* Pro Workspace Banner (Desktop only) */}
+      <div className="hidden md:block">
+        <Link href="/dev">
+          <div className="relative bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl p-4 overflow-hidden cursor-pointer hover:shadow-lg hover:shadow-indigo-500/20 transition-all group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center">
+                  <Code className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">{t("studio.proWorkspace")}</h3>
+                  <p className="text-white/60 text-xs">{t("studio.proWorkspaceDesc")}</p>
+                </div>
+              </div>
+              <svg className="w-5 h-5 text-white/50 group-hover:text-white/80 group-hover:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+        </Link>
       </div>
 
       {/* 我的剧本列表 */}

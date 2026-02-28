@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { setLocale, getLocale, t, type Locale } from "@/lib/i18n"
+import { getModelsForFeature, getModelById, getDefaultModel, getDefaultResolution, type ModelConfig } from "@/lib/model-config"
+import { SignalIcon } from "@/components/signal-icon"
+
+const STORAGE_KEY_PREFIX = "opendrama:model:"
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -159,6 +163,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <p className="mt-1.5 text-[10px]" style={{ color: "#555" }}>{t("dev.settings.autosaveHint")}</p>
               </div>
 
+              {/* AI Models */}
+              <DevModelSection feature="theater" label={t("settings.modelTheater")} />
+              <DevModelSection feature="studio" label={t("settings.modelStudio")} />
+
               {/* Theme (placeholder) */}
               <div>
                 <label className="block text-[11px] font-medium mb-2" style={{ color: "#A0A0A8" }}>
@@ -198,7 +206,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     { roleKey: "settings.leadDev", name: "Jeff Lee, MPSE" },
                     { roleKey: "settings.sysArch", name: "Nancy" },
                     { roleKey: "settings.uiDesign", name: "Joey" },
-                    { roleKey: "settings.softwareEng", name: "Mia" },
+                    { roleKey: "settings.softwareEng", name: "Mia, Shao Shuai, Charlie" },
+                    { roleKey: "settings.consultant", name: "Sun Yao" },
                   ].map((member, i) => (
                     <div
                       key={member.name}
@@ -282,5 +291,101 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         )}
       </div>
     </>
+  )
+}
+
+/* ── Model selection sub-component (dark theme) ── */
+
+function DevModelSection({ feature, label }: { feature: "theater" | "studio"; label: string }) {
+  const [modelId, setModelId] = useState("")
+  const [resolution, setResolution] = useState("")
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_PREFIX + feature)
+      if (raw) {
+        const p = JSON.parse(raw)
+        const m = getModelById(p.modelId)
+        if (m) { setModelId(m.id); setResolution(m.resolutions.includes(p.resolution) ? p.resolution : getDefaultResolution(m.id)); setMounted(true); return }
+      }
+    } catch {}
+    const def = getDefaultModel(feature)
+    setModelId(def.id); setResolution(getDefaultResolution(def.id)); setMounted(true)
+  }, [feature])
+
+  const models = getModelsForFeature(feature)
+  const selected = getModelById(modelId)
+
+  function pick(m: ModelConfig) {
+    if (!m.available) return
+    const res = m.resolutions.includes(resolution) ? resolution : getDefaultResolution(m.id)
+    setModelId(m.id); setResolution(res)
+    try { localStorage.setItem(STORAGE_KEY_PREFIX + feature, JSON.stringify({ modelId: m.id, resolution: res })) } catch {}
+  }
+
+  function pickRes(r: string) {
+    setResolution(r)
+    try { localStorage.setItem(STORAGE_KEY_PREFIX + feature, JSON.stringify({ modelId, resolution: r })) } catch {}
+  }
+
+  if (!mounted) return null
+
+  return (
+    <div>
+      <label className="block text-[11px] font-medium mb-2" style={{ color: "#A0A0A8" }}>{label}</label>
+      <div className="rounded-lg overflow-hidden" style={{ background: "#2A2A2E", border: "1px solid #3A3A3E" }}>
+        {models.map((m, i) => (
+          <button
+            key={m.id}
+            onClick={() => pick(m)}
+            disabled={!m.available}
+            className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+            style={{
+              borderTop: i > 0 ? "1px solid #3A3A3E" : undefined,
+              background: modelId === m.id ? "rgba(99,102,241,0.15)" : "transparent",
+              opacity: m.available ? 1 : 0.35,
+              cursor: m.available ? "pointer" : "not-allowed",
+            }}
+          >
+            <SignalIcon signal={m.signal} available={m.available} size={12} />
+            <span className="text-[11px] flex-1" style={{ color: modelId === m.id ? "#A5B4FC" : "#CCC", fontWeight: modelId === m.id ? 600 : 400 }}>
+              {m.name}
+            </span>
+            {m.audio && (
+              <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(16,185,129,0.2)", color: "#6EE7B7" }}>
+                {t("settings.modelAudio")}
+              </span>
+            )}
+            {!m.available && (
+              <span className="text-[9px] italic" style={{ color: "#666" }}>{t("settings.modelUnavailable")}</span>
+            )}
+          </button>
+        ))}
+      </div>
+      {/* Resolution pills */}
+      {selected && (
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-[10px]" style={{ color: "#666" }}>{t("settings.resolution")}:</span>
+          {selected.resolutions.map(r => (
+            <button
+              key={r}
+              onClick={() => pickRes(r)}
+              className="text-[10px] px-2 py-0.5 rounded-full transition-colors"
+              style={{
+                background: resolution === r ? "rgba(99,102,241,0.3)" : "#2A2A2E",
+                border: resolution === r ? "1px solid rgba(99,102,241,0.5)" : "1px solid #3A3A3E",
+                color: resolution === r ? "#A5B4FC" : "#888",
+              }}
+            >
+              {r}
+            </button>
+          ))}
+          <span className="text-[10px] ml-auto" style={{ color: "#555" }}>
+            {t("settings.modelMaxDur").replace("{n}", String(selected.maxDuration))}
+          </span>
+        </div>
+      )}
+    </div>
   )
 }

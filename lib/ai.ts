@@ -1,14 +1,25 @@
 /**
  * OpenRouter AI 客户端
  * 通过 OpenRouter 路由调用 MiniMax 及其他模型
- * 图像生成: google/gemini-2.5-flash-image (Nano Banana Gemini)
+ * 图像生成: Seedream 4.5 (ByteDance/Volcengine Ark API)
  */
 
 import { jsonrepair } from "jsonrepair"
 import sharp from "sharp"
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-const IMAGE_GEN_MODEL = "google/gemini-2.5-flash-image"
+
+// Seedream 4.5 image generation via Volcengine Ark API
+const SEEDREAM_MODEL = "doubao-seedream-4-5-251128"
+const ARK_IMAGE_BASE = "https://ark.cn-beijing.volces.com/api/v3/images/generations"
+
+// Map aspect ratios to pixel sizes for Seedream 4.5
+// Minimum total pixels: 3,686,400 (≈1920×1920)
+const SEEDREAM_SIZE_MAP: Record<string, string> = {
+  "1:1":  "2048x2048",
+  "9:16": "1440x2560",
+  "16:9": "2560x1440",
+}
 
 export interface AIMessage {
   role: "system" | "user" | "assistant"
@@ -392,37 +403,8 @@ function sanitizePromptForRetry(prompt: string, attempt: number): string {
 }
 
 /**
- * Check if an error is retryable (content policy, rate limit, transient server error).
- * Returns a category string or null if not retryable.
- */
-function classifyImageError(status: number, errorText: string): "content_policy" | "rate_limit" | "server_error" | null {
-  const lower = errorText.toLowerCase()
-
-  // Content policy / safety filter rejections
-  if (
-    lower.includes("safety") ||
-    lower.includes("content policy") ||
-    lower.includes("blocked") ||
-    lower.includes("prohibited") ||
-    lower.includes("harm") ||
-    lower.includes("responsible ai") ||
-    lower.includes("image_generation_blocked") ||
-    lower.includes("finish_reason") ||
-    lower.includes("recitation") ||
-    status === 400
-  ) {
-    return "content_policy"
-  }
-
-  if (status === 429) return "rate_limit"
-  if (status >= 500) return "server_error"
-
-  return null
-}
-
-/**
- * Generate an image via OpenRouter using Google Gemini (Nano Banana).
- * Model: google/gemini-2.5-flash-image
+ * Generate an image via Volcengine Ark API using Seedream 4.5.
+ * Model: doubao-seedream-4-5-251128
  * Returns a base64 data URL: "data:image/png;base64,..."
  *
  * Includes automatic retry with prompt sanitization on content-policy errors
@@ -433,20 +415,21 @@ export async function aiGenerateImage(
   aspectRatio: "1:1" | "9:16" | "16:9" = "1:1",
   _retryCount = 0,
 ): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY
-  if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY")
+  const apiKey = process.env.ARK_API_KEY
+  if (!apiKey) throw new Error("Missing ARK_API_KEY")
 
   const currentPrompt = _retryCount > 0 ? sanitizePromptForRetry(prompt, _retryCount) : prompt
+  const size = SEEDREAM_SIZE_MAP[aspectRatio] || "1024x1024"
 
   if (_retryCount > 0) {
     console.log(`[aiGenerateImage] Retry ${_retryCount}/${IMAGE_GEN_MAX_RETRIES}, sanitized prompt: "${currentPrompt.substring(0, 120)}..."`)
   }
 
-  const body: Record<string, unknown> = {
-    model: IMAGE_GEN_MODEL,
-    messages: [{ role: "user", content: currentPrompt }],
-    modalities: ["image"],
-    image_config: { aspect_ratio: aspectRatio },
+  const body = {
+    model: SEEDREAM_MODEL,
+    prompt: currentPrompt,
+    size,
+    n: 1,
   }
 
   // Image generation can take longer — 90 second timeout
@@ -455,13 +438,11 @@ export async function aiGenerateImage(
 
   let res: Response
   try {
-    res = await fetch(OPENROUTER_API_URL, {
+    res = await fetch(ARK_IMAGE_BASE, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://opendrama.ai",
-        "X-Title": "OpenDrama AI",
       },
       body: JSON.stringify(body),
       signal: imgController.signal,
@@ -483,121 +464,81 @@ export async function aiGenerateImage(
 
   if (!res.ok) {
     const errText = await res.text()
-    const errCategory = classifyImageError(res.status, errText)
+    const lower = errText.toLowerCase()
 
-    if (errCategory && _retryCount < IMAGE_GEN_MAX_RETRIES) {
-      const backoffMs = errCategory === "rate_limit"
-        ? 3000 * Math.pow(2, _retryCount)
-        : errCategory === "server_error"
-          ? 2000 * (_retryCount + 1)
-          : 500 // content_policy — retry quickly with sanitized prompt
-      console.warn(`[aiGenerateImage] ${errCategory} error (${res.status}), waiting ${backoffMs}ms before retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}. Error: ${errText.substring(0, 200)}`)
+    // Classify error for retry
+    const isContentPolicy = lower.includes("sensitive") || lower.includes("blocked") ||
+      lower.includes("content") || lower.includes("safety") || lower.includes("prohibited") ||
+      res.status === 400
+    const isRateLimit = res.status === 429
+    const isServerError = res.status >= 500
+
+    if ((isContentPolicy || isRateLimit || isServerError) && _retryCount < IMAGE_GEN_MAX_RETRIES) {
+      const backoffMs = isRateLimit ? 3000 * Math.pow(2, _retryCount)
+        : isServerError ? 2000 * (_retryCount + 1)
+        : 500 // content_policy — retry quickly with sanitized prompt
+      console.warn(`[aiGenerateImage] Error (${res.status}), waiting ${backoffMs}ms before retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}. Error: ${errText.substring(0, 200)}`)
       await new Promise(r => setTimeout(r, backoffMs))
       return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
     }
 
-    throw new Error(`Gemini image generation error ${res.status}: ${errText}`)
+    throw new Error(`Seedream image generation error ${res.status}: ${errText.substring(0, 500)}`)
   }
 
-  const data = await res.json()
+  const data = await res.json() as {
+    data?: Array<{ url?: string; b64_json?: string }>
+    error?: { message?: string; code?: string }
+  }
 
   if (data.error) {
     const errMsg = data.error.message || JSON.stringify(data.error)
-    const errCategory = classifyImageError(0, errMsg)
-
-    if (errCategory && _retryCount < IMAGE_GEN_MAX_RETRIES) {
-      console.warn(`[aiGenerateImage] ${errCategory} in response body, retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}. Error: ${errMsg.substring(0, 200)}`)
+    if (_retryCount < IMAGE_GEN_MAX_RETRIES) {
+      console.warn(`[aiGenerateImage] Error in response body, retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}. Error: ${errMsg.substring(0, 200)}`)
       await new Promise(r => setTimeout(r, 500))
       return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
     }
-
-    throw new Error(`Gemini image error: ${errMsg}`)
+    throw new Error(`Seedream image error: ${errMsg}`)
   }
 
-  const message = data.choices?.[0]?.message
-
-  // Handle empty response or finish_reason indicating blocked content
-  const finishReason = data.choices?.[0]?.finish_reason || ""
-  if (!message || finishReason === "content_filter" || finishReason === "safety") {
+  // Extract image from response: { data: [{ url: "..." }] } or { data: [{ b64_json: "..." }] }
+  const imageData = data.data?.[0]
+  if (!imageData) {
+    console.error("[aiGenerateImage] No image data in response:", JSON.stringify(data).slice(0, 500))
     if (_retryCount < IMAGE_GEN_MAX_RETRIES) {
-      console.warn(`[aiGenerateImage] Empty/blocked response (finish_reason=${finishReason}), retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}`)
+      console.warn(`[aiGenerateImage] Empty response, retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}`)
       return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
     }
-    throw new Error(`Image generation blocked (finish_reason=${finishReason || "empty"})`)
+    throw new Error("No image data in Seedream response")
   }
 
-  // Parse image from response — OpenRouter may return content as array of parts
-  // or as a direct data URL string
-  const content = message.content
-  let rawResult: string | null = null
+  let rawResult: string
 
-  if (typeof content === "string") {
-    // Direct data URL or base64 string
-    if (content.startsWith("data:")) rawResult = content
-    // Plain base64 without prefix — must look like actual base64 (only base64 chars)
-    // and decode to a meaningful size (>1KB). This prevents text refusals from being
-    // misinterpreted as base64 image data.
-    else if (content.length > 100 && /^[A-Za-z0-9+/=\s]+$/.test(content.substring(0, 200))) {
-      const testBuf = Buffer.from(content.substring(0, 200), "base64")
-      if (testBuf.length > 100) {
-        rawResult = `data:image/png;base64,${content}`
-      } else {
-        console.warn(`[aiGenerateImage] Content looks like text, not base64 (decoded ${testBuf.length} bytes from first 200 chars). Content preview: "${content.substring(0, 120)}"`)
-      }
-    } else if (content.length > 100) {
-      console.warn(`[aiGenerateImage] Content is text, not image data. Preview: "${content.substring(0, 120)}"`)
-    }
-  }
-
-  if (!rawResult && Array.isArray(content)) {
-    for (const part of content) {
-      if (part?.type === "image_url" && part.image_url?.url) {
-        rawResult = part.image_url.url; break
-      }
-      if (part?.type === "image" && part.image?.data) {
-        rawResult = `data:${part.image.media_type || "image/png"};base64,${part.image.data}`; break
-      }
-    }
-  }
-
-  // Fallback: check top-level images array (some OpenRouter formats)
-  if (!rawResult && Array.isArray(message.images)) {
-    const img = message.images[0]
-    if (img?.image_url?.url) rawResult = img.image_url.url
-  }
-
-  if (!rawResult) {
-    console.error("[aiGenerateImage] Unexpected response format:", JSON.stringify(data).slice(0, 500))
-    if (_retryCount < IMAGE_GEN_MAX_RETRIES) {
-      console.warn(`[aiGenerateImage] Unexpected format, retry ${_retryCount + 1}/${IMAGE_GEN_MAX_RETRIES}`)
-      return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
-    }
-    throw new Error("Could not extract image from AI response")
-  }
-
-  // If the model returned an external URL instead of base64 (e.g. signed TOS URL),
-  // fetch it and convert to base64 so callers always get a permanent data URL.
-  if (!rawResult.startsWith("data:")) {
+  if (imageData.b64_json) {
+    // Response contains base64 directly
+    rawResult = `data:image/png;base64,${imageData.b64_json}`
+  } else if (imageData.url) {
+    // Response contains a URL — fetch and convert to base64 for downstream compatibility
     try {
-      const imgRes = await fetch(rawResult)
+      const imgRes = await fetch(imageData.url)
       if (!imgRes.ok) throw new Error(`Failed to fetch image URL: ${imgRes.status}`)
       const buffer = Buffer.from(await imgRes.arrayBuffer())
       const mime = imgRes.headers.get("content-type") || "image/jpeg"
       rawResult = `data:${mime};base64,${buffer.toString("base64")}`
     } catch (fetchErr) {
-      console.warn("[aiGenerateImage] Could not fetch external image URL, storing URL as-is:", fetchErr)
-      return rawResult
+      console.warn("[aiGenerateImage] Could not fetch Seedream image URL, returning URL as-is:", fetchErr)
+      return imageData.url
     }
+  } else {
+    throw new Error("Seedream response missing both url and b64_json")
   }
 
   // Validate the image data is substantial (real images are >10KB, corrupted ones are <1KB)
   if (rawResult.startsWith("data:")) {
     const b64Part = rawResult.split(",")[1]
     if (b64Part) {
-      const decodedSize = Buffer.from(b64Part.substring(0, 2000), "base64").length
       const estimatedTotalSize = Math.floor(b64Part.length * 3 / 4)
       if (estimatedTotalSize < 1024) {
-        console.error(`[aiGenerateImage] Image data too small (${estimatedTotalSize} bytes) — likely corrupted or text response. Retrying...`)
+        console.error(`[aiGenerateImage] Image data too small (${estimatedTotalSize} bytes) — likely corrupted. Retrying...`)
         if (_retryCount < IMAGE_GEN_MAX_RETRIES) {
           return aiGenerateImage(prompt, aspectRatio, _retryCount + 1)
         }

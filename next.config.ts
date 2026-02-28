@@ -20,10 +20,23 @@ const nextConfig: NextConfig = {
   assetPrefix: process.env.NODE_ENV === "production" ? `/${ASSET_VERSION}` : undefined,
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
+      // Google user avatars (OAuth)
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      // Mux video thumbnails
+      { protocol: "https", hostname: "image.mux.com" },
+      // Cloudflare R2 storage
+      { protocol: "https", hostname: "*.r2.dev" },
+      { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
+      // Volcengine video CDN (Seedance / Jimeng)
+      { protocol: "https", hostname: "*.volccdn.com" },
+      { protocol: "https", hostname: "*.byteimg.com" },
+      { protocol: "https", hostname: "*.volcengine.com" },
+      // AI generated images
+      { protocol: "https", hostname: "*.openai.com" },
+      // Fallback wildcard for development only
+      ...(process.env.NODE_ENV === "development"
+        ? [{ protocol: "https" as const, hostname: "**" as const }]
+        : []),
     ],
   },
   async headers() {
