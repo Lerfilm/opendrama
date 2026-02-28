@@ -12,9 +12,13 @@ const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 // Nano Banano 2 image generation via OpenRouter
 const IMAGE_GEN_MODEL = "google/gemini-3.1-flash-image-preview"
 
+export type AIContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+
 export interface AIMessage {
   role: "system" | "user" | "assistant"
-  content: string
+  content: string | AIContentPart[]
 }
 
 export interface AICompletionOptions {
@@ -157,7 +161,9 @@ export async function aiComplete(options: AICompletionOptions): Promise<AIComple
       // Reduce context on retry — and DOUBLE maxTokens to give reasoning models room
       const retryMessages = options.messages.map(m => ({
         ...m,
-        content: m.content.length > 600 ? m.content.substring(0, 600) + "\n[truncated]" : m.content,
+        content: typeof m.content === "string"
+          ? (m.content.length > 600 ? m.content.substring(0, 600) + "\n[truncated]" : m.content)
+          : m.content, // Don't truncate multimodal content
       }))
       const boostedTokens = Math.min((options.maxTokens ?? 1024) * 2, 4096)
       return aiComplete({ ...options, messages: retryMessages, maxTokens: boostedTokens, _retryCount: retryCount + 1 })
