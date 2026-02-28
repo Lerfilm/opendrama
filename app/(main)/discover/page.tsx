@@ -7,6 +7,7 @@ import Image from "next/image"
 import { createT, getLocaleAsync } from "@/lib/i18n"
 import { DiscoverSearch } from "./discover-search"
 import { getGenreGradient } from "@/lib/genre-colors"
+import { resolveImageUrl } from "@/lib/storage"
 
 const GENRES = [
   { key: "all", label: "discover.allGenres" },
@@ -64,8 +65,15 @@ export default async function DiscoverPage({
     take: 30,
   })
 
+  // Resolve R2 image URLs through proxy
+  const resolvedSeries = seriesList.map(s => ({
+    ...s,
+    coverUrl: resolveImageUrl(s.coverUrl),
+    coverTall: resolveImageUrl(s.coverTall),
+  }))
+
   // Get rating stats for all series
-  const seriesIds = seriesList.map(s => s.id)
+  const seriesIds = resolvedSeries.map(s => s.id)
   const ratingStats = await prisma.seriesRating.groupBy({
     by: ["seriesId"],
     where: { seriesId: { in: seriesIds } },
@@ -92,7 +100,7 @@ export default async function DiscoverPage({
   }
 
   // Sort based on tab
-  let sorted = [...seriesList]
+  let sorted = [...resolvedSeries]
   if (tab === "trending") {
     sorted.sort((a, b) => {
       const scoreA = a.viewCount + (likeMap[a.id] || 0) * 2

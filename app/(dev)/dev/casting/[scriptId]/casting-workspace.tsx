@@ -565,7 +565,7 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
 
     aiTasks.startBatchTask({
       type: "generate_all_portraits",
-      label: "Generating Portraits",
+      label: "Generating Turnarounds",
       scriptId: script.id,
       items: targetRoles.map(r => ({ id: r.id, label: r.name })),
       estimatedMsPerItem: 15000,
@@ -696,7 +696,7 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
     })
   }
 
-  // ── Combined auto-generate: Fill Specs → Generate Portraits (for selected roles) ─────
+  // ── Combined auto-generate: Fill Specs → Generate Turnarounds (for selected roles) ──
   function autoGenerateSelected(selectedIds: string[]) {
     if (selectedIds.length === 0) return
     // Phase 1: Fill specs
@@ -1087,7 +1087,7 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
                       {fillTask
                         ? `Specs ${fillTask.done}/${fillTask.total}`
                         : portraitTask
-                        ? `Portraits ${portraitTask.done}/${portraitTask.total}`
+                        ? `Turnarounds ${portraitTask.done}/${portraitTask.total}`
                         : "Starting..."}
                     </span>
                     <div className="w-24 h-1.5 rounded-full overflow-hidden" style={{ background: "#E0E0E0" }}>
@@ -1120,7 +1120,7 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
                   disabled={isAutoGenerating || isFillingAllSpecs || isGeneratingAllPortraits || isGeneratingAllCostumes || selectedRoleIds.size === 0}
                   className="flex items-center gap-1 text-[10px] px-3 py-1.5 rounded disabled:opacity-40 transition-colors font-medium"
                   style={{ background: "#4F46E5", color: "#fff" }}
-                  title={`Auto-fill specs + generate AI portraits for ${selectedRoleIds.size} selected character(s)`}
+                  title={`Auto-fill specs + generate AI turnaround sheets for ${selectedRoleIds.size} selected character(s)`}
                 >
                   {(isFillingAllSpecs || isGeneratingAllPortraits) ? (
                     <><div className="w-2.5 h-2.5 rounded-full border-2 border-white/40 border-t-white animate-spin" /> {isFillingAllSpecs ? "Filling Specs..." : "Generating..."}</>
@@ -1280,7 +1280,7 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
                         onChange={e => updateLocal(selectedRole.id, { description: e.target.value })}
                         onBlur={() => saveRole(selectedRole.id)}
                         rows={4}
-                        placeholder="Personality, backstory, mannerisms, arc... Used by AI to generate the character portrait."
+                        placeholder="Personality, backstory, mannerisms, arc... Used by AI to generate the character turnaround sheet."
                         className="w-full px-2.5 py-2 text-sm rounded focus:outline-none resize-none leading-relaxed"
                         style={{ background: "#fff", border: "1px solid #C8C8C8", color: "#1A1A1A" }} />
                     </div>
@@ -1298,7 +1298,7 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
                           style={{ background: "#EDE9FE", color: "#6D28D9" }}>
                           {generatingFor === selectedRole.id ? (
                             <><div className="w-2.5 h-2.5 rounded-full border border-purple-400 border-t-transparent animate-spin" /> Generating...</>
-                          ) : <>Generate Portrait <span className="text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: "#EDE9FE", color: "#6D28D9" }}>AI</span></>}
+                          ) : <>Generate Turnaround <span className="text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: "#EDE9FE", color: "#6D28D9" }}>AI</span></>}
                         </button>
                         <button onClick={() => { pendingRoleIdRef.current = selectedRole.id; fileInputRef.current?.click() }} disabled={!!uploadingFor}
                           className="text-[11px] px-2.5 py-1 rounded disabled:opacity-50"
@@ -1328,12 +1328,12 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
                           <circle cx="9" cy="9" r="2" />
                           <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
                         </svg>
-                        <p className="text-[11px]" style={{ color: "#BBB" }}>Upload or AI-generate portrait</p>
+                        <p className="text-[11px]" style={{ color: "#BBB" }}>Upload or AI-generate turnaround sheet</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="space-y-2">
                         {selectedRole.referenceImages.filter(img => !brokenImages.has(img)).map((img, i) => (
-                          <div key={img} className="relative group aspect-square rounded overflow-hidden cursor-pointer" style={{ background: "#E0E0E0" }}
+                          <div key={img} className="relative group rounded overflow-hidden cursor-pointer" style={{ background: "#E0E0E0", aspectRatio: "16/9" }}
                             onClick={() => setLightboxImg({ url: img, prompt: selectedRole.imagePromptMap?.[img] })}>
                             <img src={img} alt="" className="w-full h-full object-cover"
                               onError={() => setBrokenImages(prev => new Set([...prev, img]))} />
@@ -1359,11 +1359,12 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
                           </div>
                         ))}
                         <button onClick={() => { pendingRoleIdRef.current = selectedRole.id; fileInputRef.current?.click() }}
-                          className="aspect-square rounded border-2 border-dashed flex items-center justify-center"
+                          className="w-full rounded border-2 border-dashed flex items-center justify-center py-3"
                           style={{ borderColor: "#C8C8C8", background: "#F0F0F0" }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#BBB" }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: "#BBB" }} className="mr-1.5">
                             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                           </svg>
+                          <span className="text-[10px]" style={{ color: "#BBB" }}>Add more reference images</span>
                         </button>
                       </div>
                     )}
@@ -1661,7 +1662,7 @@ export function CastingWorkspace({ script, dialogueStats = {}, characterScenes =
       {showGenerateConfirm && (
         <AIConfirmModal
           featureKey="generate_character"
-          featureLabel="AI Portrait"
+          featureLabel="AI Turnaround Sheet"
           onConfirm={() => { const id = showGenerateConfirm; setShowGenerateConfirm(null); generateCharacterImage(id) }}
           onCancel={() => setShowGenerateConfirm(null)}
         />

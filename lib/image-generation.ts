@@ -11,8 +11,8 @@ import { uploadToStorage, isStorageConfigured, storagePath } from "@/lib/storage
 import { buildStorylineContext, StorylineEntry } from "@/lib/character-analysis"
 
 // ── Constants ─────────────────────────────────────────────────────────────
-/** Max characters for the image prompt sent to Gemini (keeps tokens low) */
-const MAX_IMAGE_PROMPT_CHARS = 500
+/** Max characters for the image prompt sent to Seedream (keeps tokens low) */
+const MAX_IMAGE_PROMPT_CHARS = 700
 
 // ── Helper ─────────────────────────────────────────────────────────────────
 function styleDirective(anchor?: string): string {
@@ -42,7 +42,7 @@ function actionToText(action: string | null | undefined): string {
   return raw
 }
 
-// ── Character Portrait ─────────────────────────────────────────────────────
+// ── Character Portrait (Turnaround Reference Sheet) ───────────────────────
 export async function generateCharacterPortrait(params: {
   userId: string
   name: string
@@ -82,27 +82,42 @@ export async function generateCharacterPortrait(params: {
     : `Ethnicity: not specified — match the character's description; do NOT default to any particular ethnicity.`
 
   const attractivenessNote = isLead
-    ? `CRITICAL: This is a LEAD/PROTAGONIST character — they MUST have a CELEBRITY-LEVEL FACE. Think top-tier movie star: strikingly beautiful or handsome, perfect bone structure, captivating eyes, flawless complexion, the kind of face that commands the screen. This character must look like an A-list celebrity.`
-    : `IMPORTANT: The character should be ATTRACTIVE and GOOD-LOOKING. Think professional actor/actress — beautiful or handsome, with clear skin, expressive eyes, and photogenic features. Even elderly characters should look distinguished, elegant, and charismatic.`
+    ? `CRITICAL: This is a LEAD/PROTAGONIST character — they MUST have a CELEBRITY-LEVEL FACE. Think top-tier movie star: strikingly beautiful or handsome, perfect bone structure, captivating eyes, flawless complexion, the kind of face that commands the screen.`
+    : `IMPORTANT: The character should be ATTRACTIVE and GOOD-LOOKING. Think professional actor/actress — beautiful or handsome, clear skin, expressive eyes, photogenic features. Even elderly characters should look distinguished and elegant.`
 
   const llmResult = await aiComplete({
     messages: [
       {
         role: "system",
-        content: `You are a casting director for short drama productions.
-Generate a HIGHLY photorealistic character portrait prompt in English for AI image generation.
+        content: `You are a character designer for short drama productions.
+Generate a CHARACTER TURNAROUND REFERENCE SHEET prompt in English for AI image generation.
 
-Requirements:
-- 1:1 square portrait, head and shoulders or bust shot
-- Ultra-realistic, 8K, RAW photo quality — NOT illustration, NOT anime, NOT painting
-- Real human actor/actress appearance, pores and skin texture visible
-- Natural face, professional film lighting, shallow depth of field
-- Cinematic film still or professional headshot style
+LAYOUT (16:9 horizontal image, left-to-right):
+- LEFT ~30%: Close-up portrait (head & shoulders), slightly angled 3/4 view, showing face detail
+- RIGHT ~70%: Three FULL-BODY standing poses side by side — FRONT view, RIGHT SIDE PROFILE view, BACK view
+- All four views show the EXACT SAME person wearing the EXACT SAME outfit
+- Clean white or very light gray background, no environment, no props
+
+QUALITY:
+- Ultra-realistic, 8K, RAW photo quality — NOT illustration, NOT anime, NOT painting, NOT cartoon
+- Real human actor/actress appearance, visible skin texture and pores
+- Professional studio lighting, even and clean, no dramatic shadows
+- Sharp focus on all views equally
+
+CHARACTER:
 - ${attractivenessNote}
-- Match the specified ethnicity/appearance exactly — do NOT default to any race if unspecified
-- The character's expression and demeanor should reflect their personality from the scene context
+- Match the specified ethnicity/appearance exactly
+- Expression and demeanor should reflect their personality
+- Outfit must be complete and detailed: fabric texture, accessories, shoes all visible
+- The full-body views must show head to toe, standing naturally
+
+CRITICAL RULES:
+- The prompt MUST include the phrase "character turnaround reference sheet"
+- The prompt MUST mention "white background"
+- The prompt MUST describe "close-up portrait on the left, three full-body views on the right: front view, side view, back view"
+- All views must be of ONE person — absolutely NO variation between views
 ${styleDirective(styleAnchor)}
-- DO NOT include text, watermarks, or logos
+- NO text, NO labels, NO watermarks, NO annotations
 - Output ONLY the image prompt, no explanation`,
       },
       {
@@ -114,16 +129,16 @@ ${ethnicityNote}
 Physical specs: ${specLines || "not specified"}
 Description: ${description || "no description"}
 
-${sceneContext ? `--- SCENE APPEARANCES (use to understand character personality/expression) ---\n${sceneContext}\n---` : ""}
+${sceneContext ? `--- SCENE APPEARANCES (for personality/expression reference) ---\n${sceneContext}\n---` : ""}
 
-Generate a photorealistic portrait prompt:`,
+Generate a turnaround reference sheet prompt:`,
       },
     ],
-    maxTokens: 800,  // Reasoning models (MiniMax M2.5) need ~500 reasoning + ~200 output tokens
+    maxTokens: 800,
   })
 
   const prompt = truncatePrompt(llmResult.content.trim())
-  const b64DataUrl = await aiGenerateImage(prompt, "1:1")
+  const b64DataUrl = await aiGenerateImage(prompt, "16:9")
 
   let imageUrl: string = b64DataUrl
   if (isStorageConfigured()) {
@@ -134,7 +149,7 @@ Generate a photorealistic portrait prompt:`,
         console.error(`[generateCharacterPortrait] Image buffer too small (${buffer.length} bytes) for ${name} — skipping upload`)
         throw new Error(`Corrupted image data (${buffer.length} bytes)`)
       }
-      const path = storagePath(userId, "role-images", `${name}-portrait.png`)
+      const path = storagePath(userId, "role-images", `${name}-turnaround.png`)
       imageUrl = await uploadToStorage("role-images", path, buffer, "image/png")
     } catch (err) {
       console.warn("[generateCharacterPortrait] Storage upload failed, returning data URL:", err)

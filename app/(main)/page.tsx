@@ -37,18 +37,24 @@ export default async function HomePage() {
       coverTall: true,
       coverWide: true,
       genre: true,
+      tags: true,
+      description: true,
+      viewCount: true,
       status: true,
       createdAt: true,
       episodes: {
         select: { id: true },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { viewCount: "desc" },
     take: 20,
   })
 
   const seriesWithCount = seriesList.map((s) => ({
     ...s,
+    coverUrl: resolveImageUrl(s.coverUrl),
+    coverTall: resolveImageUrl(s.coverTall),
+    coverWide: resolveImageUrl(s.coverWide),
     episodeCount: s.episodes.length,
   }))
 
