@@ -129,10 +129,10 @@ function AnimatedSection({ children, className = "", delay = 0 }: { children: Re
 
 // ── AI-Generated Asset URLs ──
 const AI_CARDS = {
-  common: "/api/r2/covers/system/1772283498580-landing_card-common.png",
-  rare: "/api/r2/covers/system/1772283516618-landing_card-rare.png",
-  epic: "/api/r2/covers/system/1772283536267-landing_card-epic.png",
-  legendary: "/api/r2/covers/system/1772283557472-landing_card-legendary.png",
+  common: "/api/r2/covers/system/1772284641542-landing_card-common.png",
+  rare: "/api/r2/covers/system/1772284656234-landing_card-rare.png",
+  epic: "/api/r2/covers/system/1772284671354-landing_card-epic.png",
+  legendary: "/api/r2/covers/system/1772284682912-landing_card-legendary.png",
 }
 
 const AI_PIPELINE = {
@@ -290,8 +290,8 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
                 <Sparkles className="w-4.5 h-4.5 text-white" />
               </div>
               <div>
-                <p className={`text-[11px] font-bold leading-tight ${textColor} transition-colors duration-300`}>AI-Powered</p>
-                <p className={`text-[10px] ${mutedColor} transition-colors duration-300`}>Creation 2026</p>
+                <p className={`text-[11px] font-bold leading-tight ${textColor} transition-colors duration-300`}>{t("home.badgeAIPowered")}</p>
+                <p className={`text-[10px] ${mutedColor} transition-colors duration-300`}>{t("home.badgeAIYear")}</p>
               </div>
             </div>
             <div className="flex items-center gap-2.5">
@@ -303,8 +303,8 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
                 <Code className="w-4.5 h-4.5 text-white" />
               </div>
               <div>
-                <p className={`text-[11px] font-bold leading-tight ${textColor} transition-colors duration-300`}>Open Source</p>
-                <p className={`text-[10px] ${mutedColor} transition-colors duration-300`}>Filmmaking</p>
+                <p className={`text-[11px] font-bold leading-tight ${textColor} transition-colors duration-300`}>{t("home.badgeOpenSource")}</p>
+                <p className={`text-[10px] ${mutedColor} transition-colors duration-300`}>{t("home.badgeFilmmaking")}</p>
               </div>
             </div>
           </div>
@@ -500,10 +500,10 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
         <AnimatedSection className="py-12 px-6">
           <div className="grid grid-cols-2 gap-x-6 gap-y-5 max-w-xs mx-auto">
             {[
-              { quote: "AI filmmaking revolution", source: "TechCrunch" },
-              { quote: "Netflix for creators", source: "Product Hunt" },
-              { quote: "Open-source masterpiece", source: "Hacker News" },
-              { quote: "The future of drama", source: "AI Weekly" },
+              { quote: t("home.pressQuote1"), source: t("home.pressSource1") },
+              { quote: t("home.pressQuote2"), source: t("home.pressSource2") },
+              { quote: t("home.pressQuote3"), source: t("home.pressSource3") },
+              { quote: t("home.pressQuote4"), source: t("home.pressSource4") },
             ].map((item, i) => (
               <div key={i} className="text-center">
                 <p className="text-white/25 text-[9px] uppercase tracking-wider font-bold mb-1">
@@ -548,7 +548,7 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
               <div className="w-8 h-8 rounded-xl bg-rose-500/20 flex items-center justify-center">
                 <Film className="w-4 h-4 text-rose-400" />
               </div>
-              <span className="text-rose-400/60 text-[10px] font-bold uppercase tracking-wider">Watch</span>
+              <span className="text-rose-400/60 text-[10px] font-bold uppercase tracking-wider">{t("home.sectionWatch")}</span>
             </div>
             <h3 className="text-white text-xl font-black leading-tight mb-2">
               {t("home.featureWatchTitle") !== "home.featureWatchTitle" ? t("home.featureWatchTitle") : "Binge-worthy short dramas. Finally!"}
@@ -593,7 +593,7 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
               <div className="w-8 h-8 rounded-xl bg-violet-500/20 flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-violet-400" />
               </div>
-              <span className="text-violet-400/60 text-[10px] font-bold uppercase tracking-wider">AI Creation</span>
+              <span className="text-violet-400/60 text-[10px] font-bold uppercase tracking-wider">{t("home.sectionAICreation")}</span>
             </div>
             <h3 className="text-violet-200 text-xl font-black leading-tight mb-2">
               {t("home.featureAITitle") !== "home.featureAITitle" ? t("home.featureAITitle") : "Script to screen. AI does the rest."}
@@ -603,13 +603,13 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
             </p>
             {/* Pipeline visualization with AI-generated icons */}
             <div className="flex items-start justify-between">
-              <PipelineIcon imgSrc={AI_PIPELINE.script} label="Script" done={true} active={false} />
+              <PipelineIcon imgSrc={AI_PIPELINE.script} label={t("home.pipelineScript")} done={true} active={false} />
               <PipelineArrow />
-              <PipelineIcon imgSrc={AI_PIPELINE.cast} label="Cast" done={true} active={false} />
+              <PipelineIcon imgSrc={AI_PIPELINE.cast} label={t("home.pipelineCast")} done={true} active={false} />
               <PipelineArrow />
-              <PipelineIcon imgSrc={AI_PIPELINE.video} label="Video" done={false} active={true} />
+              <PipelineIcon imgSrc={AI_PIPELINE.video} label={t("home.pipelineVideo")} done={false} active={true} />
               <PipelineArrow />
-              <PipelineIcon imgSrc={AI_PIPELINE.publish} label="Publish" done={false} active={false} />
+              <PipelineIcon imgSrc={AI_PIPELINE.publish} label={t("home.pipelinePublish")} done={false} active={false} />
             </div>
           </div>
         </AnimatedSection>
@@ -621,7 +621,7 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
               <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
                 <Crown className="w-4 h-4 text-amber-400" />
               </div>
-              <span className="text-amber-400/60 text-[10px] font-bold uppercase tracking-wider">Collect</span>
+              <span className="text-amber-400/60 text-[10px] font-bold uppercase tracking-wider">{t("home.sectionCollect")}</span>
             </div>
             <h3 className="text-amber-200 text-xl font-black leading-tight mb-2">
               {t("home.featureCardsTitle") !== "home.featureCardsTitle" ? t("home.featureCardsTitle") : "Collect character cards. Show them off."}
@@ -632,10 +632,10 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
             {/* Card rarity showcase — AI-generated images */}
             <div className="flex gap-2.5">
               {[
-                { rarity: "Common", src: AI_CARDS.common, border: "border-slate-400/30", shadow: "shadow-slate-400/10" },
-                { rarity: "Rare", src: AI_CARDS.rare, border: "border-blue-400/30", shadow: "shadow-blue-400/10" },
-                { rarity: "Epic", src: AI_CARDS.epic, border: "border-purple-400/30", shadow: "shadow-purple-400/10" },
-                { rarity: "Legend", src: AI_CARDS.legendary, border: "border-amber-400/30", shadow: "shadow-amber-400/20" },
+                { rarity: t("home.cardCommon"), src: AI_CARDS.common, border: "border-slate-400/30", shadow: "shadow-slate-400/10" },
+                { rarity: t("home.cardRare"), src: AI_CARDS.rare, border: "border-blue-400/30", shadow: "shadow-blue-400/10" },
+                { rarity: t("home.cardEpic"), src: AI_CARDS.epic, border: "border-purple-400/30", shadow: "shadow-purple-400/10" },
+                { rarity: t("home.cardLegend"), src: AI_CARDS.legendary, border: "border-amber-400/30", shadow: "shadow-amber-400/20" },
               ].map((card, i) => (
                 <div key={i} className="flex-1">
                   <div className={`aspect-[3/4] rounded-xl border ${card.border} shadow-lg ${card.shadow} relative overflow-hidden`}>
@@ -657,7 +657,7 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
               <div className="w-8 h-8 rounded-xl bg-green-500/20 flex items-center justify-center">
                 <Code className="w-4 h-4 text-green-400" />
               </div>
-              <span className="text-green-400/60 text-[10px] font-bold uppercase tracking-wider">Open Source</span>
+              <span className="text-green-400/60 text-[10px] font-bold uppercase tracking-wider">{t("home.sectionOpenSource")}</span>
             </div>
             <h3 className="text-green-300 text-xl font-black leading-tight mb-2">
               {t("home.featureOSSTitle") !== "home.featureOSSTitle" ? t("home.featureOSSTitle") : "100% Open Source. Own your stories."}
@@ -733,10 +733,10 @@ export default function FlightyLanding({ items, userName, availableCoins = 0, is
         <div className="px-6 pb-24 pt-6 border-t border-white/5">
           <div className="text-center space-y-2">
             <p className="text-white/15 text-[11px] tracking-wider uppercase">
-              A LerFilm Production
+              {t("home.footerProduction")}
             </p>
             <p className="text-white/8 text-[10px]">
-              &copy; 2026 OpenDrama. Open source filmmaking for everyone.
+              {t("home.footerCopyright")}
             </p>
           </div>
         </div>
