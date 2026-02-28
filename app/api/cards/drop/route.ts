@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ dropped: false })
     }
 
-    // SECURITY: Cooldown — only allow one drop per episode per 24 hours
+    // SECURITY: Cooldown — only allow one drop per 24 hours
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const recentDrop = await prisma.userCard.findFirst({
       where: {
@@ -52,7 +52,11 @@ export async function POST(req: NextRequest) {
       orderBy: { updatedAt: "desc" },
     })
 
-    // 检查是否触发掉落（观看完成率 > 80%）
+    if (recentDrop) {
+      return NextResponse.json({ dropped: false, cooldown: true })
+    }
+
+    // Check if random drop should trigger (watch completion > 80%)
     if (!shouldDropCard(rate)) {
       return NextResponse.json({ dropped: false })
     }

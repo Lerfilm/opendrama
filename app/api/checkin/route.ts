@@ -98,13 +98,22 @@ export async function POST() {
   const streak = yesterdayCheckIn ? yesterdayCheckIn.streak + 1 : 1
   const reward = getReward(streak)
 
-  // Create check-in record
-  const checkIn = await prisma.dailyCheckIn.create({
-    data: { userId, date: today, reward, streak },
-  })
+  // Create check-in record (handle race condition with try/catch)
+  try {
+    await prisma.dailyCheckIn.create({
+      data: { userId, date: today, reward, streak },
+    })
+  } catch (err: unknown) {
+    // Unique constraint violation — concurrent request already checked in
+    const message = err instanceof Error ? err.message : String(err)
+    if (message.includes("Unique constraint")) {
+      return NextResponse.json({ error: "Already checked in today", alreadyCheckedIn: true }, { status: 400 })
+    }
+    throw err
+  }
 
   // Add coins using addTokens() — properly updates UserBalance,
-  // creates TokenTransaction with correct balanceAfter, and syncs User.coins
+  // creates TokenTransaction with correct balanceAfter
   await addTokens(userId, reward, "bonus", {
     type: "daily_checkin",
     streak,

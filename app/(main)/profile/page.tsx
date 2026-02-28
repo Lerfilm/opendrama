@@ -5,9 +5,10 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Coins, CreditCard, History, Star, Settings, Play, PenTool, Code } from "@/components/icons"
+import { Coins, CreditCard, History, Star, Settings, Play, PenTool, Code, Shield, Monitor } from "@/components/icons"
 import { createT, getLocaleAsync } from "@/lib/i18n"
-// Developer mode is open to all logged-in users
+import { isAdmin } from "@/lib/admin"
+import { isDevModeActive } from "@/lib/developer"
 import prisma from "@/lib/prisma"
 
 export default async function ProfilePage() {
@@ -37,6 +38,10 @@ export default async function ProfilePage() {
   ])
   const availableCoins = userBalance ? userBalance.balance - userBalance.reserved : 0
 
+  // Check admin/dev status
+  const userIsAdmin = isAdmin(session.user?.email)
+  const devModeOn = await isDevModeActive()
+
   const menuSections = [
     {
       title: t("profile.sectionWatching"),
@@ -56,8 +61,16 @@ export default async function ProfilePage() {
       title: t("profile.sectionCreation"),
       items: [
         { icon: PenTool, label: t("studio.myScripts"), href: "/studio", badge: scriptCount > 0 ? `${scriptCount}` : null },
+        ...(devModeOn ? [{ icon: Monitor, label: "Dev Dashboard", href: "/dev", badge: null }] : []),
       ],
     },
+    // Admin section — only visible to admins
+    ...(userIsAdmin ? [{
+      title: "Admin",
+      items: [
+        { icon: Shield, label: "Admin Panel", href: "/admin", badge: null },
+      ],
+    }] : []),
     {
       title: t("profile.sectionSettings"),
       items: [

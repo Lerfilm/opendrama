@@ -76,9 +76,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Create unlock record
-    await prisma.episodeUnlock.create({
-      data: {
+    // Create unlock record (upsert to handle race condition gracefully)
+    await prisma.episodeUnlock.upsert({
+      where: {
+        userId_episodeId: {
+          userId: session.user.id,
+          episodeId,
+        },
+      },
+      update: {}, // already exists — no-op
+      create: {
         userId: session.user.id,
         episodeId,
         coinsCost: episode.unlockCost,

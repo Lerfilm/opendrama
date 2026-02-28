@@ -6,6 +6,16 @@ import Image from "next/image"
 import { Play, Loader2 } from "@/components/icons"
 import { t } from "@/lib/i18n"
 
+/** Client-side R2 URL resolver — rewrites R2.dev URLs to /api/r2/ proxy */
+function resolveImageUrl(url: string | null | undefined): string {
+  if (!url) return ""
+  if (url.startsWith("/api/r2/")) return url
+  if (url.startsWith("data:")) return url
+  const m = url.match(/r2\.dev\/(.+)$/)
+  if (m) return `/api/r2/${m[1]}`
+  return url
+}
+
 interface ContinueItem {
   seriesId: string
   seriesTitle: string
@@ -45,7 +55,7 @@ export default function ContinueWatching() {
             <div className="relative aspect-[2/3] bg-muted rounded-xl overflow-hidden mb-2">
               {item.coverUrl ? (
                 <Image
-                  src={item.coverUrl}
+                  src={resolveImageUrl(item.coverUrl)}
                   alt={item.seriesTitle}
                   fill
                   className="object-cover"

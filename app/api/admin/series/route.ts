@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { requireAdmin } from "@/lib/admin"
+import { isAdmin } from "@/lib/admin"
 import prisma from "@/lib/prisma"
 
 export async function GET(req: NextRequest) {
@@ -10,10 +10,11 @@ export async function GET(req: NextRequest) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+  if (!isAdmin(session.user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   try {
-    requireAdmin(session.user.email)
-
     const seriesList = await prisma.series.findMany({
       include: {
         _count: {
@@ -40,9 +41,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  try {
-    requireAdmin(session.user.email)
+  if (!isAdmin(session.user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
 
+  try {
     const { title, description, coverUrl, status } = await req.json()
 
     if (!title) {

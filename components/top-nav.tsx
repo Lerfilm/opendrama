@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Compass, PenTool, Film, Coins, Sparkles } from "@/components/icons"
+import { Home, Compass, PenTool, Film, Coins, Sparkles, Shield, Monitor } from "@/components/icons"
 import { t } from "@/lib/i18n"
 
 const navKeys = [
@@ -17,6 +17,8 @@ interface UserData {
   name?: string | null
   image?: string | null
   balance?: number
+  isAdmin?: boolean
+  isDevMode?: boolean
 }
 
 export function TopNav() {
@@ -33,6 +35,8 @@ export function TopNav() {
             name: data.userName || null,
             image: data.userImage || null,
             balance: data.available ?? data.balance ?? 0,
+            isAdmin: data.isAdmin ?? false,
+            isDevMode: data.isDevMode ?? false,
           })
         }
       })
@@ -81,6 +85,16 @@ export function TopNav() {
               <Link href="/recharge" className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/15 px-3 py-1.5 rounded-full transition-colors">
                 <Coins className="w-4 h-4 text-amber-500" />
                 <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{userData.balance.toLocaleString()}</span>
+              </Link>
+            )}
+            {userData.isDevMode && (
+              <Link href="/dev" className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors" title="Dev Dashboard">
+                <Monitor className="w-4 h-4 text-emerald-500" />
+              </Link>
+            )}
+            {userData.isAdmin && (
+              <Link href="/admin" className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/10 hover:bg-blue-500/20 transition-colors" title="Admin Panel">
+                <Shield className="w-4 h-4 text-blue-500" />
               </Link>
             )}
             <Link href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
