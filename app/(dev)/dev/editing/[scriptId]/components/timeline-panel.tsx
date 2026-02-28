@@ -90,43 +90,121 @@ export function TimelinePanel({
     }
   }
 
-  // Zoom
+  // Zoom — save previous zoom for backslash toggle
+  const prevZoomRef = useRef<{ pxPerSec: number; scrollLeft: number } | null>(null)
+
   const zoomIn = () => setPxPerSec(p => Math.min(300, p * 1.3))
   const zoomOut = () => setPxPerSec(p => Math.max(2, p / 1.3))
-  const fitAll = () => {
+  const fitAll = useCallback(() => {
     if (scrollRef.current && totalDuration > 0) {
+      // Save current zoom state for toggle
+      prevZoomRef.current = { pxPerSec, scrollLeft: scrollRef.current.scrollLeft }
       setPxPerSec(Math.max(2, Math.min(300, (scrollRef.current.clientWidth - 40) / totalDuration)))
+      scrollRef.current.scrollLeft = 0
     }
-  }
+  }, [totalDuration, pxPerSec])
+
+  const fitToggle = useCallback(() => {
+    if (!scrollRef.current) return
+    if (prevZoomRef.current) {
+      // Restore previous zoom
+      const prev = prevZoomRef.current
+      prevZoomRef.current = null
+      setPxPerSec(prev.pxPerSec)
+      requestAnimationFrame(() => {
+        if (scrollRef.current) scrollRef.current.scrollLeft = prev.scrollLeft
+      })
+    } else {
+      fitAll()
+    }
+  }, [fitAll])
 
   // Auto-fit all segments on mount and when total duration changes
   useEffect(() => {
     if (scrollRef.current && totalDuration > 0) {
       const ideal = (scrollRef.current.clientWidth - 40) / totalDuration
       setPxPerSec(Math.max(2, Math.min(300, ideal)))
+      if (scrollRef.current) scrollRef.current.scrollLeft = 0
     }
   }, [totalDuration])
 
-  // Ctrl+scroll zoom
+  // Alt+scroll zoom (anchored at cursor like Premiere), Shift+scroll horizontal scroll
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     const handler = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return
-      e.preventDefault()
-      setPxPerSec(p => {
-        const factor = e.deltaY > 0 ? 0.9 : 1.1
-        return Math.max(2, Math.min(300, p * factor))
-      })
+      if (e.altKey || e.ctrlKey || e.metaKey) {
+        // Zoom anchored at cursor position
+        e.preventDefault()
+        const rect = el.getBoundingClientRect()
+        const mouseX = e.clientX - rect.left // cursor offset from left edge
+        const cursorTime = (el.scrollLeft + mouseX - 32) / pxPerSec // time at cursor
+
+        const factor = e.deltaY > 0 ? 0.85 : 1.18
+        const newPxPerSec = Math.max(2, Math.min(300, pxPerSec * factor))
+        setPxPerSec(newPxPerSec)
+
+        // Adjust scroll so cursor stays at the same time position
+        requestAnimationFrame(() => {
+          if (el) el.scrollLeft = cursorTime * newPxPerSec - mouseX + 32
+        })
+      } else if (e.shiftKey) {
+        // Horizontal scroll
+        e.preventDefault()
+        el.scrollLeft += e.deltaY
+      }
     }
     el.addEventListener("wheel", handler, { passive: false })
     return () => el.removeEventListener("wheel", handler)
-  }, [])
+  }, [pxPerSec])
 
-  // Ruler ticks
-  const tickInterval = pxPerSec >= 200 ? 1 : pxPerSec >= 80 ? 5 : 10
+  // Keyboard shortcuts: \ for fit toggle, +/- for zoom
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return
+
+      if (e.code === "Backslash") {
+        e.preventDefault()
+        fitToggle()
+      } else if (e.code === "Equal" || e.code === "NumpadAdd") {
+        e.preventDefault()
+        zoomIn()
+      } else if (e.code === "Minus" || e.code === "NumpadSubtract") {
+        e.preventDefault()
+        zoomOut()
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [fitToggle])
+
+  // Page scroll during playback — keep playhead visible
+  useEffect(() => {
+    if (!currentPlayId || !scrollRef.current) return
+    const el = scrollRef.current
+    const viewLeft = el.scrollLeft
+    const viewRight = viewLeft + el.clientWidth
+    const headPx = playheadPx + 32
+
+    // If playhead is near the right edge (within 60px) or past it, page-scroll
+    if (headPx > viewRight - 60) {
+      el.scrollLeft = headPx - 60
+    } else if (headPx < viewLeft + 32) {
+      el.scrollLeft = headPx - 60
+    }
+  }, [playheadPx, currentPlayId])
+
+  // Adaptive ruler ticks (Premiere-style: never overlap labels)
+  // Target: labels ~60px apart minimum
+  const minLabelGapPx = 60
+  const candidateIntervals = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600]
+  let tickInterval = 10
+  for (const iv of candidateIntervals) {
+    if (iv * pxPerSec >= minLabelGapPx) { tickInterval = iv; break }
+  }
   const ticks: number[] = []
-  for (let t = 0; t <= totalDuration; t += tickInterval) ticks.push(t)
+  for (let time = 0; time <= totalDuration + tickInterval; time += tickInterval) ticks.push(time)
 
   // Scene markers
   const sceneMarkers: { time: number; sceneNum: number }[] = []
@@ -266,18 +344,34 @@ export function TimelinePanel({
               onSeekToTime(time)
             }}
           >
-            {ticks.map(sec => (
-              <div
-                key={sec}
-                className="absolute top-0 bottom-0 flex flex-col items-center"
-                style={{ left: sec * pxPerSec }}
-              >
-                <div className="w-px h-2" style={{ background: "#BBB" }} />
-                <span className="text-[7px] font-mono" style={{ color: "#999" }}>
-                  {Math.floor(sec / 60)}:{String(Math.floor(sec % 60)).padStart(2, "0")}
-                </span>
-              </div>
-            ))}
+            {ticks.map(sec => {
+              // Format: show fractional seconds at high zoom, MM:SS at low zoom
+              let label: string
+              if (tickInterval < 1) {
+                label = sec.toFixed(1) + "s"
+              } else if (sec < 60) {
+                label = `0:${String(Math.floor(sec)).padStart(2, "0")}`
+              } else if (sec < 3600) {
+                label = `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`
+              } else {
+                const h = Math.floor(sec / 3600)
+                const m = Math.floor((sec % 3600) / 60)
+                const s = Math.floor(sec % 60)
+                label = `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+              }
+              return (
+                <div
+                  key={sec}
+                  className="absolute top-0 bottom-0 flex flex-col items-center"
+                  style={{ left: sec * pxPerSec }}
+                >
+                  <div className="w-px h-2" style={{ background: "#BBB" }} />
+                  <span className="text-[7px] font-mono" style={{ color: "#999" }}>
+                    {label}
+                  </span>
+                </div>
+              )
+            })}
             {/* Scene markers */}
             {sceneMarkers.map((m, i) => (
               <div

@@ -192,34 +192,6 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* ===== Dev Tools Banner (Desktop only) ===== */}
-      {session?.user && (
-        <div className="hidden md:block px-4 md:px-6 mt-3">
-          <Link href="/developer">
-            <div className="relative bg-gradient-to-r from-slate-800 to-slate-700 rounded-2xl p-4 md:p-5 overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-slate-500/10 transition-shadow group">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-4 translate-x-4" />
-              <div className="relative z-10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                    <Code className="w-4 h-4 text-indigo-400" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-white font-bold text-sm">{t("home.devToolsTitle")}</h3>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-medium uppercase tracking-wider">Desktop</span>
-                    </div>
-                    <p className="text-white/50 text-xs">{t("home.devToolsDesc")}</p>
-                  </div>
-                </div>
-                <svg className="w-5 h-5 text-white/40 group-hover:text-white/70 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </div>
-          </Link>
-        </div>
-      )}
-
       {/* ===== Top Up Banner ===== */}
       <div className="px-4 md:px-6 mt-6">
         <Link href="/recharge">
@@ -429,6 +401,33 @@ export default async function HomePage() {
             <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm">{t("home.noSeries")}</p>
           </div>
+        </div>
+      )}
+
+      {/* ===== Dev Tools Banner (Desktop only) ===== */}
+      {session?.user && (
+        <div className="hidden md:block px-4 md:px-6 mt-6">
+          <Link href="/developer">
+            <div className="relative bg-gradient-to-r from-slate-800 to-slate-700 rounded-2xl p-4 overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-slate-500/10 transition-shadow group">
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                    <Code className="w-4 h-4 text-indigo-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-white/70 font-medium text-xs">{t("home.devToolsTitle")}</h3>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300/60 font-medium uppercase tracking-wider">Desktop</span>
+                    </div>
+                    <p className="text-white/30 text-[11px]">{t("home.devToolsDesc")}</p>
+                  </div>
+                </div>
+                <svg className="w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
+          </Link>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { t } from "@/lib/i18n"
 import { usePreloadVideos } from "./hooks/use-preload-videos"
 import type { Script, VideoSegment } from "./lib/editing-helpers"
@@ -30,6 +30,7 @@ export function EditingWorkspace({ script }: { script: Script }) {
   const [isSequentialPlay, setIsSequentialPlay] = useState(false)
   const [currentSegTime, setCurrentSegTime] = useState(0)
   const [videoVolume, setVideoVolume] = useState(0.8)
+  const [isPaused, setIsPaused] = useState(true) // Start paused like Premiere
 
   // Audio
   const audio = useAudioTrack(script.id, selectedEp)
@@ -82,6 +83,7 @@ export function EditingWorkspace({ script }: { script: Script }) {
   // Handlers
   const handleSequenceEnded = useCallback(() => {
     setIsSequentialPlay(false)
+    setIsPaused(true)
     audio.pause()
   }, [audio])
 
@@ -98,6 +100,7 @@ export function EditingWorkspace({ script }: { script: Script }) {
   const handlePreview = useCallback((seg: VideoSegment) => {
     setPlayingSegId(seg.id)
     setIsSequentialPlay(false)
+    setIsPaused(false) // clicking a clip starts playing it
     setCurrentSegTime(0)
     // Sync audio position
     if (audio.audioUrl) {
@@ -114,6 +117,8 @@ export function EditingWorkspace({ script }: { script: Script }) {
     if (orderedSegs.length === 0) return
     setPlayingSegId(orderedSegs[0].id)
     setIsSequentialPlay(true)
+    setIsPaused(false)
+    setCurrentSegTime(0)
     if (audio.audioUrl) {
       audio.seekTo(0)
       audio.play()
@@ -122,6 +127,7 @@ export function EditingWorkspace({ script }: { script: Script }) {
 
   const handleStopSequence = useCallback(() => {
     setIsSequentialPlay(false)
+    setIsPaused(true)
     audio.pause()
   }, [audio])
 
@@ -308,6 +314,59 @@ export function EditingWorkspace({ script }: { script: Script }) {
   // Preload videos
   const preload = usePreloadVideos(epSegments)
 
+  // Spacebar play/stop toggle (Premiere-style)
+  const handleTogglePlayback = useCallback(() => {
+    if (orderedSegs.length === 0) return
+
+    if (isPaused) {
+      // Resume or start from beginning
+      if (!playingSegId) {
+        // Nothing selected → play from start
+        setPlayingSegId(orderedSegs[0].id)
+        setIsSequentialPlay(true)
+        setCurrentSegTime(0)
+        if (audio.audioUrl) {
+          audio.seekTo(0)
+          audio.play()
+        }
+      } else {
+        // Resume current position, sequential mode
+        setIsSequentialPlay(true)
+        if (audio.audioUrl) audio.play()
+      }
+      setIsPaused(false)
+    } else {
+      // Pause
+      setIsPaused(true)
+      setIsSequentialPlay(false)
+      if (audio.audioUrl) audio.pause()
+    }
+  }, [orderedSegs, isPaused, playingSegId, audio])
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't capture if user is typing in an input
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return
+
+      if (e.code === "Space") {
+        e.preventDefault()
+        handleTogglePlayback()
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault()
+        // Previous segment
+        if (currentPlayIdx > 0) handleSegmentChange(currentPlayIdx - 1)
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault()
+        // Next segment
+        if (currentPlayIdx < orderedSegs.length - 1) handleSegmentChange(currentPlayIdx + 1)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [handleTogglePlayback, currentPlayIdx, orderedSegs.length, handleSegmentChange])
+
   const handleSelectEp = useCallback((ep: number) => {
     setSelectedEp(ep)
     setPlayingSegId(null)
@@ -378,7 +437,7 @@ export function EditingWorkspace({ script }: { script: Script }) {
                 <SeamlessPlayer
                   segments={orderedSegs}
                   currentIdx={currentPlayIdx}
-                  isPlaying={true}
+                  isPlaying={!isPaused}
                   videoVolume={videoVolume}
                   onSegmentChange={handleSegmentChange}
                   onEnded={handleSequenceEnded}
@@ -411,39 +470,41 @@ export function EditingWorkspace({ script }: { script: Script }) {
 
             {/* Playback controls */}
             <div className="flex items-center gap-2 px-3 py-1.5 flex-shrink-0" style={{ background: "#EBEBEB", borderTop: "1px solid #D0D0D0" }}>
+              {/* Play/Pause toggle (Spacebar) */}
               <button
-                onClick={handlePlayAll}
+                onClick={handleTogglePlayback}
                 disabled={orderedSegs.length === 0}
                 className="flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-medium disabled:opacity-40"
-                style={{ background: "#4F46E5", color: "#fff" }}
+                style={{ background: isPaused ? "#4F46E5" : "#DC2626", color: "#fff" }}
+                title="Space"
               >
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                {t("dev.editing.playAll")}
+                {isPaused ? (
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                ) : (
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                )}
+                {isPaused ? t("dev.editing.playAll") : t("dev.editing.stopSequence")}
               </button>
-              {currentPlayIdx >= 0 && (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleSegmentChange(currentPlayIdx - 1)}
-                    disabled={currentPlayIdx <= 0}
-                    className="text-[10px] px-1 py-0.5 rounded disabled:opacity-30"
-                    style={{ background: "#E0E0E0", color: "#555" }}
-                  >◀</button>
-                  <span className="text-[9px] font-mono" style={{ color: "#888" }}>
-                    {currentPlayIdx + 1}/{orderedSegs.length}
-                  </span>
-                  <button
-                    onClick={() => handleSegmentChange(currentPlayIdx + 1)}
-                    disabled={currentPlayIdx >= orderedSegs.length - 1}
-                    className="text-[10px] px-1 py-0.5 rounded disabled:opacity-30"
-                    style={{ background: "#E0E0E0", color: "#555" }}
-                  >▶</button>
-                </div>
-              )}
-              {isSequentialPlay && (
-                <button onClick={handleStopSequence} className="text-[9px] px-2 py-0.5 rounded" style={{ background: "#E8E8E8", color: "#666" }}>
-                  {t("dev.editing.stopSequence")}
-                </button>
-              )}
+              {/* Prev / Next */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleSegmentChange(currentPlayIdx - 1)}
+                  disabled={currentPlayIdx <= 0}
+                  className="text-[10px] px-1 py-0.5 rounded disabled:opacity-30"
+                  style={{ background: "#E0E0E0", color: "#555" }}
+                  title="←"
+                >◀</button>
+                <span className="text-[9px] font-mono" style={{ color: "#888" }}>
+                  {currentPlayIdx >= 0 ? `${currentPlayIdx + 1}/${orderedSegs.length}` : `–/${orderedSegs.length}`}
+                </span>
+                <button
+                  onClick={() => handleSegmentChange(currentPlayIdx + 1)}
+                  disabled={currentPlayIdx >= orderedSegs.length - 1}
+                  className="text-[10px] px-1 py-0.5 rounded disabled:opacity-30"
+                  style={{ background: "#E0E0E0", color: "#555" }}
+                  title="→"
+                >▶</button>
+              </div>
               <div className="flex-1" />
               {playingSeg && (
                 <span className="text-[9px] font-mono" style={{ color: "#888" }}>

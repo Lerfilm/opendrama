@@ -100,6 +100,17 @@ export function SeamlessPlayer({
     if (videoBRef.current) videoBRef.current.volume = videoVolume
   }, [videoVolume])
 
+  // Handle play/pause state changes
+  useEffect(() => {
+    const active = activeBufferRef.current === "A" ? videoARef : videoBRef
+    if (!active.current) return
+    if (isPlaying) {
+      active.current.play().catch(() => {})
+    } else {
+      active.current.pause()
+    }
+  }, [isPlaying])
+
   const handleVideoEnded = useCallback(() => {
     const nextIdx = currentIdx + 1
     if (nextIdx >= segments.length) {
