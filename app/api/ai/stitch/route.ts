@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { aiComplete, extractJSON } from "@/lib/ai"
 import { getAvailableBalance, directDeduction } from "@/lib/tokens"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 /**
  * POST /api/ai/stitch
@@ -15,6 +16,14 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const rl = checkRateLimit(`ai:${session.user.id}`, 20, 60_000)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait a moment." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    )
   }
 
   try {

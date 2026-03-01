@@ -26,8 +26,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id
-        // @ts-ignore - 添加自定义字段
-        session.user.coins = user.coins
       }
       return session
     },

@@ -83,11 +83,6 @@ export async function confirmDeduction(
       },
     })
 
-    // Sync legacy User.coins field
-    await tx.user.update({
-      where: { id: userId },
-      data: { coins: balance.balance },
-    })
   })
 }
 
@@ -122,12 +117,6 @@ export async function directDeduction(
         description: `Consumed ${amount} coins`,
         metadata: metadata as any,
       },
-    })
-
-    // Sync legacy User.coins field
-    await tx.user.update({
-      where: { id: userId },
-      data: { coins: updated.balance },
     })
 
     return true
@@ -201,10 +190,5 @@ export async function addTokens(
       },
     })
 
-    // Also update the legacy User.coins field for backward compatibility
-    await tx.user.update({
-      where: { id: userId },
-      data: { coins: balance.balance },
-    })
   })
 }

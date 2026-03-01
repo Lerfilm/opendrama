@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { requireAdmin } from "@/lib/admin"
+import { isAdmin } from "@/lib/admin"
 import prisma from "@/lib/prisma"
 
 // 更新单集
@@ -14,8 +14,10 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  if (!isAdmin(session.user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
   try {
-    requireAdmin(session.user.email)
     const { id } = await params
     const body = await req.json()
 
@@ -51,8 +53,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  if (!isAdmin(session.user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
   try {
-    requireAdmin(session.user.email)
     const { id } = await params
 
     await prisma.episode.delete({ where: { id } })

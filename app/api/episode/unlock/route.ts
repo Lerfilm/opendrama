@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Atomic balance check + deduction using directDeduction()
-    // Updates UserBalance, creates TokenTransaction audit, and syncs User.coins
+    // Updates UserBalance and creates TokenTransaction audit
     const charged = await directDeduction(
       session.user.id,
       episode.unlockCost,

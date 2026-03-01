@@ -76,13 +76,7 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        // 2. 更新 users.coins（兼容旧字段）
-        await tx.user.update({
-          where: { id: userId },
-          data: { coins: { increment: coins } },
-        })
-
-        // 3. Upsert user_balances（余额 API 读取此表）
+        // 2. Upsert user_balances（余额 API 读取此表）
         const currentBalance = await tx.userBalance.findUnique({
           where: { userId },
         })
@@ -128,10 +122,6 @@ export async function POST(req: NextRequest) {
               totalPurchased: { increment: coins },
               firstChargeBonusUsed: true,
             },
-          })
-          await tx.user.update({
-            where: { id: userId },
-            data: { coins: { increment: coins } },
           })
           await tx.tokenTransaction.create({
             data: {

@@ -5,10 +5,19 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { chargeAiFeatureSilent } from "@/lib/ai-pricing"
 import { generateLocationPhoto } from "@/lib/image-generation"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return Response.json({ error: "Unauthorized" }, { status: 401 })
+
+  const rl = checkRateLimit(`ai:${session.user.id}`, 20, 60_000)
+  if (!rl.allowed) {
+    return Response.json(
+      { error: "Too many requests. Please wait a moment." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    )
+  }
 
   chargeAiFeatureSilent(session.user.id, "generate_location_photo")
 

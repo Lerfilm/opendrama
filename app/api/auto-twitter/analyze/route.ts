@@ -8,7 +8,7 @@
 
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { requireAdmin } from "@/lib/admin"
+import { isAdmin } from "@/lib/admin"
 import { resolveTwitterVideo, downloadVideo, cleanupVideo } from "@/lib/twitter"
 import { extractFrames } from "@/lib/ffmpeg-frames"
 import { aiComplete, extractJSON } from "@/lib/ai"
@@ -17,10 +17,14 @@ import type { AIContentPart } from "@/lib/ai"
 export const maxDuration = 120 // 2 minute timeout for video processing
 
 export async function POST(req: Request) {
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (!isAdmin(session.user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
   try {
-    const session = await auth()
-    requireAdmin(session?.user?.email)
-
     const body = await req.json()
     const { tweetUrl } = body as { tweetUrl: string }
 

@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { checkRateLimit } from "@/lib/rate-limit"
+import { directDeduction } from "@/lib/tokens"
 
 const COST_PER_VIDEO = 10
 
@@ -11,6 +13,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const rl = checkRateLimit(`ai:${session.user.id}`, 20, 60_000)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait a moment." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    )
+  }
+
   try {
     const { prompt, negativePrompt, style, aspectRatio, duration } = await req.json()
 
@@ -18,41 +28,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 })
     }
 
-    // 检查金币余额
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { coins: true },
+    // Check balance and deduct via UserBalance (atomic)
+    const charged = await directDeduction(session.user.id, COST_PER_VIDEO, {
+      feature: "text_to_video",
     })
-
-    if (!user || user.coins < COST_PER_VIDEO) {
+    if (!charged) {
       return NextResponse.json(
         { error: "Insufficient coins" },
         { status: 402 }
       )
     }
 
-    // 扣除金币 + 创建 AI 任务（原子操作）
-    const [, job] = await prisma.$transaction([
-      prisma.user.update({
-        where: { id: session.user.id },
-        data: { coins: { decrement: COST_PER_VIDEO } },
-      }),
-      prisma.aIJob.create({
-        data: {
-          userId: session.user.id,
-          type: "text_to_video",
-          status: "pending",
-          cost: COST_PER_VIDEO,
-          input: JSON.stringify({
-            prompt: prompt.trim(),
-            negativePrompt: negativePrompt?.trim() || "",
-            style: style || "auto",
-            aspectRatio: aspectRatio || "9:16",
-            duration: duration || 5,
-          }),
-        },
-      }),
-    ])
+    // Create AI job
+    const job = await prisma.aIJob.create({
+      data: {
+        userId: session.user.id,
+        type: "text_to_video",
+        status: "pending",
+        cost: COST_PER_VIDEO,
+        input: JSON.stringify({
+          prompt: prompt.trim(),
+          negativePrompt: negativePrompt?.trim() || "",
+          style: style || "auto",
+          aspectRatio: aspectRatio || "9:16",
+          duration: duration || 5,
+        }),
+      },
+    })
 
     // TODO: 调用 Volcengine Seed Dance API
     // 这里需要异步调用视频生成 API，然后通过 webhook 或轮询更新任务状态

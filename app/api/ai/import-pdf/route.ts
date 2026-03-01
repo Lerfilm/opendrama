@@ -8,6 +8,7 @@ import { aiComplete, extractJSON } from "@/lib/ai"
 import { chargeAiFeature, chargeAiFeatureSilent } from "@/lib/ai-pricing"
 import { uploadToStorage, isStorageConfigured } from "@/lib/storage"
 import { extractSceneData, StorylineEntry } from "@/lib/character-analysis"
+import { checkRateLimit } from "@/lib/rate-limit"
 import {
   generateCharacterPortrait,
   generateLocationPhoto,
@@ -310,6 +311,14 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 })
+  }
+
+  const rl = checkRateLimit(`ai:${session.user.id}`, 20, 60_000)
+  if (!rl.allowed) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Please wait a moment." }),
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    )
   }
 
   // ── Per-user lock: prevent same user from running multiple imports ──────

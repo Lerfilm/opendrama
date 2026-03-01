@@ -16,7 +16,6 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  coins         Int       @default(0) // 金币余额
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

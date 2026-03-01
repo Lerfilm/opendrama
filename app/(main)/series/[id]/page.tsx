@@ -125,7 +125,7 @@ export default async function SeriesDetailPage({ params }: Props) {
           .then((u) => u.map((x) => x.episodeId))
       : Promise.resolve([]),
     userId
-      ? prisma.user.findUnique({ where: { id: userId }, select: { coins: true } }).then((u) => u?.coins || 0)
+      ? prisma.userBalance.findUnique({ where: { userId } }).then((b) => Math.max(0, (b?.balance ?? 0) - (b?.reserved ?? 0)))
       : Promise.resolve(0),
     prisma.seriesLike.count({ where: { seriesId: id } }),
     prisma.seriesFavorite.count({ where: { seriesId: id } }),

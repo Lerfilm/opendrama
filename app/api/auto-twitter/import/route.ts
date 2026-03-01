@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { requireAdmin } from "@/lib/admin"
+import { isAdmin } from "@/lib/admin"
 import { aiGenerateImage } from "@/lib/ai"
 import { uploadToStorage, isStorageConfigured, storagePath } from "@/lib/storage"
 import { video } from "@/lib/mux"
@@ -16,10 +16,15 @@ import prisma from "@/lib/prisma"
 export const maxDuration = 180 // 3 minutes for poster gen + Mux upload
 
 export async function POST(req: Request) {
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (!isAdmin(session.user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
   try {
-    const session = await auth()
-    requireAdmin(session?.user?.email)
-    const userId = session!.user!.id as string
+    const userId = session.user.id as string
 
     const body = await req.json()
     const {

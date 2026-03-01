@@ -1,14 +1,18 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { requireAdmin } from "@/lib/admin"
+import { isAdmin } from "@/lib/admin"
 import prisma from "@/lib/prisma"
 
 export async function GET() {
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (!isAdmin(session.user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
   try {
-    const session = await auth()
-    requireAdmin(session?.user?.email)
-
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
     thirtyDaysAgo.setHours(0, 0, 0, 0)
@@ -46,6 +50,7 @@ export async function GET() {
       })),
     })
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 401 })
+    console.error(e)
+    return NextResponse.json({ error: "Failed" }, { status: 500 })
   }
 }

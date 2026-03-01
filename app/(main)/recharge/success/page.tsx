@@ -60,13 +60,7 @@ async function fulfillPayment(sessionId: string, userId: string) {
         },
       })
 
-      // 2. Update users.coins (legacy field)
-      await tx.user.update({
-        where: { id: userId },
-        data: { coins: { increment: coins } },
-      })
-
-      // 3. Upsert user_balances
+      // 2. Upsert user_balances
       const currentBalance = await tx.userBalance.findUnique({
         where: { userId },
       })
@@ -84,7 +78,7 @@ async function fulfillPayment(sessionId: string, userId: string) {
         },
       })
 
-      // 4. Token transaction log
+      // 3. Token transaction log
       await tx.tokenTransaction.create({
         data: {
           userId,
@@ -101,7 +95,7 @@ async function fulfillPayment(sessionId: string, userId: string) {
         },
       })
 
-      // 5. First charge bonus: double coins on first purchase
+      // 4. First charge bonus: double coins on first purchase
       const balanceRecord = await tx.userBalance.findUnique({
         where: { userId },
       })
@@ -113,10 +107,6 @@ async function fulfillPayment(sessionId: string, userId: string) {
             totalPurchased: { increment: coins },
             firstChargeBonusUsed: true,
           },
-        })
-        await tx.user.update({
-          where: { id: userId },
-          data: { coins: { increment: coins } },
         })
         await tx.tokenTransaction.create({
           data: {

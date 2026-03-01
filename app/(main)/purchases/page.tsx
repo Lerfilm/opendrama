@@ -25,10 +25,10 @@ export default async function PurchasesPage() {
     take: 50,
   })
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { coins: true },
+  const userBalance = await prisma.userBalance.findUnique({
+    where: { userId: session.user.id },
   })
+  const availableBalance = Math.max(0, (userBalance?.balance ?? 0) - (userBalance?.reserved ?? 0))
 
   return (
     <div className="p-4 pb-20">
@@ -38,7 +38,7 @@ export default async function PurchasesPage() {
             <p className="text-sm opacity-90 mb-2">{t("purchases.currentBalance")}</p>
             <div className="flex items-center gap-2">
               <Coins className="w-8 h-8" />
-              <span className="text-4xl font-bold">{user?.coins || 0}</span>
+              <span className="text-4xl font-bold">{availableBalance}</span>
             </div>
           </CardContent>
         </Card>

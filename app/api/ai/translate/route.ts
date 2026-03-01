@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -13,6 +14,14 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const rl = checkRateLimit(`ai:${session.user.id}`, 20, 60_000)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait a moment." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    )
   }
 
   try {

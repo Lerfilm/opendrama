@@ -9,11 +9,13 @@ import { t } from "@/lib/i18n"
 interface UserFlags {
   isAdmin: boolean
   isDevMode: boolean
+  isLoggedIn: boolean
 }
 
 export function BottomNav() {
   const pathname = usePathname()
-  const [flags, setFlags] = useState<UserFlags | null>(null)
+  const [flags, setFlags] = useState<UserFlags>({ isAdmin: false, isDevMode: false, isLoggedIn: false })
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     fetch("/api/tokens/balance")
@@ -23,10 +25,16 @@ export function BottomNav() {
           setFlags({
             isAdmin: data.isAdmin ?? false,
             isDevMode: data.isDevMode ?? false,
+            isLoggedIn: true,
           })
+        } else {
+          setFlags({ isAdmin: false, isDevMode: false, isLoggedIn: false })
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setFlags({ isAdmin: false, isDevMode: false, isLoggedIn: false })
+      })
+      .finally(() => setLoaded(true))
   }, [])
 
   // Dark pages use transparent dark nav
@@ -37,11 +45,11 @@ export function BottomNav() {
     { key: "discover", href: "/discover", icon: Compass, label: t("nav.discover"), accent: false },
     { key: "create", href: "/studio", icon: PenTool, label: t("nav.create"), accent: true },
     { key: "cards", href: "/cards", icon: Sparkles, label: t("nav.cards"), accent: false },
-    { key: "profile", href: "/profile", icon: User, label: t("nav.me"), accent: false },
+    { key: "profile", href: loaded && !flags.isLoggedIn ? "/auth/signin" : "/profile", icon: User, label: loaded && !flags.isLoggedIn ? t("common.login") : t("nav.me"), accent: false },
   ]
 
-  const showAdmin = flags?.isAdmin
-  const showDev = flags?.isDevMode
+  const showAdmin = flags.isAdmin
+  const showDev = flags.isDevMode
 
   return (
     <>

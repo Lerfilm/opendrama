@@ -76,10 +76,10 @@ export default async function StudioPage() {
         {/* Pipeline Visualization */}
         <div className="mb-6 flex items-center justify-between px-2">
           {[
-            { icon: PenTool, label: t("studio.pipelineScript"), done: true },
-            { icon: Users, label: t("studio.pipelineCast"), done: true },
-            { icon: Video, label: t("studio.pipelineVideo"), done: false },
-            { icon: Send, label: t("studio.pipelinePublish"), done: false },
+            { icon: PenTool, label: t("studio.pipelineScript"), done: scripts.some(s => s._count.scenes > 0) },
+            { icon: Users, label: t("studio.pipelineCast"), done: scripts.some(s => s._count.roles > 0) },
+            { icon: Video, label: t("studio.pipelineVideo"), done: scripts.some(s => s._count.videoSegments > 0) },
+            { icon: Send, label: t("studio.pipelinePublish"), done: scripts.some(s => s.status === "published") },
           ].map((step, i) => (
             <div key={i} className="flex items-center gap-1">
               <div className="flex flex-col items-center gap-1">

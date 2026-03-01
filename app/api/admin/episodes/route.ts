@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { requireAdmin } from "@/lib/admin"
+import { isAdmin } from "@/lib/admin"
 import prisma from "@/lib/prisma"
 
 // 创建单集
@@ -11,9 +11,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  if (!isAdmin(session.user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
   try {
-    requireAdmin(session.user.email)
-
     const { seriesId, episodeNum, title, description, muxPlaybackId, muxAssetId, duration, unlockCost } = await req.json()
 
     if (!seriesId || !title || episodeNum === undefined) {
