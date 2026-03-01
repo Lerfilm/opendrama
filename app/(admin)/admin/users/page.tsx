@@ -113,11 +113,11 @@ export default function AdminUsersPage() {
           onClick={handleSearch}
           className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
         >
-          Search
+          {t("common.search")}
         </button>
       </div>
 
-      <p className="text-xs text-muted-foreground mb-3">{total} users found</p>
+      <p className="text-xs text-muted-foreground mb-3">{t("admin.users.usersFound", { total: String(total) })}</p>
 
       {/* Table */}
       <div className="rounded-lg border bg-card overflow-hidden">
@@ -135,7 +135,7 @@ export default function AdminUsersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">{t("common.loading")}</td></tr>
             ) : users.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">{t("admin.users.noUsers")}</td></tr>
             ) : (
@@ -186,7 +186,7 @@ export default function AdminUsersPage() {
             disabled={page <= 1}
             className="h-8 px-3 rounded border text-sm disabled:opacity-40"
           >
-            Prev
+            {t("common.prev")}
           </button>
           <span className="text-sm text-muted-foreground">
             {page} / {totalPages}
@@ -196,7 +196,7 @@ export default function AdminUsersPage() {
             disabled={page >= totalPages}
             className="h-8 px-3 rounded border text-sm disabled:opacity-40"
           >
-            Next
+            {t("common.next")}
           </button>
         </div>
       )}
@@ -226,7 +226,7 @@ export default function AdminUsersPage() {
               type="text"
               value={grantNote}
               onChange={(e) => setGrantNote(e.target.value)}
-              placeholder="e.g. Testing bonus"
+              placeholder={t("admin.users.notePlaceholder")}
               className="w-full h-9 px-3 rounded-md border text-sm mb-4 focus:outline-none focus:ring-1 focus:ring-primary"
             />
 

@@ -40,14 +40,14 @@ export default function AdminCardsPage() {
   useEffect(() => { fetchCards() }, [])
 
   async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete card "${name}"? This cannot be undone.`)) return
+    if (!confirm(t("admin.cards.deleteConfirm", { name }))) return
     setDeletingId(id)
     try {
       const res = await fetch(`/api/admin/cards/${id}`, { method: "DELETE" })
       if (res.ok) {
         setCards(prev => prev.filter(c => c.id !== id))
       } else {
-        alert("Delete failed")
+        alert(t("admin.cards.deleteFailed"))
       }
     } finally {
       setDeletingId(null)
@@ -71,19 +71,19 @@ export default function AdminCardsPage() {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search by card name or series..."
+          placeholder={t("admin.cards.searchPlaceholder")}
           className="h-9 px-3 rounded-md border text-sm focus:outline-none focus:ring-1 focus:ring-primary"
           style={{ minWidth: 260 }}
         />
-        <span className="text-sm text-muted-foreground">{filtered.length} cards</span>
+        <span className="text-sm text-muted-foreground">{t("admin.cards.cardCount", { count: filtered.length })}</span>
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-muted-foreground text-sm">Loading...</div>
+        <div className="py-12 text-center text-muted-foreground text-sm">{t("common.loading")}</div>
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center text-muted-foreground">
-            {search ? `No cards matching "${search}"` : t("admin.cards.noCards")}
+            {search ? t("admin.cards.noMatch", { query: search }) : t("admin.cards.noCards")}
           </CardContent>
         </Card>
       ) : (

@@ -17,10 +17,10 @@ const STYLES = [
 ]
 
 const ASPECT_RATIOS = [
-  { id: "16:9", label: "16:9", desc: "横屏" },
-  { id: "9:16", label: "9:16", desc: "竖屏" },
-  { id: "1:1", label: "1:1", desc: "方形" },
-  { id: "4:3", label: "4:3", desc: "经典" },
+  { id: "16:9", label: "16:9", descKey: "t2v.landscape" },
+  { id: "9:16", label: "9:16", descKey: "t2v.portrait" },
+  { id: "1:1", label: "1:1", descKey: "t2v.square" },
+  { id: "4:3", label: "4:3", descKey: "t2v.classic" },
 ]
 
 const DURATIONS = [
@@ -29,7 +29,7 @@ const DURATIONS = [
   { id: 10, label: "10s" },
 ]
 
-const COST_PER_VIDEO = 10 // 每次生成消耗金币
+const COST_PER_VIDEO = 10
 
 export function TextToVideoForm({ userCoins }: { userCoins: number }) {
   const [prompt, setPrompt] = useState("")
@@ -155,7 +155,7 @@ export function TextToVideoForm({ userCoins }: { userCoins: number }) {
                 }`}
               >
                 <div>{ar.label}</div>
-                <div className="text-[10px] opacity-70">{ar.desc}</div>
+                <div className="text-[10px] opacity-70">{t(ar.descKey)}</div>
               </button>
             ))}
           </div>

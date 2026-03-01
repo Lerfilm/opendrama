@@ -146,7 +146,7 @@ export default function AdminFeedbackPage() {
       {/* Feedback list */}
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-12 text-muted-foreground">Loading...</div>
+          <div className="text-center py-12 text-muted-foreground">{t("common.loading")}</div>
         ) : items.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">{t("admin.feedback.noFeedback")}</div>
         ) : (
@@ -258,7 +258,7 @@ export default function AdminFeedbackPage() {
             disabled={page <= 1}
             className="h-8 px-3 rounded border text-sm disabled:opacity-40"
           >
-            Prev
+            {t("common.prev")}
           </button>
           <span className="text-sm text-muted-foreground">
             {page} / {totalPages}
@@ -268,7 +268,7 @@ export default function AdminFeedbackPage() {
             disabled={page >= totalPages}
             className="h-8 px-3 rounded border text-sm disabled:opacity-40"
           >
-            Next
+            {t("common.next")}
           </button>
         </div>
       )}

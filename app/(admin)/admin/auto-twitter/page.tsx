@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Loader2 } from "@/components/icons"
 import Link from "next/link"
+import { t } from "@/lib/i18n"
 
 interface TweetMeta {
   author: string
@@ -102,7 +103,7 @@ export default function AutoTwitterPage() {
   async function handleImport() {
     if (!analyzeData) return
     setStep("importing")
-    setImportStatus("Generating poster...")
+    setImportStatus(t("admin.twitter.generatingPoster"))
 
     try {
       const res = await fetch("/api/auto-twitter/import", {
@@ -153,9 +154,9 @@ export default function AutoTwitterPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Auto-Twitter Import</h1>
+        <h1 className="text-3xl font-bold mb-2">{t("admin.twitter.title")}</h1>
         <p className="text-muted-foreground">
-          Import AI-generated videos from X/Twitter. Paste a tweet URL, analyze the video, and publish to OpenDrama.
+          {t("admin.twitter.desc")}
         </p>
       </div>
 
@@ -163,7 +164,7 @@ export default function AutoTwitterPage() {
       {(step === "input" || step === "analyzing" || step === "error") && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">1. Paste Tweet URL</CardTitle>
+            <CardTitle className="text-lg">{t("admin.twitter.step1")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-3">
@@ -171,7 +172,7 @@ export default function AutoTwitterPage() {
                 type="url"
                 value={tweetUrl}
                 onChange={(e) => setTweetUrl(e.target.value)}
-                placeholder="https://x.com/user/status/123456789"
+                placeholder={t("admin.twitter.urlPlaceholder")}
                 className="flex-1 h-10 px-3 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={step === "analyzing"}
                 onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
@@ -183,10 +184,10 @@ export default function AutoTwitterPage() {
                 {step === "analyzing" ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Analyzing...
+                    {t("admin.twitter.analyzing")}
                   </>
                 ) : (
-                  "Analyze"
+                  t("admin.twitter.analyze")
                 )}
               </Button>
             </div>
@@ -194,7 +195,7 @@ export default function AutoTwitterPage() {
             {step === "analyzing" && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Downloading video, extracting frames, AI analyzing content...
+                {t("admin.twitter.analyzingDesc")}
               </div>
             )}
 
@@ -213,7 +214,7 @@ export default function AutoTwitterPage() {
           {/* Extracted Frames */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">2. Extracted Frames ({analyzeData.durationSec}s video)</CardTitle>
+              <CardTitle className="text-lg">{t("admin.twitter.step2", { sec: analyzeData.durationSec })}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-5 gap-2">
@@ -221,7 +222,7 @@ export default function AutoTwitterPage() {
                   <div key={i} className="relative aspect-video rounded-lg overflow-hidden bg-muted">
                     <img
                       src={frame}
-                      alt={`Frame ${i + 1}`}
+                      alt={t("admin.twitter.frame", { n: i + 1 })}
                       className="w-full h-full object-cover"
                     />
                     <span className="absolute bottom-1 right-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
@@ -239,11 +240,11 @@ export default function AutoTwitterPage() {
           {/* Editable Metadata */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">3. Metadata (editable)</CardTitle>
+              <CardTitle className="text-lg">{t("admin.twitter.step3")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-1 block">Title</label>
+                <label className="text-sm font-medium mb-1 block">{t("admin.twitter.labelTitle")}</label>
                 <input
                   type="text"
                   value={title}
@@ -254,7 +255,7 @@ export default function AutoTwitterPage() {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-1 block">Description</label>
+                <label className="text-sm font-medium mb-1 block">{t("admin.twitter.labelDesc")}</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -266,7 +267,7 @@ export default function AutoTwitterPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Genre</label>
+                  <label className="text-sm font-medium mb-1 block">{t("admin.twitter.labelGenre")}</label>
                   <select
                     value={genre}
                     onChange={(e) => setGenre(e.target.value)}
@@ -281,7 +282,7 @@ export default function AutoTwitterPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Tags</label>
+                  <label className="text-sm font-medium mb-1 block">{t("admin.twitter.labelTags")}</label>
                   <div className="flex flex-wrap gap-1.5">
                     {tags.map((tag, i) => (
                       <Badge key={i} variant="secondary" className="text-xs">
@@ -309,7 +310,7 @@ export default function AutoTwitterPage() {
                     disabled={step === "importing"}
                   />
                   <label htmlFor="generatePoster" className="text-sm font-medium">
-                    Generate AI Poster (9:16)
+                    {t("admin.twitter.generatePoster")}
                   </label>
                 </div>
                 {generatePoster && (
@@ -318,7 +319,7 @@ export default function AutoTwitterPage() {
                     onChange={(e) => setPosterPrompt(e.target.value)}
                     rows={3}
                     className="w-full px-3 py-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                    placeholder="Poster generation prompt..."
+                    placeholder={t("admin.twitter.posterPromptPlaceholder")}
                     disabled={step === "importing"}
                   />
                 )}
@@ -333,21 +334,21 @@ export default function AutoTwitterPage() {
                   {step === "importing" ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Importing...
+                      {t("admin.twitter.importing")}
                     </>
                   ) : (
-                    "Import to OpenDrama"
+                    t("admin.twitter.importBtn")
                   )}
                 </Button>
                 <Button variant="outline" onClick={handleReset} disabled={step === "importing"}>
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </div>
 
               {step === "importing" && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {importStatus || "Processing..."}
+                  {importStatus || t("common.processing")}
                 </div>
               )}
             </CardContent>
@@ -360,23 +361,23 @@ export default function AutoTwitterPage() {
         <Card className="border-green-200 dark:border-green-800">
           <CardContent className="p-6 text-center space-y-4">
             <div className="text-4xl">✅</div>
-            <h2 className="text-xl font-bold">Import Complete!</h2>
+            <h2 className="text-xl font-bold">{t("admin.twitter.importComplete")}</h2>
             <p className="text-muted-foreground">
-              Series "{title}" has been created and published.
+              {t("admin.twitter.seriesCreated", { title })}
             </p>
 
             {importResult.coverUrl && (
               <div className="mx-auto w-32 aspect-[9/16] rounded-lg overflow-hidden bg-muted">
-                <img src={importResult.coverUrl} alt="Generated poster" className="w-full h-full object-cover" />
+                <img src={importResult.coverUrl} alt={t("admin.twitter.posterAlt")} className="w-full h-full object-cover" />
               </div>
             )}
 
             <div className="flex justify-center gap-3">
               <Link href={`/series/${importResult.seriesId}`}>
-                <Button>View Series →</Button>
+                <Button>{t("admin.twitter.viewSeries")}</Button>
               </Link>
               <Button variant="outline" onClick={handleReset}>
-                Import Another
+                {t("admin.twitter.importAnother")}
               </Button>
             </div>
           </CardContent>
@@ -388,14 +389,14 @@ export default function AutoTwitterPage() {
         <Card className="border-destructive">
           <CardContent className="p-6 text-center space-y-4">
             <div className="text-4xl">❌</div>
-            <h2 className="text-xl font-bold">Import Failed</h2>
+            <h2 className="text-xl font-bold">{t("admin.twitter.importFailed")}</h2>
             <p className="text-destructive text-sm">{error}</p>
             <div className="flex justify-center gap-3">
               <Button onClick={() => setStep("review")}>
-                Try Again
+                {t("admin.twitter.tryAgain")}
               </Button>
               <Button variant="outline" onClick={handleReset}>
-                Start Over
+                {t("admin.twitter.startOver")}
               </Button>
             </div>
           </CardContent>
